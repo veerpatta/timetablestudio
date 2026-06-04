@@ -6,6 +6,7 @@ import { TimetableGrid } from "../grid/TimetableGrid";
 import { ViolationsPanel } from "../panels/ViolationsPanel";
 import { TeacherLoadPanel } from "../panels/TeacherLoadPanel";
 import { QuotaPanel } from "../panels/QuotaPanel";
+import { CompleteButton } from "../solverui/CompleteButton";
 
 export function App() {
   const init = useProjectStore((s) => s.init);
@@ -28,9 +29,13 @@ export function App() {
       <header className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-3">
         <div>
           <h1 className="text-lg font-semibold">Timetable Studio</h1>
-          <p className="text-xs text-slate-500">{project.school.name}</p>
+          <p className="text-xs text-slate-500">
+            {project.school.name} · <span className="text-slate-400">{timetable.name}</span>
+          </p>
         </div>
         <div className="flex items-center gap-2 text-sm">
+          <CompleteButton />
+          <span className="mx-1 h-5 w-px bg-slate-200" />
           <button
             type="button"
             onClick={undo}

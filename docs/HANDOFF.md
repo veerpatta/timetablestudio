@@ -6,21 +6,20 @@ This file is the bridge between work sessions. The agent MUST update it after ev
 
 ## Current state
 
-- **Last completed milestone**: M2 — constraint-aware editor. 41 tests green; `npm run build` (68 KB gzip) and `npm run lint` clean. Verified visually in the dev server (ELGA renders as one pinned indigo block P3–P5; no console errors).
-  - `domain/edit.ts` — pure move/pin/remove/add placement ops (immutable).
-  - `store/projectStore.ts` — Project source of truth + debounced IndexedDB autosave + `init()` (load-or-seed-sample).
-  - `store/editorStore.ts` — day/view/selection + undo/redo over immutable snapshots, commits via projectStore.
-  - `ui/grid/gridModel.ts` (pure) + `TimetableGrid.tsx` — class & teacher views, dnd-kit drag-to-move (within a day), click-to-pin, per-cell hard/soft conflict overlay.
-  - `ui/panels/` — ViolationsPanel, TeacherLoadPanel, QuotaPanel. `ui/app/App.tsx` shell + `hooks.ts` (memoized derived data).
-  - All four M2 AC proven by tests: Kusum-vs-ELGA → H1 instantly (store + jsdom App test); ELGA block moves 15 cells atomically; undo restores exact prior Project (`toEqual`); IndexedDB save→load restores (fake-indexeddb).
-  - M1 carryover still green (derive/validate/legacy bridge/persistence/fixture).
-- **In-progress milestone**: M3 (not started)
-- **Tests**: green — 41 tests across 10 files
-- **Build**: green — typechecks + builds (68 KB gzip)
+- **Last completed milestone**: M3 — auto-complete solver. 53 tests green; `npm run build` (69 KB gzip main + 12 KB worker chunk) and `npm run lint` clean. Verified end-to-end in the dev server: clicking "Complete" runs the worker, applies a new feasible "Auto-completed (seed 1)" draft, ELGA pins preserved, no console errors.
+  - `solver/prng.ts` (mulberry32 + seeded shuffle), `solver/types.ts`, `solver/score.ts` (hard×10000 + soft S1–S6 weighted), `solver/engine.ts` (seeded backtracking, dynamic MCV, fill-only complete mode, budgets, cancel).
+  - `domain/requirements.ts` — derive requirements + canonical lessons from a timetable; `normalizeProject`. `makeSampleProject` now returns the normalized sample.
+  - `worker/protocol.ts` + `worker/solver.worker.ts` (message protocol); `ui/solverui/runSolver.ts` (worker wrapper, cancel = terminate) + `CompleteButton.tsx`; `projectStore.addDraft` (apply result as a new draft, never overwrite).
+  - ORACLE FIX: `validate` H1/H2 now count raw occupancies (was deduping by activityId) — required by the canonical-lesson-placed-N-times model. Regression test added.
+  - All M3 AC proven by tests: 30%-cleared fixture → 0 hard via the real `validate()` in ~15 ms (<5 s); deterministic per seed (`toEqual`); cancel returns promptly + incomplete; pins (ELGA) preserved.
+  - M0–M2 carryover still green.
+- **In-progress milestone**: M4 (not started)
+- **Tests**: green — 53 tests across 14 files
+- **Build**: green — typechecks + builds (69 KB gzip main, separate worker chunk)
 
 ## Next action
 
-Start M3 (auto-complete solver): implement `solver/types.ts`, `solver/score.ts` (soft S1–S6 + hard×10000, CONSTRAINTS.md § Scoring), `solver/engine.ts` (seeded mulberry32 PRNG; place blocks first; backtracking with most-constrained-variable ordering + seed-randomized value order; min-conflicts repair; `maxMillis`/`maxIterations` budgets; H10 = freeze `pinned` placements). Then `worker/solver.worker.ts` message protocol (ARCHITECTURE.md) and `ui/solverui/` "Complete this timetable" button with progress + cancel; apply results as a NEW draft timetable (never overwrite). First concrete step: `solver/engine.ts` `solve(project, timetableId, {mode:"complete", seed, maxMillis})` returning `{placements, score, violations, seed}`, with a Vitest (Node, no worker) test: VPPS fixture, ELGA pinned, ~30% cells cleared → 0 hard violations in < 5 s, deterministic per seed. NOTE: `requirements.curriculum` is empty on the sample — M3 needs requirement data to know what to place. Define fixture requirements derived from the sample's existing lessons (each placed lesson ⇒ its class/subject/teacher quota) so "clear 30% then re-complete" is well-posed; mark as fixture-derived, not owner-authoritative.
+Start M4 (full generation + candidate compare): use the existing `solver` "generate" mode (base = pinned only, variables = full periodsPerWeek per requirement — already implemented, needs UI). Generate N candidates from different seeds (run the worker N times or one worker sequentially), show side-by-side scores + violation diff, let the user pick one as the active timetable. Add a soft-constraint weight editor (S1–S6) that feeds `SoftWeights` into `scoreTimetable` so changing weights re-ranks candidates deterministically. First concrete step: a `solver` test proving 3 seeds produce 3 feasible, visibly-different candidates for the normalized fixture, then `ui/solverui/CandidateCompare.tsx` + a weights store. NOTE: confirm "generate" mode reaches 0 hard on the normalized sample (only Mon/Tue, primary classes are tightly packed — generate from only-pinned may need the full backtracker to succeed; if it struggles, keep complete-mode semantics and seed diversity via value ordering). Soft amber badges in the editor can also be wired now (scoreTimetable already returns soft Violation[]).
 
 ## Mid-milestone notes (empty if between milestones)
 
@@ -39,7 +38,9 @@ Start M3 (auto-complete solver): implement `solver/types.ts`, `solver/score.ts` 
 
 - `domain/legacyImport.ts` — block detection is keyed on the literal "ELGA" subject token; generalize only if a second block type appears (DECISIONS).
 - No real `rawData` snapshot — `fixtures/legacyRaw.sample.ts` is synthetic-but-faithful; replace/augment when the owner provides one.
-- `requirements.curriculum` is empty on import — quotas (H7/H8) inert until the owner supplies per-class subject quotas (Open question 1).
+- Solver requirements are FIXTURE-DERIVED (`deriveRequirements` reads them off the sample timetable), not owner-authoritative quotas. Replace with real per-class subject quotas when the owner provides them (Open question 1). `maxPerDay` is inferred as `max(2, observed/day)`.
+- Soft constraints (S1–S6) are computed in `solver/score.ts` but NOT yet shown as amber badges in the editor, and weights are fixed defaults (weight editor is M4).
+- "generate" mode exists but its 0-hard feasibility on the normalized sample is unverified (M4); only "complete" mode is covered by tests.
 
 ---
 

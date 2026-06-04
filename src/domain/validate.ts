@@ -54,8 +54,10 @@ function checkTeacherClash(maps: DerivedMaps, look: NameLookups): Violation[] {
   const out: Violation[] = [];
   for (const [teacherId, slots] of maps.teacherCells) {
     for (const [, occ] of slots) {
-      const acts = [...new Set(occ.map((o) => o.activityId))];
-      if (acts.length > 1) {
+      // Each placement contributes exactly one teacher occupancy per slot, so
+      // >1 occupancy == >1 placement here == a clash (incl. two placements of
+      // the same canonical lesson, or two overlapping blocks).
+      if (occ.length > 1) {
         const { day, period } = occ[0]!;
         out.push({
           constraintId: "H1",
@@ -63,7 +65,7 @@ function checkTeacherClash(maps: DerivedMaps, look: NameLookups): Violation[] {
           message: `${tName(look, teacherId)} is double-booked at ${slotLabel(
             day,
             period,
-          )} (${acts.length} activities).`,
+          )} (${occ.length} activities).`,
           slots: [{ teacherId, day, period }],
         });
       }
@@ -77,13 +79,12 @@ function checkClassClash(maps: DerivedMaps, look: NameLookups): Violation[] {
   const out: Violation[] = [];
   for (const [classId, slots] of maps.classCells) {
     for (const [, occ] of slots) {
-      const acts = [...new Set(occ.map((o) => o.activityId))];
-      if (acts.length > 1) {
+      if (occ.length > 1) {
         const { day, period } = occ[0]!;
         out.push({
           constraintId: "H2",
           severity: "hard",
-          message: `${cName(look, classId)} has ${acts.length} activities at ${slotLabel(
+          message: `${cName(look, classId)} has ${occ.length} activities at ${slotLabel(
             day,
             period,
           )}.`,

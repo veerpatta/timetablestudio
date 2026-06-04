@@ -61,8 +61,13 @@ export function expandPlacement(
   activity: Activity,
 ): { classCells: ClassOccupancy[]; teacherCells: TeacherOccupancy[] } {
   const periods = occupiedPeriods(activity, placement.period);
-  const classIds = activity.kind === "block" ? activity.classIds : [activity.classId];
-  const teacherIds = activity.teacherIds;
+  // De-dupe ids within ONE activity so each placement contributes at most one
+  // occupancy per (entity, slot). Clash detection then reduces to "more than one
+  // occupancy in a slot" without false positives from a malformed id list.
+  const classIds = [
+    ...new Set(activity.kind === "block" ? activity.classIds : [activity.classId]),
+  ];
+  const teacherIds = [...new Set(activity.teacherIds)];
 
   const classCells: ClassOccupancy[] = [];
   for (const classId of classIds) {

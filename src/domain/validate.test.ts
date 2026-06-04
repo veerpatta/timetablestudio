@@ -71,6 +71,17 @@ describe("validate — individual hard constraints", () => {
     expect(ids(validate(p, p.timetables[0]!))).toContain("H2");
   });
 
+  it("H1+H2: two placements of the SAME canonical lesson in one slot clash", () => {
+    // Regression: clash detection must count occupancies, not dedupe by id —
+    // the requirement model places one lesson activity many times.
+    const p = elgaFixture();
+    p.activities.push(lesson("canon", "c1", "Maths", ["Bindu"]));
+    p.timetables[0]!.placements = [place("canon", "Tue", 1), place("canon", "Tue", 1)];
+    const got = ids(validate(p, p.timetables[0]!));
+    expect(got).toContain("H1");
+    expect(got).toContain("H2");
+  });
+
   it("H3: a degenerate block (no teachers) is flagged", () => {
     const p = elgaFixture();
     const block = p.activities[0];
