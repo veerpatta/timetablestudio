@@ -6,18 +6,17 @@ This file is the bridge between work sessions. The agent MUST update it after ev
 
 ## Current state
 
-- **Last completed milestone**: M4 — full generation + candidate compare. 60 tests green; `npm run build` (71 KB gzip main + worker chunk) and `npm run lint` clean. Verified end-to-end in the dev server: "Generate…" produces 3 feasible distinct candidates (scores 96/143/148), cranking the S1 weight re-ranks them (2↔3 flip), "Use" applies the pick as the active "Generated (seed 1)" draft; no console errors.
-  - `solver` "generate" mode (base = pinned only) already existed; M4 added `generate.test.ts` (3 seeds → 3 feasible visibly-different candidates on a roomy 6-day variant) + a deterministic weight-flip test in `score.test.ts`.
-  - `store/weightsStore.ts` (SoftWeights, defaults from CONSTRAINTS.md) + `ui/solverui/WeightEditor.tsx`.
-  - `ui/solverui/CandidateCompare.tsx` — modal: generate N candidates via the worker, RE-SCORE on the main thread with live weights (instant re-rank), pick → `addDraft` active. Wired into the App toolbar ("Generate…").
-  - M0–M3 carryover still green (incl. M3 oracle fix, solver, editor, legacy bridge).
-- **In-progress milestone**: M5 (not started)
-- **Tests**: green — 60 tests across 16 files
-- **Build**: green — typechecks + builds (71 KB gzip main, separate worker chunk)
+- **Last completed milestone**: M5 — substitution assistant. 64 tests green; `npm run build` (73 KB gzip main + worker chunk) and `npm run lint` clean. Verified end-to-end in the dev server: marking Kusum absent on Mon flags the ELGA block "OWNER DECISION" (no auto-cover) and proposes Rakesh/Anjana for her other lessons (honest "no free qualified teacher" for EVS); no console errors.
+  - `domain/substitution.ts` (PURE, read-only): `proposeSubstitutions(project, timetableId, {day, absentTeacherIds})` → per-slot cover items. ELGA/block → `owner-decision` (zero candidates); single-teacher lesson → `needs-cover` ranked by S1/S4; co-taught lesson → `partial`.
+  - `ui/substitution/SubstitutionView.tsx` — modal: pick day + absent teachers, see the plan, print day sheet. `@media print` rules in index.css print only the sheet (App shell wrapped in `.app-shell`). Wired into toolbar ("Substitutions").
+  - M0–M4 carryover still green.
+- **In-progress milestone**: M6 (not started)
+- **Tests**: green — 64 tests across 17 files
+- **Build**: green — typechecks + builds (73 KB gzip main, separate worker chunk)
 
 ## Next action
 
-Start M5 (substitution assistant): mark teacher(s) absent for a date; engine proposes per-period covers from FREE, QUALIFIED teachers, respecting H1/H5/H9 and minimizing S1/S4 disruption; output a printable day sheet. AC: marking any one primary teacher absent on an ELGA day flags the ELGA block as needing an explicit owner decision (cannot auto-cover an ELGA level silently). First concrete step: a pure `domain/substitution.ts` (or `solver/substitute.ts`) `proposeSubstitutions(project, timetableId, { day, absentTeacherIds })` returning per-(class,period) cover suggestions + an `elgaConflict` flag when an absent teacher is in a block placed that day. Test the ELGA-absent → needs-owner-decision case first (it's the AC), then free/qualified candidate ranking by S1/S4 disruption. Then a `ui/` substitution view + print stylesheet (print stylesheet also feeds M6). NOTE: substitution is read-only over an existing timetable — do NOT mutate the draft; produce a separate cover plan.
+Start M6 (ship): (1) Export UI — legacy rawData (copy-to-clipboard + file download via `exportLegacyRawData`) for the existing viewer, JSON backup (`serializeProject` + download, `suggestFilename`), and import (file picker → `deserializeProject` / `importLegacyRawData`); print stylesheet for the timetable grid (extend the M5 `@media print` scaffolding to print the grid). (2) PWA — `manifest.webmanifest` + a cache-first service worker (hand-rolled or `vite-plugin-pwa`; if adding the plugin, justify it — else write a tiny SW + manifest by hand to stay dependency-light) registered in `main.tsx`, offline-capable shell. (3) Deploy — a GitHub Pages Actions workflow building `dist/` (note `base: "./"` is already set in vite.config), documented in README. AC: Lighthouse PWA installable; full flow works offline; exported rawData pasted into the legacy viewer renders correctly. First concrete step: an Export/Import panel or modal using the already-tested `legacyExport`/`projectFile` functions (download via Blob + anchor), then the manifest + SW, then the Pages workflow. NOTE: prefer a hand-rolled SW (no new dep) caching the built assets (cache-first for the app shell); keep it tiny.
 
 ## Mid-milestone notes (empty if between milestones)
 

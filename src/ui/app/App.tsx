@@ -8,11 +8,13 @@ import { TeacherLoadPanel } from "../panels/TeacherLoadPanel";
 import { QuotaPanel } from "../panels/QuotaPanel";
 import { CompleteButton } from "../solverui/CompleteButton";
 import { CandidateCompare } from "../solverui/CandidateCompare";
+import { SubstitutionView } from "../substitution/SubstitutionView";
 
 export function App() {
   const init = useProjectStore((s) => s.init);
   const derived = useDerived();
   const [showGenerate, setShowGenerate] = useState(false);
+  const [showSubs, setShowSubs] = useState(false);
   const { selectedDay, viewMode, past, future } = useEditorStore();
   const { setSelectedDay, setViewMode, undo, redo } = useEditorStore.getState();
 
@@ -28,6 +30,7 @@ export function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
+      <div className="app-shell">
       <header className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-3">
         <div>
           <h1 className="text-lg font-semibold">Timetable Studio</h1>
@@ -43,6 +46,13 @@ export function App() {
             className="rounded bg-indigo-600 px-3 py-1 font-medium text-white hover:bg-indigo-700"
           >
             ⚖ Generate…
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowSubs(true)}
+            className="rounded border border-slate-300 px-3 py-1 hover:bg-slate-50"
+          >
+            🧑‍🏫 Substitutions
           </button>
           <span className="mx-1 h-5 w-px bg-slate-200" />
           <button
@@ -116,8 +126,10 @@ export function App() {
           <QuotaPanel project={project} quota={quota} />
         </aside>
       </main>
+      </div>
 
       {showGenerate && <CandidateCompare onClose={() => setShowGenerate(false)} />}
+      {showSubs && <SubstitutionView onClose={() => setShowSubs(false)} />}
     </div>
   );
 }

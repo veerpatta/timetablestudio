@@ -1,3 +1,22 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Print: show only the substitution day sheet (or whatever is marked printable). */
+@media print {
+  .app-shell,
+  .no-print {
+    display: none !important;
+  }
+  .modal-overlay {
+    position: static !important;
+    overflow: visible !important;
+    background: none !important;
+    padding: 0 !important;
+  }
+  .modal-card {
+    box-shadow: none !important;
+    max-width: none !important;
+    width: 100% !important;
+  }
+}
