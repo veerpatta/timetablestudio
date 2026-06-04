@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useProjectStore } from "../../store/projectStore";
 import { useEditorStore } from "../../store/editorStore";
 import { useDerived } from "./hooks";
@@ -7,10 +7,12 @@ import { ViolationsPanel } from "../panels/ViolationsPanel";
 import { TeacherLoadPanel } from "../panels/TeacherLoadPanel";
 import { QuotaPanel } from "../panels/QuotaPanel";
 import { CompleteButton } from "../solverui/CompleteButton";
+import { CandidateCompare } from "../solverui/CandidateCompare";
 
 export function App() {
   const init = useProjectStore((s) => s.init);
   const derived = useDerived();
+  const [showGenerate, setShowGenerate] = useState(false);
   const { selectedDay, viewMode, past, future } = useEditorStore();
   const { setSelectedDay, setViewMode, undo, redo } = useEditorStore.getState();
 
@@ -35,6 +37,13 @@ export function App() {
         </div>
         <div className="flex items-center gap-2 text-sm">
           <CompleteButton />
+          <button
+            type="button"
+            onClick={() => setShowGenerate(true)}
+            className="rounded bg-indigo-600 px-3 py-1 font-medium text-white hover:bg-indigo-700"
+          >
+            ⚖ Generate…
+          </button>
           <span className="mx-1 h-5 w-px bg-slate-200" />
           <button
             type="button"
@@ -107,6 +116,8 @@ export function App() {
           <QuotaPanel project={project} quota={quota} />
         </aside>
       </main>
+
+      {showGenerate && <CandidateCompare onClose={() => setShowGenerate(false)} />}
     </div>
   );
 }

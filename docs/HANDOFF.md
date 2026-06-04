@@ -6,20 +6,18 @@ This file is the bridge between work sessions. The agent MUST update it after ev
 
 ## Current state
 
-- **Last completed milestone**: M3 — auto-complete solver. 53 tests green; `npm run build` (69 KB gzip main + 12 KB worker chunk) and `npm run lint` clean. Verified end-to-end in the dev server: clicking "Complete" runs the worker, applies a new feasible "Auto-completed (seed 1)" draft, ELGA pins preserved, no console errors.
-  - `solver/prng.ts` (mulberry32 + seeded shuffle), `solver/types.ts`, `solver/score.ts` (hard×10000 + soft S1–S6 weighted), `solver/engine.ts` (seeded backtracking, dynamic MCV, fill-only complete mode, budgets, cancel).
-  - `domain/requirements.ts` — derive requirements + canonical lessons from a timetable; `normalizeProject`. `makeSampleProject` now returns the normalized sample.
-  - `worker/protocol.ts` + `worker/solver.worker.ts` (message protocol); `ui/solverui/runSolver.ts` (worker wrapper, cancel = terminate) + `CompleteButton.tsx`; `projectStore.addDraft` (apply result as a new draft, never overwrite).
-  - ORACLE FIX: `validate` H1/H2 now count raw occupancies (was deduping by activityId) — required by the canonical-lesson-placed-N-times model. Regression test added.
-  - All M3 AC proven by tests: 30%-cleared fixture → 0 hard via the real `validate()` in ~15 ms (<5 s); deterministic per seed (`toEqual`); cancel returns promptly + incomplete; pins (ELGA) preserved.
-  - M0–M2 carryover still green.
-- **In-progress milestone**: M4 (not started)
-- **Tests**: green — 53 tests across 14 files
-- **Build**: green — typechecks + builds (69 KB gzip main, separate worker chunk)
+- **Last completed milestone**: M4 — full generation + candidate compare. 60 tests green; `npm run build` (71 KB gzip main + worker chunk) and `npm run lint` clean. Verified end-to-end in the dev server: "Generate…" produces 3 feasible distinct candidates (scores 96/143/148), cranking the S1 weight re-ranks them (2↔3 flip), "Use" applies the pick as the active "Generated (seed 1)" draft; no console errors.
+  - `solver` "generate" mode (base = pinned only) already existed; M4 added `generate.test.ts` (3 seeds → 3 feasible visibly-different candidates on a roomy 6-day variant) + a deterministic weight-flip test in `score.test.ts`.
+  - `store/weightsStore.ts` (SoftWeights, defaults from CONSTRAINTS.md) + `ui/solverui/WeightEditor.tsx`.
+  - `ui/solverui/CandidateCompare.tsx` — modal: generate N candidates via the worker, RE-SCORE on the main thread with live weights (instant re-rank), pick → `addDraft` active. Wired into the App toolbar ("Generate…").
+  - M0–M3 carryover still green (incl. M3 oracle fix, solver, editor, legacy bridge).
+- **In-progress milestone**: M5 (not started)
+- **Tests**: green — 60 tests across 16 files
+- **Build**: green — typechecks + builds (71 KB gzip main, separate worker chunk)
 
 ## Next action
 
-Start M4 (full generation + candidate compare): use the existing `solver` "generate" mode (base = pinned only, variables = full periodsPerWeek per requirement — already implemented, needs UI). Generate N candidates from different seeds (run the worker N times or one worker sequentially), show side-by-side scores + violation diff, let the user pick one as the active timetable. Add a soft-constraint weight editor (S1–S6) that feeds `SoftWeights` into `scoreTimetable` so changing weights re-ranks candidates deterministically. First concrete step: a `solver` test proving 3 seeds produce 3 feasible, visibly-different candidates for the normalized fixture, then `ui/solverui/CandidateCompare.tsx` + a weights store. NOTE: confirm "generate" mode reaches 0 hard on the normalized sample (only Mon/Tue, primary classes are tightly packed — generate from only-pinned may need the full backtracker to succeed; if it struggles, keep complete-mode semantics and seed diversity via value ordering). Soft amber badges in the editor can also be wired now (scoreTimetable already returns soft Violation[]).
+Start M5 (substitution assistant): mark teacher(s) absent for a date; engine proposes per-period covers from FREE, QUALIFIED teachers, respecting H1/H5/H9 and minimizing S1/S4 disruption; output a printable day sheet. AC: marking any one primary teacher absent on an ELGA day flags the ELGA block as needing an explicit owner decision (cannot auto-cover an ELGA level silently). First concrete step: a pure `domain/substitution.ts` (or `solver/substitute.ts`) `proposeSubstitutions(project, timetableId, { day, absentTeacherIds })` returning per-(class,period) cover suggestions + an `elgaConflict` flag when an absent teacher is in a block placed that day. Test the ELGA-absent → needs-owner-decision case first (it's the AC), then free/qualified candidate ranking by S1/S4 disruption. Then a `ui/` substitution view + print stylesheet (print stylesheet also feeds M6). NOTE: substitution is read-only over an existing timetable — do NOT mutate the draft; produce a separate cover plan.
 
 ## Mid-milestone notes (empty if between milestones)
 
@@ -39,8 +37,8 @@ Start M4 (full generation + candidate compare): use the existing `solver` "gener
 - `domain/legacyImport.ts` — block detection is keyed on the literal "ELGA" subject token; generalize only if a second block type appears (DECISIONS).
 - No real `rawData` snapshot — `fixtures/legacyRaw.sample.ts` is synthetic-but-faithful; replace/augment when the owner provides one.
 - Solver requirements are FIXTURE-DERIVED (`deriveRequirements` reads them off the sample timetable), not owner-authoritative quotas. Replace with real per-class subject quotas when the owner provides them (Open question 1). `maxPerDay` is inferred as `max(2, observed/day)`.
-- Soft constraints (S1–S6) are computed in `solver/score.ts` but NOT yet shown as amber badges in the editor, and weights are fixed defaults (weight editor is M4).
-- "generate" mode exists but its 0-hard feasibility on the normalized sample is unverified (M4); only "complete" mode is covered by tests.
+- Soft constraints (S1–S6) drive scoring + the weight editor + candidate ranking, but are NOT shown as per-cell amber badges in the editor grid (the grid overlay only reflects `validate()` hard violations). Optional polish; wire `scoreTimetable().soft` into `gridModel` overlay if desired.
+- "generate" mode reaches 0 hard on both the roomy 6-day variant (tested) and the live 2-day sample (verified in-app); diversity is limited on the rigid 2-day data (expected).
 
 ---
 
