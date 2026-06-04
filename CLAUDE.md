@@ -2,7 +2,9 @@
 
 Read and obey `AGENTS.md` in this directory — it is the full operating contract for this repo.
 
-Then read, in order: `docs/SCHOOL_CONTEXT.md`, `docs/DATA_MODEL.md`, `docs/CONSTRAINTS.md`, `docs/ARCHITECTURE.md`, `docs/ROADMAP.md`.
+Then read, in order: `docs/SCHOOL_CONTEXT.md`, `docs/DATA_MODEL.md`, `docs/CONSTRAINTS.md`, `docs/ARCHITECTURE.md`, `docs/ROADMAP.md`, `docs/HANDOFF.md`.
+
+Session protocol: `docs/HANDOFF.md` holds the current state and next action — keep it updated per AGENTS.md § 5. Session prompts (marathon/resume) are in `docs/PROMPTS.md`.
 
 Key reminders:
 

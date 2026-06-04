@@ -35,7 +35,16 @@ This file is the contract. If a user instruction conflicts with this file, ask; 
 - Update `docs/DECISIONS.md` (append-only log: date, decision, why) whenever you make a non-obvious technical choice.
 - Commit messages: `M<milestone>: <imperative summary>` e.g. `M2: add teacher clash detection`.
 
-## 5. Domain quick-reference (details in docs/)
+## 5. Session protocol (marathon + handoff)
+
+- `docs/HANDOFF.md` is the living session state. Update it: (a) after every completed milestone, (b) before ending any session, (c) whenever you stop mid-milestone. Use its template; describe NOW, not history.
+- In marathon mode (large-context sessions), complete milestones back-to-back without asking permission to continue — but never start milestone N+1 with N's acceptance criteria unmet.
+- Commit and push after every milestone (`M<n>: <summary>`); also commit before any risky refactor.
+- Stop cleanly when degrading: >2 failed attempts at the same problem, or context pressure → get tests green, commit, push, write the handoff, end the session. A clean stop beats a long broken session.
+- On resume, trust `git log` + `npm test` over HANDOFF.md if they disagree, and fix HANDOFF.md first.
+- Session prompts live in `docs/PROMPTS.md` (Prompt A = marathon start, Prompt B = resume).
+
+## 6. Domain quick-reference (details in docs/)
 
 - 14 classes: Class 1–10, plus 11/12 × Arts/Commerce/Science. 6 days (Mon–Sat), 6 periods/day.
 - **ELGA**: Classes 1–5 regroup by English level for 3 *consecutive* periods (currently P3–P5) on ELGA days. All five primary teachers (Bindu, Anita, Rashmita, Kusum, Ravina) are simultaneously occupied — a single ELGA block consumes 5 teachers × 5 classes atomically. It is modeled as one `BlockActivity`, never as independent cells.

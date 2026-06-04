@@ -19,12 +19,14 @@ A free, fast, offline-first **timetable builder** for Veer Patta Public School (
 
 **Read these in order before writing any code:**
 
-1. `AGENTS.md` — operating rules and guardrails (Claude Code users: `CLAUDE.md` points here)
+1. `AGENTS.md` — operating rules and guardrails, incl. the session/handoff protocol (Claude Code users: `CLAUDE.md` points here)
 2. `docs/SCHOOL_CONTEXT.md` — the real school data and what makes it complex
 3. `docs/DATA_MODEL.md` — canonical TypeScript types; the single source of truth
 4. `docs/CONSTRAINTS.md` — the full constraint catalog (hard vs soft)
 5. `docs/ARCHITECTURE.md` — stack, folder layout, solver design
 6. `docs/ROADMAP.md` — milestones with acceptance criteria; work strictly in order
+7. `docs/HANDOFF.md` — living session state: what's done, what's next
+8. `docs/PROMPTS.md` — session prompts: Prompt A (marathon), Prompt B (resume)
 
 ## Stack (decided — do not relitigate)
 
