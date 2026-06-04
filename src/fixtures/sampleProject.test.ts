@@ -4,6 +4,7 @@ import { deserializeProject } from "../persistence/projectFile";
 import { exportLegacyRawData } from "../domain/legacyExport";
 import { validate } from "../domain/validate";
 import { legacyRawSample } from "./legacyRaw.sample";
+import { makeSampleProject } from "../store/projectStore";
 
 describe("vpps.sample.ttproj.json", () => {
   // Guards against drift between the checked-in fixture and the import logic.
@@ -11,6 +12,12 @@ describe("vpps.sample.ttproj.json", () => {
   it("parses, is feasible, and re-exports to the canonical rawData", () => {
     const project = deserializeProject(JSON.stringify(sample));
     expect(validate(project, project.timetables[0]!)).toEqual([]);
+    expect(exportLegacyRawData(project, project.activeTimetableId!)).toBe(legacyRawSample);
+  });
+
+  it("the NORMALIZED in-app sample also exports byte-identically (what ships)", () => {
+    // The app exports makeSampleProject() (normalized), not the raw fixture above.
+    const project = makeSampleProject();
     expect(exportLegacyRawData(project, project.activeTimetableId!)).toBe(legacyRawSample);
   });
 });
