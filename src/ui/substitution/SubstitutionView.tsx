@@ -43,7 +43,15 @@ export function SubstitutionView({ onClose }: { onClose: () => void }) {
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => window.print()}
+              onClick={() => {
+                document.body.classList.add("print-subs");
+                const cleanup = () => {
+                  document.body.classList.remove("print-subs");
+                  window.removeEventListener("afterprint", cleanup);
+                };
+                window.addEventListener("afterprint", cleanup);
+                window.print();
+              }}
               disabled={!plan}
               className="rounded bg-slate-800 px-3 py-1 text-sm text-white disabled:opacity-40"
             >

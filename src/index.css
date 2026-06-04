@@ -2,19 +2,27 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Print: show only the substitution day sheet (or whatever is marked printable). */
+/* Print targets:
+   - default print  → the timetable grid (chrome is marked .no-print, modals hidden)
+   - body.print-subs → only the substitution day sheet (app shell hidden) */
 @media print {
-  .app-shell,
   .no-print {
     display: none !important;
   }
   .modal-overlay {
+    display: none !important;
+  }
+  body.print-subs .app-shell {
+    display: none !important;
+  }
+  body.print-subs .modal-overlay {
+    display: block !important;
     position: static !important;
     overflow: visible !important;
     background: none !important;
     padding: 0 !important;
   }
-  .modal-card {
+  body.print-subs .modal-card {
     box-shadow: none !important;
     max-width: none !important;
     width: 100% !important;

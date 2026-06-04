@@ -6,17 +6,23 @@ This file is the bridge between work sessions. The agent MUST update it after ev
 
 ## Current state
 
-- **Last completed milestone**: M5 — substitution assistant. 64 tests green; `npm run build` (73 KB gzip main + worker chunk) and `npm run lint` clean. Verified end-to-end in the dev server: marking Kusum absent on Mon flags the ELGA block "OWNER DECISION" (no auto-cover) and proposes Rakesh/Anjana for her other lessons (honest "no free qualified teacher" for EVS); no console errors.
-  - `domain/substitution.ts` (PURE, read-only): `proposeSubstitutions(project, timetableId, {day, absentTeacherIds})` → per-slot cover items. ELGA/block → `owner-decision` (zero candidates); single-teacher lesson → `needs-cover` ranked by S1/S4; co-taught lesson → `partial`.
-  - `ui/substitution/SubstitutionView.tsx` — modal: pick day + absent teachers, see the plan, print day sheet. `@media print` rules in index.css print only the sheet (App shell wrapped in `.app-shell`). Wired into toolbar ("Substitutions").
-  - M0–M4 carryover still green.
-- **In-progress milestone**: M6 (not started)
-- **Tests**: green — 64 tests across 17 files
-- **Build**: green — typechecks + builds (73 KB gzip main, separate worker chunk)
+- **Last completed milestone**: M6 — ship. **All milestones M0–M6 complete.** 66 tests green; `npm run build` (74 KB gzip main + worker chunk, well under the 300 KB budget) and `npm run lint` clean. Verified in a production `vite preview`: SW registers and controls the page, cache holds the shell + JS/CSS, manifest exposes 192/512 icons; no console errors.
+  - Export/Import (`ui/io/ExportImport.tsx` + `download.ts`): legacy rawData (copy + download) via `exportLegacyRawData`, JSON backup via `serializeProject`/`suggestFilename`, import of JSON (`deserializeProject`) and legacy rawData (`importLegacyRawData`→`normalizeProject`). Reads files via `readFileText` (FileReader, jsdom-safe). Tested in jsdom.
+  - Print: two `@media print` targets — default prints the grid (chrome `.no-print`), `body.print-subs` prints the substitution sheet. Toolbar "Print" button.
+  - PWA: `public/manifest.webmanifest` + hand-rolled `public/sw.js` (cache-first shell + runtime asset caching), registered PROD-only in `main.tsx`; icons via `scripts/makeIcons.mjs` (dependency-free PNG encoder). No new deps.
+  - Deploy: `.github/workflows/deploy.yml` (lint+test+build → GitHub Pages); README documents the one-time Pages setting. `base: "./"` already set.
+  - M0–M5 carryover still green.
+- **In-progress milestone**: none — v1 roadmap complete.
+- **Tests**: green — 66 tests across 18 files
+- **Build**: green — typechecks + builds (74 KB gzip main, separate worker chunk)
 
 ## Next action
 
-Start M6 (ship): (1) Export UI — legacy rawData (copy-to-clipboard + file download via `exportLegacyRawData`) for the existing viewer, JSON backup (`serializeProject` + download, `suggestFilename`), and import (file picker → `deserializeProject` / `importLegacyRawData`); print stylesheet for the timetable grid (extend the M5 `@media print` scaffolding to print the grid). (2) PWA — `manifest.webmanifest` + a cache-first service worker (hand-rolled or `vite-plugin-pwa`; if adding the plugin, justify it — else write a tiny SW + manifest by hand to stay dependency-light) registered in `main.tsx`, offline-capable shell. (3) Deploy — a GitHub Pages Actions workflow building `dist/` (note `base: "./"` is already set in vite.config), documented in README. AC: Lighthouse PWA installable; full flow works offline; exported rawData pasted into the legacy viewer renders correctly. First concrete step: an Export/Import panel or modal using the already-tested `legacyExport`/`projectFile` functions (download via Blob + anchor), then the manifest + SW, then the Pages workflow. NOTE: prefer a hand-rolled SW (no new dep) caching the built assets (cache-first for the app shell); keep it tiny.
+v1 roadmap (M0–M6) is complete. Suggested next steps (none blocking), in rough priority:
+1. Enable GitHub Pages (repo Settings → Pages → Source: GitHub Actions) and confirm the first deploy; paste exported rawData into the LIVE legacy viewer to close the last AC empirically (no viewer instance was available in-session).
+2. Replace the synthetic `fixtures/legacyRaw.sample.ts` with a real `rawData` snapshot from the viewer; add a tolerant (semantic) round-trip comparison alongside the exact one.
+3. Owner-authoritative data: real per-class subject quotas + teacher caps/unavailability (currently fixture-derived) — see Open questions. Then the solver targets real requirements.
+4. Polish: soft (amber) badges in the editor grid; a timetable/draft switcher UI; generalize block detection beyond the literal "ELGA" token if a second block type appears.
 
 ## Mid-milestone notes (empty if between milestones)
 

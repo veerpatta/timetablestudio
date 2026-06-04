@@ -9,12 +9,14 @@ import { QuotaPanel } from "../panels/QuotaPanel";
 import { CompleteButton } from "../solverui/CompleteButton";
 import { CandidateCompare } from "../solverui/CandidateCompare";
 import { SubstitutionView } from "../substitution/SubstitutionView";
+import { ExportImport } from "../io/ExportImport";
 
 export function App() {
   const init = useProjectStore((s) => s.init);
   const derived = useDerived();
   const [showGenerate, setShowGenerate] = useState(false);
   const [showSubs, setShowSubs] = useState(false);
+  const [showIO, setShowIO] = useState(false);
   const { selectedDay, viewMode, past, future } = useEditorStore();
   const { setSelectedDay, setViewMode, undo, redo } = useEditorStore.getState();
 
@@ -31,7 +33,7 @@ export function App() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
       <div className="app-shell">
-      <header className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-3">
+      <header className="no-print flex items-center justify-between border-b border-slate-200 bg-white px-6 py-3">
         <div>
           <h1 className="text-lg font-semibold">Timetable Studio</h1>
           <p className="text-xs text-slate-500">
@@ -54,6 +56,20 @@ export function App() {
           >
             🧑‍🏫 Substitutions
           </button>
+          <button
+            type="button"
+            onClick={() => setShowIO(true)}
+            className="rounded border border-slate-300 px-3 py-1 hover:bg-slate-50"
+          >
+            📤 File
+          </button>
+          <button
+            type="button"
+            onClick={() => window.print()}
+            className="rounded border border-slate-300 px-3 py-1 hover:bg-slate-50"
+          >
+            🖨 Print
+          </button>
           <span className="mx-1 h-5 w-px bg-slate-200" />
           <button
             type="button"
@@ -74,7 +90,7 @@ export function App() {
         </div>
       </header>
 
-      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white px-6 py-2">
+      <div className="no-print flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white px-6 py-2">
         <div className="flex gap-1" role="tablist" aria-label="Day">
           {days.map((d) => (
             <button
@@ -116,11 +132,11 @@ export function App() {
             viewMode={viewMode}
             violations={violations}
           />
-          <p className="mt-2 text-xs text-slate-400">
+          <p className="no-print mt-2 text-xs text-slate-400">
             Drag a cell to move it within the day · 📍/📌 to pin · ELGA moves as one block.
           </p>
         </div>
-        <aside className="flex flex-col gap-4">
+        <aside className="no-print flex flex-col gap-4">
           <ViolationsPanel violations={violations} />
           <TeacherLoadPanel project={project} maps={maps} day={selectedDay} />
           <QuotaPanel project={project} quota={quota} />
@@ -130,6 +146,7 @@ export function App() {
 
       {showGenerate && <CandidateCompare onClose={() => setShowGenerate(false)} />}
       {showSubs && <SubstitutionView onClose={() => setShowSubs(false)} />}
+      {showIO && <ExportImport onClose={() => setShowIO(false)} />}
     </div>
   );
 }
