@@ -32,11 +32,12 @@ A free, fast, offline-first **timetable builder** for Veer Patta Public School (
 
 Vite + React 18 + TypeScript (strict) · Zustand · Web Worker solver (plain TS, no solver libraries) · IndexedDB via `idb` · Tailwind CSS · Vitest · deploy as static files.
 
-## Quick start (once scaffolded)
+## Quick start
 
 ```bash
 npm install
-npm run dev      # local dev server
-npm test         # vitest
-npm run build    # static build to dist/
+npm run dev      # local dev server (http://localhost:5173)
+npm test         # vitest (Node by default; UI tests use jsdom)
+npm run build    # tsc --noEmit typecheck, then static build to dist/
+npm run lint     # eslint, no-explicit-any enforced
 ```
