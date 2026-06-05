@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { buildProject, type BuildInput } from "./projectBuilder";
 import { addBlock, fillSubjectColumn, copyClassQuotas } from "./projectEdit";
-import { validate } from "./validate";
+import { preflight } from "../solver/guidance";
 import type { Project } from "./types";
 
 // M13 AC: full VPPS-scale data is enterable from scratch using the matrix + bulk
@@ -30,6 +30,7 @@ describe("M13 — full data enterable via matrix + bulk tools", () => {
         { name: "Harshita", subjects: ["English compulsory"] },
         { name: "Nidhika", subjects: ["Maths"] },
         { name: "Toshit", subjects: ["Science"] },
+        { name: "Bindu", subjects: [] }, // ELGA block teacher (blocks bypass subject checks)
       ],
       quotas: [],
     };
@@ -37,10 +38,11 @@ describe("M13 — full data enterable via matrix + bulk tools", () => {
     const ttId = p.activeTimetableId!;
 
     // 2) Wizard Blocks step: ELGA across the five primary classes, Mon–Thu.
+    //    Its own teacher (Bindu) — the column teachers are each already at 32/wk.
     p = addBlock(p, {
       name: "ELGA",
       classIds: ["Class 1", "Class 2", "Class 3", "Class 4", "Class 5"],
-      teacherIds: ["Anjana"],
+      teacherIds: ["Bindu"],
       length: 3,
       days: ["Mon", "Tue", "Wed", "Thu"],
       startPeriod: 3,
@@ -49,11 +51,12 @@ describe("M13 — full data enterable via matrix + bulk tools", () => {
     const allIds = p.classes.map((c) => c.id);
     let bulkCalls = 0;
 
-    // 3) Bulk-fill four subject columns across ALL classes at once.
-    p = fillSubjectColumn(p, "Maths", "Nidhika", 6, allIds); bulkCalls++;
-    p = fillSubjectColumn(p, "Hindi", "Anjana", 5, allIds); bulkCalls++;
-    p = fillSubjectColumn(p, "English compulsory", "Harshita", 5, allIds); bulkCalls++;
-    p = fillSubjectColumn(p, "Science", "Toshit", 4, allIds); bulkCalls++;
+    // 3) Bulk-fill four subject columns across ALL classes at once. 2 periods ×
+    //    16 classes = 32 per teacher, within the 36/week cap (stays feasible).
+    p = fillSubjectColumn(p, "Maths", "Nidhika", 2, allIds); bulkCalls++;
+    p = fillSubjectColumn(p, "Hindi", "Anjana", 2, allIds); bulkCalls++;
+    p = fillSubjectColumn(p, "English compulsory", "Harshita", 2, allIds); bulkCalls++;
+    p = fillSubjectColumn(p, "Science", "Toshit", 2, allIds); bulkCalls++;
 
     // 4) Copy Class 6's plan onto two more classes in one tool action.
     p = copyClassQuotas(p, "Class 6", ["Class 7", "Class 8"]); bulkCalls++;
@@ -64,9 +67,11 @@ describe("M13 — full data enterable via matrix + bulk tools", () => {
     expect(p.requirements.curriculum.length).toBe(64); // 16 × 4 subjects
     expect(bulkCalls).toBeLessThanOrEqual(6);
 
-    // The assembled project is structurally sound (no hard violations to start).
-    const hard = validate(p, p.timetables.find((t) => t.id === ttId)!).filter((v) => v.severity === "hard");
-    expect(hard).toEqual([]);
+    // The pre-flight passes: quotas present, no teacher/class over capacity.
+    // (Under-target classes only raise warnings, which don't block generation.)
+    const pre = preflight(p, ttId);
+    expect(pre.ok).toBe(true);
+    expect(pre.items.some((i) => i.status === "blocker")).toBe(false);
     // ELGA survived as one atomic block.
     expect(p.activities.filter((a) => a.kind === "block")).toHaveLength(1);
   });
