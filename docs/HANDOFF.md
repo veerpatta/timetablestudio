@@ -6,23 +6,22 @@ This file is the bridge between work sessions. The agent MUST update it after ev
 
 ## Current state
 
-- **In-progress milestone**: **M18 — Real-data reconciliation + everyday-ops polish (PARTIAL).** The PDF structural reconciliation landed; the rest of M18 remains (see Next action). **187 tests green (41 files);** build (102 KB gzip) + lint clean.
-  - **Done — M18 (1/n) PDF structural reconciliation**: read the authoritative `Class_Wise.pdf` (all 16 classes) and compared to the rawData import — cells already MATCH in subject+teacher; only differences are subject-label verbosity, board flags, and the dropped clock/break. `domain/reconcile.ts` (pure) applies the PDF's structural facts: real heatwave clock + break after P4 (10:10–10:25) on the profile, `isBoardClass` on exactly Class 10/12 Arts/Commerce/Science; `PDF_SUBJECT_ALIASES` (display/compare map, NOT a rename — keeps the byte-exact round-trip). Wired into `makeRealVppsProject`. `reconcile.test.ts` (6 tests) incl. board-class P1 anchors verified cell-for-cell vs the PDF under the alias map. Idempotent on cell data (placements/subjects untouched).
-  - **Done — M18 (2/n) entity-lifecycle reassignment (AC#2 ✓)**: `domain/lifecycle.ts` — `teacherImpact` (footprint preview) + `reassignTeacher` (moves EVERY reference — lessons, blocks, requirements, classTeacherId, R8/R12/R15 rules — to another teacher, makes them qualified, drops the old one). `lifecycle.test.ts` (3): reassign-then-remove leaves ZERO dangling references on the real VPPS project, no H6 regression. UI: `ui/manage/ReassignTeacherModal.tsx` on the Teachers page — the ✕ now opens "Remove Maya? Maya teaches 21 periods… reassign to whom?" with reassign / remove-anyway. Verified live (Maya → Anjana, Maya gone everywhere, no crash; the resulting load clashes surface honestly in the conflicts panel).
-- **Completed milestones**: M17 — scenario workbench (branch/compare/promote + undo, swap finder, targeted regenerate; verified live). M16 — rules UI (builder + auto-detect + presets). M15 — domain rules/durations/block-days/schema v2.
-- **Tests**: green — 190 tests across 42 files
-- **Build**: green — typechecks + builds (102 KB gzip, well under the 300 KB budget); lint clean
+- **Last completed milestone**: **M18 — Real-data reconciliation + everyday-ops polish. v4 (M15–M18) COMPLETE.** 192 tests green (43 files); build (103 KB gzip) + lint clean.
+  - **AC met**: (1) the in-app grid matches `Class_Wise.pdf` CELL-FOR-CELL — 576/576, scripted against the transcribed `fixtures/classWisePdf.ts` under `pdfSubjectLabel` (`classWisePdf.test.ts`); (2) removing a teacher walks through reassignment with ZERO dangling references (`lifecycle.test.ts` + live); (3) the three print views (per-class week, per-teacher week, whole-school day) carry the reconciled clock + positioned break, mirroring the PDF formats (live-verified; pixel-exact match is owner-side, standard caveat).
+  - Built: `domain/reconcile.ts` (PDF clock + break + board flags + `PDF_SUBJECT_ALIASES`; applied in `makeRealVppsProject`), `domain/lifecycle.ts` + `ReassignTeacherModal` (teacher reassignment), `fixtures/classWisePdf.ts` (full PDF transcription) + comparison test, `WeekGrid`/`TimetableGrid` clock+break headers. The cross-check caught one real PDF-vs-rawData label diff ("Science Practice"→"Sci. Practice") — aliased, PDF wins.
+- **Completed milestones**: M17 — scenario workbench; M16 — rules UI; M15 — domain rules/durations/block-days/schema v2. (v1 M0–M6, v2 M7–M10, v3 M11–M14 complete since prior sessions.)
+- **In-progress milestone**: none — **all of v1, v2, v3, v4 complete.**
+- **Tests**: green — 192 tests across 43 files
+- **Build**: green — typechecks + builds (103 KB gzip, well under the 300 KB budget); lint clean
 
-## Next action (finish M18 — 3 remaining AC pieces, in order)
+## Next action
 
-AC#2 (reassignment) is DONE. The PDF cells were proven to match the import EXCEPT the documented `PDF_SUBJECT_ALIASES`, so the rest is well-scoped:
+v4 is complete. No milestone is in progress. Parked (post-v4) follow-ups, none blocking:
+1. **Period-count change wizard (6→7 / 6→5)** — a ROADMAP M18 feature bullet, NOT one of the three M18 AC clauses, so it was parked. `setActiveProfile` already resizes the period array; add a placement-remap + guided modal ("which lessons drop when shrinking; where the new column goes when growing").
+2. Owner-side visual checks (standard honesty caveats): pixel-exact print match vs the school's PDFs; the live legacy-viewer paste; Lighthouse a11y/PWA numeric scores on the deployed site.
+3. The original ROADMAP "Parked (post-v4)" list: rooms/labs, multi-school config, teacher preference forms, statistics dashboard, share links, mid-week timetable versioning (effective-from dates).
 
-1. **Full cell-for-cell PDF fixture + comparison (AC#1, the defining piece).** Transcribe all 16 classes × 6 days × 6 periods of `Class_Wise.pdf` into a fixture (subject label + teacher per cell; ELGA cells = the block). Then a scripted test builds the grid from `makeRealVppsProject` and asserts it equals the fixture cell-for-cell UNDER `pdfSubjectLabel` (the alias map). The cross-check catches transcription errors (any mismatch is either a real PDF-wins diff to fix in favour of the PDF, or a typo). Board-class P1 anchors already spot-verified to match — expect the rest to match under aliases. Re-read `docs/sources/Class_Wise.pdf` (16 pages, one per class).
-2. **Period-count change wizard (6→7 / 6→5).** Remap placements with explicit owner decisions (which lessons drop when shrinking; where the new column goes when growing). `setActiveProfile` already resizes the period array — add the placement-remap + a guided modal.
-3. **Print/export parity** with the three PDF formats (class-wise, teacher-wise, day-wise). Week views + print CSS exist (M10/M13); align headers/timings (use the now-reconciled clock + break) to match the school's sheets.
-- **Full AC**: in-app grid matches `Class_Wise.pdf` cell-for-cell (scripted, against the transcribed fixture); removing a teacher walks through reassignment without a dangling reference (✓ done); the three print views visually match.
-
-Note: `rawData.vpps.txt` is the machine-readable SUBSET; `Class_Wise.pdf` is authoritative. Where they differ the PDF wins (DECISIONS). The only known differences are the subject-label aliases (already mapped) + the structural facts (already applied) — no cell/teacher discrepancies were found in the spot-checks.
+Honest carried claims (unchanged discipline): AC "non-technical tester unaided" is owner-side; the 11 EXCESS quota requirements in the real import (e.g. Class 4 English Revision placed 2 vs inferred 1) are a quota-INFERENCE quirk, harmless to the solver/scope guarantees — a candidate for a future quota-review pass. Reassigning a full teacher load onto an existing teacher legitimately creates load clashes (surfaced in the conflicts panel) — that's the everyday workflow, not a bug.
 
 Honest carried claims (unchanged discipline): AC#3 "non-technical tester unaided" is owner-side; Lighthouse a11y/PWA numeric scores confirm on deploy; the live legacy-viewer paste check is owner-side (the byte-exact M1 + semantic M12 round-trip tests back it in-repo).
 

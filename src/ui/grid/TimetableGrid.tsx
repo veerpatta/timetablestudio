@@ -113,6 +113,11 @@ export function TimetableGrid({ project, timetable, day, viewMode, violations }:
       ? buildClassRows(project, timetable, day, violations)
       : buildTeacherRows(project, timetable, day, violations);
   const periodCount = rows[0]?.cells.length ?? 6;
+  const profile = project.profiles.find((p) => p.id === timetable.profileId);
+  const periodTime = (i: number): string => {
+    const pd = profile?.periods[i];
+    return pd?.start && pd?.end ? `${pd.start}–${pd.end}` : "";
+  };
 
   const onDragEnd = (e: DragEndEvent) => {
     const ref = e.active.data.current?.ref as PlacementRef | undefined;
@@ -137,6 +142,9 @@ export function TimetableGrid({ project, timetable, day, viewMode, violations }:
                 className="border border-slate-200 bg-slate-100 p-2 text-xs font-semibold"
               >
                 Period {i + 1}
+                {periodTime(i) && (
+                  <div className="text-[10px] font-normal text-slate-400">{periodTime(i)}</div>
+                )}
               </th>
             ))}
           </tr>
