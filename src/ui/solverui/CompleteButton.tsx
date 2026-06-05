@@ -7,7 +7,6 @@ export function CompleteButton() {
   const project = useProjectStore((s) => s.project);
   const addDraft = useProjectStore((s) => s.addDraft);
   const [running, setRunning] = useState(false);
-  const [iteration, setIteration] = useState(0);
   const [handle, setHandle] = useState<RunHandle | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [seed, setSeed] = useState(1);
@@ -17,20 +16,22 @@ export function CompleteButton() {
   const onComplete = async () => {
     setError(null);
     setRunning(true);
-    setIteration(0);
-    const h = runSolver(
-      { project, timetableId: project.activeTimetableId!, mode: "complete", seed, maxMillis: 5000 },
-      (p) => setIteration(p.iteration),
-    );
+    const h = runSolver({
+      project,
+      timetableId: project.activeTimetableId!,
+      mode: "complete",
+      seed,
+      maxMillis: 5000,
+    });
     setHandle(h);
     try {
       const done = await h.promise;
       addDraft(
-        `Auto-completed (seed ${done.seed}${done.feasible ? "" : ", infeasible"})`,
+        done.feasible ? "Filled-in timetable" : "Filled-in timetable (still has conflicts)",
         done.placements,
       );
       useEditorStore.setState({ past: [], future: [] }); // fresh history for the new draft
-      setSeed((s) => s + 1);
+      setSeed((s) => s + 1); // vary internally so repeated fills differ; not shown
     } catch (e) {
       if ((e as Error).message !== "cancelled") setError((e as Error).message);
     } finally {
@@ -43,7 +44,7 @@ export function CompleteButton() {
     <div className="flex items-center gap-2">
       {running ? (
         <>
-          <span className="text-xs text-slate-500">Solving… {iteration} steps</span>
+          <span className="text-xs text-slate-500">Working…</span>
           <button
             type="button"
             onClick={() => handle?.cancel()}
@@ -56,9 +57,10 @@ export function CompleteButton() {
         <button
           type="button"
           onClick={onComplete}
+          title="Fill empty periods automatically, keeping what you've pinned"
           className="rounded bg-emerald-600 px-3 py-1 text-sm font-medium text-white hover:bg-emerald-700"
         >
-          ⚙ Complete (seed {seed})
+          Fill the gaps
         </button>
       )}
       {error && <span className="text-xs text-hard">⚠ {error}</span>}

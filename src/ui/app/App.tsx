@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useProjectStore } from "../../store/projectStore";
 import { useEditorStore } from "../../store/editorStore";
+import { useUiStore } from "../../store/uiStore";
 import { useDerived } from "./hooks";
 import { TimetableGrid } from "../grid/TimetableGrid";
 import { ViolationsPanel } from "../panels/ViolationsPanel";
@@ -27,6 +28,8 @@ export function App() {
   const [showData, setShowData] = useState(false);
   const { selectedDay, viewMode, past, future } = useEditorStore();
   const { setSelectedDay, setViewMode, undo, redo } = useEditorStore.getState();
+  const advanced = useUiStore((s) => s.advanced);
+  const toggleAdvanced = useUiStore((s) => s.toggleAdvanced);
 
   useEffect(() => {
     void init();
@@ -52,6 +55,7 @@ export function App() {
     return <div className="p-6 text-slate-500">Loading…</div>;
   }
   const { timetable, violations, maps, quota } = derived;
+  const hardCount = violations.filter((v) => v.severity === "hard").length;
   const days = project.profiles.find((p) => p.id === timetable.profileId)?.days ?? [];
 
   return (
@@ -61,7 +65,14 @@ export function App() {
         <div>
           <h1 className="text-lg font-semibold">Timetable Studio</h1>
           <p className="text-xs text-slate-500">
-            {project.school.name} · <span className="text-slate-400">{timetable.name}</span>
+            {project.school.name} · <span className="text-slate-400">{timetable.name}</span> ·{" "}
+            {hardCount === 0 ? (
+              <span className="text-emerald-600">Ready — no conflicts</span>
+            ) : (
+              <span className="text-hard">
+                {hardCount} {hardCount === 1 ? "conflict" : "conflicts"} to fix
+              </span>
+            )}
           </p>
         </div>
         <div className="flex items-center gap-2 text-sm">
@@ -71,7 +82,7 @@ export function App() {
             onClick={() => setShowGenerate(true)}
             className="rounded bg-indigo-600 px-3 py-1 font-medium text-white hover:bg-indigo-700"
           >
-            ⚖ Generate…
+            Create timetables
           </button>
           <button
             type="button"
@@ -100,6 +111,15 @@ export function App() {
             className="rounded border border-slate-300 px-3 py-1 hover:bg-slate-50"
           >
             🖨 Print
+          </button>
+          <button
+            type="button"
+            onClick={toggleAdvanced}
+            aria-pressed={advanced}
+            title="Show developer details (codes, seeds, scores)"
+            className={`rounded border px-3 py-1 ${advanced ? "border-slate-800 bg-slate-800 text-white" : "border-slate-300 hover:bg-slate-50"}`}
+          >
+            Advanced
           </button>
           <span className="mx-1 h-5 w-px bg-slate-200" />
           <button
@@ -168,7 +188,7 @@ export function App() {
           </p>
         </div>
         <aside className="no-print flex flex-col gap-4">
-          <ViolationsPanel violations={violations} />
+          <ViolationsPanel violations={violations} onJump={(d) => setSelectedDay(d)} />
           <TeacherLoadPanel project={project} maps={maps} day={selectedDay} />
           <QuotaPanel project={project} quota={quota} />
         </aside>

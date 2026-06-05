@@ -13,13 +13,15 @@ beforeEach(() => {
 });
 
 describe("App (jsdom) — live editor", () => {
-  it("renders the seeded sample grid and reports it feasible", async () => {
+  it("renders the seeded sample grid and reports no conflicts in plain language", async () => {
     render(<App />);
     expect(await screen.findByText("Maths (Bindu)")).toBeInTheDocument();
     expect(screen.getByText(/No conflicts/)).toBeInTheDocument();
+    // No developer jargon (constraint codes) in the default UI.
+    expect(screen.queryByText("H1")).not.toBeInTheDocument();
   });
 
-  it("flags H1 instantly when Kusum is placed opposite the ELGA block", async () => {
+  it("flags the clash instantly as a plain sentence when Kusum is placed opposite ELGA", async () => {
     render(<App />);
     await screen.findByText("Maths (Bindu)");
 
@@ -28,11 +30,11 @@ describe("App (jsdom) — live editor", () => {
       useEditorStore.getState().add(lesson("L-clash", "Class 7", "Hindi", ["Kusum"]), "Mon", 4),
     );
 
-    const badge = await screen.findByText("H1");
-    expect(badge).toBeInTheDocument();
     await waitFor(() =>
       expect(screen.getByText(/Kusum is double-booked/)).toBeInTheDocument(),
     );
+    // The constraint code stays hidden unless Advanced is on.
+    expect(screen.queryByText("[H1]")).not.toBeInTheDocument();
   });
 
   it("undo button reverts the last change", async () => {
@@ -41,10 +43,12 @@ describe("App (jsdom) — live editor", () => {
     act(() =>
       useEditorStore.getState().add(lesson("L-clash", "Class 7", "Hindi", ["Kusum"]), "Mon", 4),
     );
-    await screen.findByText("H1");
+    await screen.findByText(/Kusum is double-booked/);
 
     fireEvent.click(screen.getByText("↶ Undo"));
-    await waitFor(() => expect(screen.queryByText("H1")).not.toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.queryByText(/Kusum is double-booked/)).not.toBeInTheDocument(),
+    );
     expect(screen.getByText(/No conflicts/)).toBeInTheDocument();
   });
 });

@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useProjectStore } from "../../store/projectStore";
 import { useEditorStore } from "../../store/editorStore";
 import { useWeightsStore } from "../../store/weightsStore";
+import { useUiStore } from "../../store/uiStore";
 import { scoreTimetable } from "../../solver/score";
 import { runSolver } from "./runSolver";
 import { WeightEditor } from "./WeightEditor";
@@ -25,6 +26,7 @@ export function CandidateCompare({ onClose }: { onClose: () => void }) {
   const project = useProjectStore((s) => s.project);
   const addDraft = useProjectStore((s) => s.addDraft);
   const weights = useWeightsStore((s) => s.weights);
+  const advanced = useUiStore((s) => s.advanced);
   const [candidates, setCandidates] = useState<Candidate[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [n, setN] = useState(3);
@@ -74,7 +76,8 @@ export function CandidateCompare({ onClose }: { onClose: () => void }) {
   };
 
   const applyCandidate = (c: Candidate) => {
-    addDraft(`Generated (seed ${c.seed})`, c.placements);
+    const rank = (scored ?? []).findIndex((x) => x.seed === c.seed);
+    addDraft(rank === 0 ? "Created timetable (best fit)" : "Created timetable", c.placements);
     useEditorStore.setState({ past: [], future: [] });
     onClose();
   };
@@ -82,8 +85,8 @@ export function CandidateCompare({ onClose }: { onClose: () => void }) {
   return (
     <Modal onClose={onClose} maxWidth="max-w-3xl" label="Create timetables">
         <header className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-          <h2 className="font-semibold">Generate &amp; compare candidates</h2>
-          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600">
+          <h2 className="font-semibold">Create &amp; compare timetables</h2>
+          <button type="button" onClick={onClose} aria-label="Close" className="text-slate-400 hover:text-slate-600">
             ✕
           </button>
         </header>
@@ -92,7 +95,7 @@ export function CandidateCompare({ onClose }: { onClose: () => void }) {
           <div>
             <div className="mb-3 flex items-center gap-2 text-sm">
               <label className="flex items-center gap-1">
-                Candidates
+                How many options
                 <input
                   type="number"
                   min={1}
@@ -108,7 +111,7 @@ export function CandidateCompare({ onClose }: { onClose: () => void }) {
                 disabled={busy}
                 className="rounded bg-indigo-600 px-3 py-1 font-medium text-white disabled:opacity-50"
               >
-                {busy ? "Generating…" : "Generate"}
+                {busy ? "Working…" : "Create options"}
               </button>
               {error && <span className="text-xs text-hard">⚠ {error}</span>}
             </div>
@@ -117,36 +120,33 @@ export function CandidateCompare({ onClose }: { onClose: () => void }) {
               <table className="w-full text-xs">
                 <thead>
                   <tr className="text-slate-500">
-                    <th className="px-2 py-1 text-left">#</th>
-                    <th className="px-2 py-1 text-left">Seed</th>
-                    <th className="px-2 py-1 text-right">Hard</th>
-                    <th className="px-2 py-1 text-right">Score</th>
-                    <th className="px-2 py-1 text-left">Soft</th>
+                    <th className="px-2 py-1 text-left">Option</th>
+                    <th className="px-2 py-1 text-right">Conflicts</th>
+                    <th className="px-2 py-1 text-left">Quality</th>
+                    {advanced && <th className="px-2 py-1 text-right">seed</th>}
+                    {advanced && <th className="px-2 py-1 text-right">score</th>}
                     <th className="px-2 py-1" />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {scored.map((c, i) => (
                     <tr key={c.seed} className={i === 0 ? "bg-emerald-50" : ""}>
-                      <td className="px-2 py-1">{i === 0 ? "★" : i + 1}</td>
-                      <td className="px-2 py-1">{c.seed}</td>
+                      <td className="px-2 py-1">{i === 0 ? "★ Best" : `Option ${i + 1}`}</td>
                       <td className={`px-2 py-1 text-right ${c.hard ? "text-hard" : "text-emerald-600"}`}>
-                        {c.hard}
+                        {c.hard === 0 ? "None" : c.hard}
                       </td>
-                      <td className="px-2 py-1 text-right font-mono">{c.score}</td>
                       <td className="px-2 py-1 text-slate-500">
-                        {Object.entries(c.softCounts)
-                          .sort()
-                          .map(([k, v]) => `${k}:${v}`)
-                          .join(" ") || "—"}
+                        {i === 0 ? "Best fit" : "Good"}
                       </td>
+                      {advanced && <td className="px-2 py-1 text-right font-mono">{c.seed}</td>}
+                      {advanced && <td className="px-2 py-1 text-right font-mono">{c.score}</td>}
                       <td className="px-2 py-1 text-right">
                         <button
                           type="button"
                           onClick={() => applyCandidate(c)}
                           className="rounded bg-slate-800 px-2 py-0.5 text-white"
                         >
-                          Use
+                          Use this
                         </button>
                       </td>
                     </tr>
@@ -156,8 +156,8 @@ export function CandidateCompare({ onClose }: { onClose: () => void }) {
             )}
             {!scored && !busy && (
               <p className="text-xs text-slate-400">
-                Generate several candidates from different seeds, then pick one. Pinned
-                placements (ELGA) are preserved in every candidate.
+                Create a few options, then pick the one you like. Anything you've pinned (like
+                ELGA) is kept in every option.
               </p>
             )}
           </div>
