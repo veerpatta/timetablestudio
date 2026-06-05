@@ -8,7 +8,7 @@ Factual ground truth extracted from the live viewer app (`veerpatta/timetable202
 - **Periods**: 6 per day. Current "heatwave" profile: P1 starts 07:30, each period 40 min (P1 7:30–8:10, …). Timings are a configurable *schedule profile*, not hardcoded — the school switches profiles seasonally.
 - **Non-teaching slots** (reporting, short break/hydration, dispersal) are timing metadata of the profile, NOT timetable columns.
 
-## Classes (14)
+## Classes (16)
 
 Class 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 Arts, 11 Commerce, 11 Science, 12 Arts, 12 Commerce, 12 Science.
 
@@ -17,6 +17,8 @@ Senior secondary (11/12) streams run in parallel and share stream-specific teach
 ## Teachers (current roster, ~19)
 
 Anita, Anjana, Antima, Bindu, Harshita, Hemlata, Jainendra, Kusum, Mahesh, Maya, Nathulal, Nidhika, Pradhyuman, Prakash, Rakesh, Rashmita, Ravina, Toshit (verify the full list against the live `rawData` when importing; the roster changes between sessions).
+
+**Authoritative data snapshot**: `docs/sources/rawData.vpps.txt` — the real, full 6-day rawData extracted verbatim from the live viewer (2026-06-05). Use it for the real-data fixture, semantic round-trip tests, and quota inference. It supersedes any synthetic sample where they disagree.
 
 ## Subjects (observed)
 

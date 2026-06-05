@@ -13,7 +13,11 @@ This file is the bridge between work sessions. The agent MUST update it after ev
 - **Tests**: green — 105 tests across 30 files
 - **Build**: green — typechecks + builds (87 KB gzip, well under the 300 KB budget)
 
-## Next action
+## Next action (v3 — start M11)
+
+Owner review #2 (2026-06-05) after the v2 ship: still not usable by a non-technical person. v3 roadmap added (M11–M14 in docs/ROADMAP.md) — storage resilience (live repro: wedged IndexedDB = infinite "Loading…" with no recovery), real VPPS data as the spine (the REAL 6-day rawData snapshot is now at docs/sources/rawData.vpps.txt — the long-missing fixture), sidebar pages instead of modals + a quota matrix editor (quotas are currently one-row-at-a-time: impractical at ~100 rows), wizard Blocks step (M7 promise), guided tour + generate pre-flight. SCHOOL_CONTEXT corrected to 16 classes. Use Prompt D in docs/PROMPTS.md. Start M11.
+
+## Previous next-action (v2, superseded)
 
 Roadmap complete (M0–M10). Live at https://veerpatta.github.io/timetablestudio/ (auto-deploys on push to `main`). Suggested follow-ups, none blocking, rough priority:
 1. Owner-side empirical checks: run Lighthouse on the deployed site (confirm a11y ≥ 90 and PWA installable); paste exported rawData into the LIVE legacy viewer (the one M6/v1 AC never verifiable in-session).

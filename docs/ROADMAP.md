@@ -93,6 +93,41 @@ The single biggest gap: a user must be able to build their school inside the app
 - Undo toast ("Moved Maths · Undo"), autosave indicator.
 - **AC**: Lighthouse a11y ≥ 90; soft violations visible in-grid; all four print layouts correct.
 
-## Parked (post-v2)
+---
+
+# v3 — Make it truly non-technical (owner review #2, 2026-06-05)
+
+v2 shipped its ACs, but a second owner review + source audit found the product still assumes a technical user. Root causes: (a) storage failure bricks the app to an infinite "Loading…" (reproduced live — no timeout, no error screen, no reset); (b) the setup wizard uses developer idioms — newline textarea for classes, comma-separated subjects, and quotas added ONE ROW AT A TIME (~100 rows for VPPS: impractical); (c) the ELGA/block step promised in M7 was deferred out of the wizard; (d) everything is a modal over one screen — the M7/M8 "persistent left-nav" was never built; (e) the demo is synthetic while the REAL school data now exists in-repo. v3 fixes these. Strict order, AC-gated, marathon rules apply.
+
+## M11 — Storage resilience (never brick)
+
+- Render the app shell immediately; load IndexedDB in the background. `openDb` wrapped with a ~3 s timeout.
+- On open timeout/error: a recovery screen (not a dev message): "We couldn't open your saved data" with three actions — **Try again**, **Download a backup** (if a read succeeds via a fresh attempt), **Start fresh** (deleteDatabase + reload), plus a tip to try closing other tabs of this site.
+- Autosave failures surface as a non-blocking banner ("Changes aren't being saved — download a backup"), never silent.
+- **AC**: a test simulating a never-resolving `indexedDB.open` renders the recovery screen (fake timers); "Start fresh" produces a working empty state; no code path can leave the user on "Loading…" for more than ~4 s.
+
+## M12 — Real VPPS data as the spine
+
+- `docs/sources/rawData.vpps.txt` (real, full 6-day snapshot, now in-repo) becomes the real-data fixture: add the semantic (tolerant) round-trip test that v1/v2 deferred; fix anything it flushes out (multi-teacher cells, "English compulsory", senior streams).
+- Demo = the real VPPS school (16 classes, 6 days). Drop the synthetic demo or keep it only for tests.
+- Import → **quota confirmation flow**: after a legacy import, show inferred quotas as an editable review screen ("Class 1 gets Maths 6×/week with Bindu — keep/adjust"), then normalize. The user confirms reality instead of typing it from scratch.
+- **AC**: importing the snapshot yields 6 day-tabs, 16 classes, 0 hard conflicts, ELGA as bands; semantic round-trip test green; inferred-quota review screen shown and editable after import.
+
+## M13 — Pages, not modals + the quota matrix
+
+- Left sidebar navigation with real views (hash-routed): **Timetable · Teachers · Classes · Subjects & Quotas · Blocks · Substitutions · Settings**. Modals remain only for confirmations and the wizard. Mobile: sidebar collapses to a bottom nav/hamburger.
+- **Quota matrix editor** (the make-or-break screen): grid of classes × subjects with number cells; per-class running total vs available slots ("31 of 36 periods planned"); assign a teacher per class-subject from the cell; bulk tools — copy one class's quotas to others, fill a subject column. No more one-row-at-a-time.
+- Wizard v2: chips/tag inputs replace newline/comma textareas; inline validation messages (why Next/Finish is disabled); **Blocks step added** (define ELGA: classes, teachers, length, days) as M7 originally specified; wizard progress autosaved.
+- **AC**: full VPPS data (16 classes, ~19 teachers, quotas) enterable from scratch in under 15 minutes using matrix + bulk tools (scripted walkthrough test of the flow); every sidebar view reachable on a 390 px viewport; zero textarea-based data entry left.
+
+## M14 — Guided experience + pre-flight
+
+- First-run guided tour (coach marks: grid → conflicts → fill gaps → print) — the M10 item that wasn't delivered; dismissible, replayable from Settings.
+- "Next step" hints in the header driven by project state: no quotas → "Add weekly subject quotas"; quota shortfall → "Class 7 has 4 unplanned periods"; conflicts → "2 clashes to fix — tap to see".
+- Generate pre-flight: one **Create timetable** CTA runs a readable checklist first (quota sums vs slots, teacher capacity vs demand, block fit) and explains any blocker in a sentence before the solver runs.
+- Plain-language glossary popovers (quota, block, draft, pin) on first encounter.
+- **AC**: a deliberately under-quota'd project shows the right hint and the pre-flight names the class and the missing count; tour renders on a fresh project and never again unless replayed; a non-technical tester (the owner) completes import → adjust → generate → print unaided.
+
+## Parked (post-v3)
 
 Rooms/labs, multi-school config, teacher preference forms, statistics dashboard, share links.

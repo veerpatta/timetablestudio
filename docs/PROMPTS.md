@@ -35,6 +35,16 @@ The session handoff protocol both modes rely on is defined in `AGENTS.md` § 6 a
 >
 > Begin with M7.
 
+## Prompt D — v3 marathon (non-technical usability, M11–M14)
+
+> v2 shipped but a second owner review found the app still assumes a technical user — findings and fixes are specified in docs/ROADMAP.md § v3. Read AGENTS.md, docs/HANDOFF.md, docs/ROADMAP.md § v3, and docs/SCHOOL_CONTEXT.md (note: the REAL 6-day rawData snapshot now lives at docs/sources/rawData.vpps.txt — it supersedes synthetic fixtures). Verify reality first: `git log --oneline -10`, `npm test`, `npm run build`. Then work M11 → M14 in strict order under the marathon rules (Prompt A rules 1–7) plus Prompt C's rules 8–10, and:
+>
+> 11. Resilience rule: no code path may strand the user on a spinner or blank screen — every async boundary (storage, worker, import) needs a timeout + a plain-language recovery action.
+> 12. Data-entry rule: no newline- or comma-separated text fields for structured data; use proper inputs (chips, selects, matrix cells) with inline validation that says why something is invalid.
+> 13. The real snapshot is law: where docs/sources/rawData.vpps.txt contradicts a synthetic fixture or an assumption in docs, the snapshot wins — update the doc and note it in DECISIONS.md.
+>
+> Begin with M11.
+
 ## Per-milestone prompts (single-milestone mode)
 
 Always start a session with the kickoff line.
