@@ -12,6 +12,7 @@ import {
   setSchoolName,
 } from "../../domain/projectEdit";
 import type { Day, Project, SchoolClass } from "../../domain/types";
+import { Modal } from "../common/Modal";
 
 const TABS = ["School", "Classes", "Teachers", "Subjects & Quotas"] as const;
 type Tab = (typeof TABS)[number];
@@ -37,8 +38,7 @@ export function DataManager({ onClose }: { onClose: () => void }) {
     project.profiles.find((p) => p.id === project.timetables.find((t) => t.id === project.activeTimetableId)?.profileId)?.days ?? [];
 
   return (
-    <div className="modal-overlay fixed inset-0 z-20 flex items-start justify-center overflow-auto bg-black/40 p-4 sm:p-6">
-      <div className="modal-card w-full max-w-3xl rounded-lg bg-white shadow-xl">
+    <Modal onClose={onClose} maxWidth="max-w-3xl" label="Manage school data">
         <header className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
           <h2 className="font-semibold">Manage school data</h2>
           <button type="button" onClick={onClose} aria-label="Close" className="text-slate-400 hover:text-slate-600">✕</button>
@@ -124,7 +124,6 @@ export function DataManager({ onClose }: { onClose: () => void }) {
             </div>
           )}
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

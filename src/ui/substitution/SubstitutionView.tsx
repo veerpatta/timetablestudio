@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useProjectStore } from "../../store/projectStore";
 import { proposeSubstitutions, type CoverItem } from "../../domain/substitution";
 import type { Day } from "../../domain/types";
+import { Modal } from "../common/Modal";
 
 const statusStyle: Record<CoverItem["status"], string> = {
   "owner-decision": "border-hard bg-red-50",
@@ -36,8 +37,7 @@ export function SubstitutionView({ onClose }: { onClose: () => void }) {
     });
 
   return (
-    <div className="modal-overlay fixed inset-0 z-10 flex items-start justify-center overflow-auto bg-black/30 p-6">
-      <div className="modal-card w-full max-w-3xl rounded-lg bg-white shadow-xl">
+    <Modal onClose={onClose} maxWidth="max-w-3xl" label="Substitution assistant">
         <header className="no-print flex items-center justify-between border-b border-slate-200 px-4 py-3">
           <h2 className="font-semibold">Substitution assistant</h2>
           <div className="flex items-center gap-2">
@@ -153,7 +153,6 @@ export function SubstitutionView({ onClose }: { onClose: () => void }) {
             </ul>
           )}
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

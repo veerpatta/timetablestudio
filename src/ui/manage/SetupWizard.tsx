@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useProjectStore } from "../../store/projectStore";
 import { buildProject, type BuildInput, type QuotaInput, type TeacherInput } from "../../domain/projectBuilder";
 import type { Day, SchoolClass } from "../../domain/types";
+import { Modal } from "../common/Modal";
 
 const ALL_DAYS: Day[] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -55,8 +56,7 @@ export function SetupWizard({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <div className="modal-overlay fixed inset-0 z-20 flex items-start justify-center overflow-auto bg-black/40 p-4 sm:p-6">
-      <div className="modal-card w-full max-w-2xl rounded-lg bg-white shadow-xl">
+    <Modal onClose={onClose} maxWidth="max-w-2xl" label="Set up my school">
         <header className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
           <h2 className="font-semibold">Set up my school</h2>
           <button type="button" onClick={onClose} aria-label="Close" className="text-slate-400 hover:text-slate-600">
@@ -164,7 +164,6 @@ export function SetupWizard({ onClose }: { onClose: () => void }) {
             <button type="button" onClick={finish} disabled={!canFinish} className="rounded bg-emerald-600 px-4 py-1 text-sm font-medium text-white disabled:opacity-40">Create timetable</button>
           )}
         </footer>
-      </div>
-    </div>
+    </Modal>
   );
 }

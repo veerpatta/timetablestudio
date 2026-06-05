@@ -5,6 +5,7 @@ import { useWeightsStore } from "../../store/weightsStore";
 import { scoreTimetable } from "../../solver/score";
 import { runSolver } from "./runSolver";
 import { WeightEditor } from "./WeightEditor";
+import { Modal } from "../common/Modal";
 import type { Placement, Project, Timetable } from "../../domain/types";
 
 interface Candidate {
@@ -79,8 +80,7 @@ export function CandidateCompare({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <div className="fixed inset-0 z-10 flex items-start justify-center bg-black/30 p-6 overflow-auto">
-      <div className="w-full max-w-3xl rounded-lg bg-white shadow-xl">
+    <Modal onClose={onClose} maxWidth="max-w-3xl" label="Create timetables">
         <header className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
           <h2 className="font-semibold">Generate &amp; compare candidates</h2>
           <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600">
@@ -164,7 +164,6 @@ export function CandidateCompare({ onClose }: { onClose: () => void }) {
 
           <WeightEditor />
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

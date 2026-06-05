@@ -6,6 +6,7 @@ import { importLegacyRawData } from "../../domain/legacyImport";
 import { normalizeProject } from "../../domain/requirements";
 import { serializeProject, deserializeProject, suggestFilename } from "../../persistence/projectFile";
 import { downloadText, copyText, readFileText } from "./download";
+import { Modal } from "../common/Modal";
 
 export function ExportImport({ onClose }: { onClose: () => void }) {
   const project = useProjectStore((s) => s.project);
@@ -58,8 +59,7 @@ export function ExportImport({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <div className="modal-overlay fixed inset-0 z-10 flex items-start justify-center overflow-auto bg-black/30 p-6">
-      <div className="modal-card w-full max-w-2xl rounded-lg bg-white shadow-xl">
+    <Modal onClose={onClose} maxWidth="max-w-2xl" label="Export / Import">
         <header className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
           <h2 className="font-semibold">Export / Import</h2>
           <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600">
@@ -126,7 +126,6 @@ export function ExportImport({ onClose }: { onClose: () => void }) {
             </p>
           </section>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
