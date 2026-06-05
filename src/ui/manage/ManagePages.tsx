@@ -1,20 +1,21 @@
+import { useState } from "react";
 import { useProjectStore } from "../../store/projectStore";
 import {
   addClass,
   removeClass,
   addTeacher,
   setTeacher,
-  removeTeacher,
   setSchoolName,
   setActiveProfile,
   addBlock,
   removeBlock,
 } from "../../domain/projectEdit";
-import type { Day, Project, SchoolClass } from "../../domain/types";
+import type { Day, Project, SchoolClass, Teacher } from "../../domain/types";
 import { useUiStore } from "../../store/uiStore";
 import { Chips } from "../common/Chips";
 import { Glossary } from "../common/Glossary";
 import { BlockForm } from "./BlockForm";
+import { ReassignTeacherModal } from "./ReassignTeacherModal";
 
 const ALL_DAYS: Day[] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -63,6 +64,7 @@ export function ClassesPage() {
 export function TeachersPage() {
   const [project, apply] = useApply();
   const subjectSuggestions = project.subjects.map((s) => s.name);
+  const [removing, setRemoving] = useState<Teacher | null>(null);
   return (
     <PageShell title="Teachers" subtitle="Each teacher and the subjects they can teach. Add subjects as chips.">
       <ul className="space-y-3">
@@ -70,7 +72,7 @@ export function TeachersPage() {
           <li key={t.id} className="rounded border border-slate-200 p-2">
             <div className="mb-1 flex items-center justify-between">
               <span className="font-medium">{t.name}</span>
-              <button type="button" onClick={() => apply(removeTeacher(project, t.id))} aria-label={`Remove ${t.name}`} className="text-slate-400 hover:text-hard">
+              <button type="button" onClick={() => setRemoving(t)} aria-label={`Remove ${t.name}`} className="text-slate-400 hover:text-hard">
                 ✕
               </button>
             </div>
@@ -92,6 +94,14 @@ export function TeachersPage() {
         onAdd={(name) => apply(addTeacher(project, name))}
         onRemove={() => {}}
       />
+      {removing && (
+        <ReassignTeacherModal
+          project={project}
+          teacher={removing}
+          apply={apply}
+          onClose={() => setRemoving(null)}
+        />
+      )}
     </PageShell>
   );
 }
