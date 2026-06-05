@@ -18,8 +18,8 @@ This file is the bridge between work sessions. The agent MUST update it after ev
 
 ## Next action
 
-v1 roadmap (M0–M6) is complete. Suggested next steps (none blocking), in rough priority:
-1. Enable GitHub Pages (repo Settings → Pages → Source: GitHub Actions) and confirm the first deploy; paste exported rawData into the LIVE legacy viewer to close the last AC empirically (no viewer instance was available in-session).
+v1 roadmap (M0–M6) is complete and DEPLOYED. Live at https://veerpatta.github.io/timetablestudio/ (GitHub Pages enabled via API with `build_type=workflow`; deploy workflow green; root + manifest + sw.js all 200, relative `./` asset paths resolve under the `/timetablestudio/` subpath). Suggested next steps (none blocking), in rough priority:
+1. Paste exported rawData into the LIVE legacy viewer to close the last AC empirically (no viewer instance was available in-session). Optionally install the PWA from the live URL to confirm Lighthouse "installable".
 2. Replace the synthetic `fixtures/legacyRaw.sample.ts` with a real `rawData` snapshot from the viewer; add a tolerant (semantic) round-trip comparison alongside the exact one.
 3. Owner-authoritative data: real per-class subject quotas + teacher caps/unavailability (currently fixture-derived) — see Open questions. Then the solver targets real requirements.
 4. Polish: soft (amber) badges in the editor grid; a timetable/draft switcher UI; generalize block detection beyond the literal "ELGA" token if a second block type appears.
