@@ -6,18 +6,18 @@ This file is the bridge between work sessions. The agent MUST update it after ev
 
 ## Current state
 
-- **Last completed milestone**: M12 — Real VPPS data as the spine. **v3 in progress.** 113 tests green; `npm run build` (86 KB gzip) and `npm run lint` clean. Verified live: "Explore demo" now loads the REAL VPPS school — header "Veer Patta Public School · Ready — no conflicts", 6 day tabs, 16 classes, ELGA as a merged band, Class 1 Mon = Maths(Bindu)/EVS(Ravina)/ELGA/Hindi(Anjana) (matches snapshot), 0 console errors.
-  - **AC met**: (1) importing `docs/sources/rawData.vpps.txt` → 6 days, 16 classes, 18 teachers, 0 hard, ELGA bands (`vppsReal.test.ts`, live); (2) semantic round-trip green (tolerant of the viewer's blank lines between days); (3) editable inferred-quota review (`ui/manage/QuotaReview`) shown after a legacy import before commit (`ExportImport.test.tsx`).
-  - Built: combined-section detection in `legacyImport` (senior shared Hindi/English/Economics → length-1 multi-class blocks, 0 false clashes); `fixtures/vppsReal.ts` (snapshot via Vite `?raw`, single source); `loadDemo` → real school; `QuotaReview` + `setQuotaPeriods`. SCHOOL_CONTEXT corrected (ELGA Mon–Thu, 18 teachers); synthetic demo kept test-only.
-- **In-progress milestone**: none between — M12 done, **M13 is next**.
-- **Tests**: green — 113 tests across 31 files
-- **Build**: green — typechecks + builds (86 KB gzip, well under the 300 KB budget)
+- **Last completed milestone**: M13 — Pages, not modals + the quota matrix. **v3 in progress.** 119 tests green; `npm run build` (90 KB gzip) and `npm run lint` clean. Verified live (clean server restart, 0 console errors): real VPPS demo, 7-view sidebar, quota matrix 16×22 with inferred quotas + bulk tools, wizard v2 (5 steps incl. Blocks, chips, no textarea, validation-gated Next), all views reachable at 390px.
+  - **AC met**: (1) full-data completability via matrix + bulk tools (`domain/quotaWalkthrough.test.ts` — 5 bulk calls → 64 quotas across 16 classes); (2) every sidebar view reachable at 390px (live); (3) zero textarea-based structured entry (`wizardV2.test.tsx`).
+  - Built: `useHashRoute` + `Sidebar` (7 hash-routed views); `QuotaMatrix` (cells + per-cell teacher + bulk copy/fill); `ManagePages` (Classes/Teachers/Settings/Blocks, chips); `Chips`, `BlockForm`; pure `setClassSubjectQuota`/`copyClassQuotas`/`fillSubjectColumn`/`addBlock`/`removeBlock`; wizard v2 + `persistence/wizardDraft`; `SubstitutionView` → page; `DataManager` modal deleted; print model simplified to `.no-print` chrome.
+- **In-progress milestone**: none between — M13 done, **M14 is next (final v3 milestone)**.
+- **Tests**: green — 119 tests across 33 files
+- **Build**: green — typechecks + builds (90 KB gzip, well under the 300 KB budget)
 
-## Next action (v3 — start M13)
+## Next action (v3 — start M14)
 
-M13 — Pages, not modals + the quota matrix. (a) Left sidebar nav with hash-routed real views: Timetable · Teachers · Classes · Subjects & Quotas · Blocks · Substitutions · Settings; modals remain only for confirmations + the wizard; mobile = collapsible bottom nav/hamburger. (b) **Quota matrix editor** (make-or-break): grid of classes × subjects with number cells, per-class running total vs available ("31 of 36 periods planned"), assign a teacher per class-subject from the cell, bulk tools (copy one class's quotas to others, fill a subject column) — no one-row-at-a-time. (c) Wizard v2: chips/tag inputs replace newline/comma textareas; inline validation messages; **Blocks step added** (ELGA: classes, teachers, length, days) per the original M7 promise; wizard progress autosaved. AC: full VPPS data enterable from scratch in <15 min via matrix + bulk (scripted walkthrough test); every sidebar view reachable at 390 px; zero textarea-based structured data entry left.
+M14 — Guided experience + pre-flight (final v3 milestone). (a) First-run guided tour (coach marks: grid → conflicts → fill gaps → print) — the M10 item never delivered; dismissible, replayable from Settings. (b) "Next step" hints in the header driven by project state: no quotas → "Add weekly subject quotas"; quota shortfall → "Class 7 has 4 unplanned periods"; conflicts → "2 clashes to fix — tap to see". (c) Generate pre-flight: one **Create timetable** CTA runs a readable checklist first (quota sums vs slots, teacher capacity vs demand, block fit) and explains any blocker in a sentence before the solver runs — build on the existing pure `solver/diagnose.ts` (M9). (d) Plain-language glossary popovers (quota, block, draft, pin) on first encounter. AC: a deliberately under-quota'd project shows the right hint and the pre-flight names the class + missing count; tour renders on a fresh project and never again unless replayed; non-technical tester completes import → adjust → generate → print unaided.
 
-Note: `QuotaReview` (M12) already provides a class-grouped editable quota list with inline validation + block-aware per-class totals — a strong base to factor the M13 matrix editor from.
+Note: `solver/diagnose.ts` already produces plain-language structural blockers (teacher over-commitment, class demand vs slots) — the pre-flight checklist should surface it BEFORE solving. `quotaStatus()` gives per-class shortfalls for the hints.
 
 ## Previous next-action (v2, superseded)
 
