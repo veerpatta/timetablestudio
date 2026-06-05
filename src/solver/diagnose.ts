@@ -26,8 +26,10 @@ function activeTimetable(project: Project, timetableId: Id): Timetable | undefin
   return project.timetables.find((t) => t.id === timetableId);
 }
 
-/** Required weekly periods each teacher / class must receive, including blocks. */
-function demand(project: Project) {
+/** Required weekly periods each teacher / class must receive, including blocks.
+ * The ONE place this is computed — quota matrix, header hint and pre-flight all
+ * read from here so the "planned vs slots" number can never diverge (M14). */
+export function demand(project: Project) {
   const teacherWeek = new Map<Id, number>();
   const classWeek = new Map<Id, number>();
   const add = (m: Map<Id, number>, id: Id, n: number) => m.set(id, (m.get(id) ?? 0) + n);
@@ -46,6 +48,26 @@ function demand(project: Project) {
     for (const t of block.teacherIds) add(teacherWeek, t, periods);
   }
   return { teacherWeek, classWeek };
+}
+
+export interface ClassLoad {
+  classId: Id;
+  name: string;
+  planned: number; // curriculum + block periods a week
+  slots: number; // available periods a week
+  unplanned: number; // slots − planned, clamped at 0 (free periods)
+}
+
+/** Per-class planned vs available periods, from the single `demand()` source. */
+export function classLoads(project: Project, timetableId: Id): ClassLoad[] {
+  const timetable = activeTimetable(project, timetableId);
+  const profile = timetable && project.profiles.find((p) => p.id === timetable.profileId);
+  const slots = (profile ? profile.days.length : 6) * (profile ? profile.periods.length : 6);
+  const { classWeek } = demand(project);
+  return project.classes.map((c) => {
+    const planned = classWeek.get(c.id) ?? 0;
+    return { classId: c.id, name: c.name, planned, slots, unplanned: Math.max(0, slots - planned) };
+  });
 }
 
 export function diagnose(project: Project, timetableId: Id): FeasibilityReport {

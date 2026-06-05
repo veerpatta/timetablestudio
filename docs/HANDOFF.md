@@ -6,18 +6,20 @@ This file is the bridge between work sessions. The agent MUST update it after ev
 
 ## Current state
 
-- **Last completed milestone**: M13 — Pages, not modals + the quota matrix. **v3 in progress.** 119 tests green; `npm run build` (90 KB gzip) and `npm run lint` clean. Verified live (clean server restart, 0 console errors): real VPPS demo, 7-view sidebar, quota matrix 16×22 with inferred quotas + bulk tools, wizard v2 (5 steps incl. Blocks, chips, no textarea, validation-gated Next), all views reachable at 390px.
-  - **AC met**: (1) full-data completability via matrix + bulk tools (`domain/quotaWalkthrough.test.ts` — 5 bulk calls → 64 quotas across 16 classes); (2) every sidebar view reachable at 390px (live); (3) zero textarea-based structured entry (`wizardV2.test.tsx`).
-  - Built: `useHashRoute` + `Sidebar` (7 hash-routed views); `QuotaMatrix` (cells + per-cell teacher + bulk copy/fill); `ManagePages` (Classes/Teachers/Settings/Blocks, chips); `Chips`, `BlockForm`; pure `setClassSubjectQuota`/`copyClassQuotas`/`fillSubjectColumn`/`addBlock`/`removeBlock`; wizard v2 + `persistence/wizardDraft`; `SubstitutionView` → page; `DataManager` modal deleted; print model simplified to `.no-print` chrome.
-- **In-progress milestone**: none between — M13 done, **M14 is next (final v3 milestone)**.
-- **Tests**: green — 119 tests across 33 files
-- **Build**: green — typechecks + builds (90 KB gzip, well under the 300 KB budget)
+- **Last completed milestone**: M14 — Guided experience + pre-flight. **v3 roadmap (M11–M14) COMPLETE.** 126 tests green; `npm run build` (92 KB gzip) and `npm run lint` clean. Verified live (clean server restart, 0 console errors): tour auto-opens on first run (and not again), header "Next step" hint, Create-timetables pre-flight checklist (✓/⚠/✗), glossary `?` popovers.
+  - **AC met**: (1) under-quota project → correct hint naming class + count, pre-flight names it as a warning that still allows generate (`solver/guidance.test.ts`); (2) tour renders on a fresh project, closes for good, replayable from Settings (`ui/app/tour.test.tsx`); (3) non-technical end-to-end is human/owner-side (honest claim) — verifiable parts covered by tests + live walkthrough.
+  - Built: `solver/guidance.ts` (`nextStep` + `preflight`, reading one shared `demand()`/`classLoads()` source); header hint strip + `PreflightChecklist`; `Tour` + `uiStore.tourOpen` + `persistence/uiPrefs`; `Glossary` (quota/block/draft/pin).
+- **In-progress milestone**: none — **v1 (M0–M6), v2 (M7–M10), v3 (M11–M14) all complete.**
+- **Tests**: green — 126 tests across 35 files
+- **Build**: green — typechecks + builds (92 KB gzip, well under the 300 KB budget)
 
-## Next action (v3 — start M14)
+## Next action
 
-M14 — Guided experience + pre-flight (final v3 milestone). (a) First-run guided tour (coach marks: grid → conflicts → fill gaps → print) — the M10 item never delivered; dismissible, replayable from Settings. (b) "Next step" hints in the header driven by project state: no quotas → "Add weekly subject quotas"; quota shortfall → "Class 7 has 4 unplanned periods"; conflicts → "2 clashes to fix — tap to see". (c) Generate pre-flight: one **Create timetable** CTA runs a readable checklist first (quota sums vs slots, teacher capacity vs demand, block fit) and explains any blocker in a sentence before the solver runs — build on the existing pure `solver/diagnose.ts` (M9). (d) Plain-language glossary popovers (quota, block, draft, pin) on first encounter. AC: a deliberately under-quota'd project shows the right hint and the pre-flight names the class + missing count; tour renders on a fresh project and never again unless replayed; non-technical tester completes import → adjust → generate → print unaided.
+v3 complete. All milestones shipped and AC-verified. Branch `v3-m11-m14` (M11→M14, six commits) — ready to push / open a PR to `main`.
 
-Note: `solver/diagnose.ts` already produces plain-language structural blockers (teacher over-commitment, class demand vs slots) — the pre-flight checklist should surface it BEFORE solving. `quotaStatus()` gives per-class shortfalls for the hints.
+Honest carried claims (unchanged discipline): AC#3 "non-technical tester unaided" is owner-side; Lighthouse a11y/PWA numeric scores confirm on deploy; the live legacy-viewer paste check is owner-side (the byte-exact M1 + semantic M12 round-trip tests back it in-repo).
+
+Suggested follow-ups (none blocking): mobile polish on the 16×22 matrix (sticky-column scroll works; could add per-class card view); "first-encounter" auto-surfacing for glossary terms (currently click-to-reveal); teacher unavailable-slot editor in Settings; per-teacher week print "print all".
 
 ## Previous next-action (v2, superseded)
 

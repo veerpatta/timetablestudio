@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react";
 import { useProjectStore } from "../../store/projectStore";
 import { setClassSubjectQuota, copyClassQuotas, fillSubjectColumn } from "../../domain/projectEdit";
+import { classLoads } from "../../solver/diagnose";
+import { Glossary } from "../common/Glossary";
 import type { Id, Project } from "../../domain/types";
 
 /** Classes × subjects quota matrix with per-cell teacher assignment, per-class
@@ -11,11 +13,6 @@ export function QuotaMatrix() {
   const setProject = useProjectStore((s) => s.setProject);
   const apply = (p: Project) => setProject(p);
 
-  const profile = project.profiles.find(
-    (p) => p.id === project.timetables.find((t) => t.id === project.activeTimetableId)?.profileId,
-  );
-  const slotsPerWeek = (profile?.days.length ?? 6) * (profile?.periods.length ?? 6);
-
   const reqOf = useMemo(() => {
     const m = new Map<string, { teacher: Id; periods: number }>();
     for (const r of project.requirements.curriculum) {
@@ -24,28 +21,17 @@ export function QuotaMatrix() {
     return m;
   }, [project]);
 
-  const blockPeriodsByClass = useMemo(() => {
-    const tt = project.timetables.find((t) => t.id === project.activeTimetableId);
-    const byId = new Map(project.activities.map((a) => [a.id, a] as const));
-    const counts = new Map<Id, number>();
-    for (const pl of tt?.placements ?? []) {
-      const a = byId.get(pl.activityId);
-      if (a?.kind === "block") for (const c of a.classIds) counts.set(c, (counts.get(c) ?? 0) + a.length);
-    }
-    return counts;
-  }, [project]);
+  // Single source for planned-vs-slots — shared with the header hint + pre-flight.
+  const loads = useMemo(
+    () => new Map(classLoads(project, project.activeTimetableId!).map((l) => [l.classId, l])),
+    [project],
+  );
 
   const qualifiedFor = (subjectId: Id) =>
     project.teachers.filter((t) => t.subjects.includes(subjectId));
   const defaultTeacher = (subjectId: Id): Id => {
     const q = qualifiedFor(subjectId)[0] ?? project.teachers[0];
     return q?.id ?? "";
-  };
-
-  const classTotal = (classId: Id) => {
-    let sum = blockPeriodsByClass.get(classId) ?? 0;
-    for (const s of project.subjects) sum += reqOf.get(`${classId}#${s.id}`)?.periods ?? 0;
-    return sum;
   };
 
   const setPeriods = (classId: Id, subjectId: Id, raw: string) => {
@@ -61,7 +47,7 @@ export function QuotaMatrix() {
 
   return (
     <div className="p-4">
-      <h2 className="text-lg font-semibold">Subjects &amp; Quotas</h2>
+      <h2 className="text-lg font-semibold">Subjects &amp; Quotas<Glossary term="quota" /></h2>
       <p className="mb-3 text-sm text-slate-500">
         How many periods a week each class gets of each subject, and who teaches it. Use the bulk
         tools to avoid filling cells one at a time.
@@ -84,7 +70,9 @@ export function QuotaMatrix() {
           </thead>
           <tbody>
             {project.classes.map((c) => {
-              const total = classTotal(c.id);
+              const load = loads.get(c.id);
+              const total = load?.planned ?? 0;
+              const slots = load?.slots ?? 36;
               return (
                 <tr key={c.id} className="border-t border-slate-100">
                   <th scope="row" className="sticky left-0 z-10 whitespace-nowrap bg-white px-2 py-1 text-left font-medium">
@@ -120,8 +108,8 @@ export function QuotaMatrix() {
                       </td>
                     );
                   })}
-                  <td className={`border-l border-slate-200 px-2 py-1 text-right ${total > slotsPerWeek ? "text-hard" : "text-slate-500"}`}>
-                    {total}/{slotsPerWeek}
+                  <td className={`border-l border-slate-200 px-2 py-1 text-right ${total > slots ? "text-hard" : "text-slate-500"}`}>
+                    {total}/{slots}
                   </td>
                 </tr>
               );

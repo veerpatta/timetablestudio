@@ -4,11 +4,11 @@ import { useEditorStore } from "../../store/editorStore";
 import { useWeightsStore } from "../../store/weightsStore";
 import { useUiStore } from "../../store/uiStore";
 import { scoreTimetable } from "../../solver/score";
-import { diagnose, type Blocker } from "../../solver/diagnose";
+import { preflight } from "../../solver/guidance";
 import { diffTimetables } from "../../domain/diff";
 import { runSolver } from "./runSolver";
 import { WeightEditor } from "./WeightEditor";
-import { BlockerReport } from "./BlockerReport";
+import { PreflightChecklist } from "./PreflightChecklist";
 import { Modal } from "../common/Modal";
 import type { Placement, Project, Timetable } from "../../domain/types";
 
@@ -35,8 +35,12 @@ export function CandidateCompare({ onClose }: { onClose: () => void }) {
   const [n, setN] = useState(3);
   const [seedBase, setSeedBase] = useState(1);
   const [error, setError] = useState<string | null>(null);
-  const [blockers, setBlockers] = useState<Blocker[] | null>(null);
   const [diffSeed, setDiffSeed] = useState<number | null>(null);
+
+  const pre = useMemo(
+    () => (project ? preflight(project, project.activeTimetableId!) : null),
+    [project],
+  );
 
   const currentPlacements = useMemo(
     () => (project ? active(project).placements : []),
@@ -67,11 +71,7 @@ export function CandidateCompare({ onClose }: { onClose: () => void }) {
   const generate = async () => {
     setError(null);
     setDiffSeed(null);
-    const pre = diagnose(project, project.activeTimetableId!);
-    if (!pre.ok) {
-      setBlockers(pre.blockers);
-      return;
-    }
+    if (!pre?.ok) return; // gated by the pre-flight checklist (button is disabled too)
     setBusy(true);
     setCandidates(null);
     const out: Candidate[] = [];
@@ -130,13 +130,16 @@ export function CandidateCompare({ onClose }: { onClose: () => void }) {
               <button
                 type="button"
                 onClick={generate}
-                disabled={busy}
+                disabled={busy || !pre?.ok}
+                title={!pre?.ok ? "Fix the items below first" : "Create timetable options"}
                 className="rounded bg-indigo-600 px-3 py-1 font-medium text-white disabled:opacity-50"
               >
                 {busy ? "Working…" : "Create options"}
               </button>
               {error && <span className="text-xs text-hard">⚠ {error}</span>}
             </div>
+
+            {!scored && !busy && pre && <PreflightChecklist preflight={pre} />}
 
             {scored && (
               <table className="w-full text-xs">
@@ -205,7 +208,7 @@ export function CandidateCompare({ onClose }: { onClose: () => void }) {
               </div>
             )}
             {!scored && !busy && (
-              <p className="text-xs text-slate-400">
+              <p className="mt-2 text-xs text-slate-400">
                 Create a few options, then pick the one you like. Anything you've pinned (like
                 ELGA) is kept in every option.
               </p>
@@ -214,7 +217,6 @@ export function CandidateCompare({ onClose }: { onClose: () => void }) {
 
           <WeightEditor />
         </div>
-        {blockers && <BlockerReport blockers={blockers} onClose={() => setBlockers(null)} />}
     </Modal>
   );
 }

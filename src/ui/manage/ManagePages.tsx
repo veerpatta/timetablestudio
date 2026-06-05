@@ -11,7 +11,9 @@ import {
   removeBlock,
 } from "../../domain/projectEdit";
 import type { Day, Project, SchoolClass } from "../../domain/types";
+import { useUiStore } from "../../store/uiStore";
 import { Chips } from "../common/Chips";
+import { Glossary } from "../common/Glossary";
 import { BlockForm } from "./BlockForm";
 
 const ALL_DAYS: Day[] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -23,10 +25,10 @@ function inferGroup(name: string): SchoolClass["group"] {
   return "middle";
 }
 
-function PageShell({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
+function PageShell({ title, subtitle, glossary, children }: { title: string; subtitle?: string; glossary?: React.ReactNode; children: React.ReactNode }) {
   return (
     <div className="mx-auto max-w-3xl p-4">
-      <h2 className="text-lg font-semibold">{title}</h2>
+      <h2 className="text-lg font-semibold">{title}{glossary}</h2>
       {subtitle && <p className="mb-3 text-sm text-slate-500">{subtitle}</p>}
       <div className="mt-3">{children}</div>
     </div>
@@ -96,6 +98,7 @@ export function TeachersPage() {
 
 export function SettingsPage() {
   const [project, apply] = useApply();
+  const startTour = useUiStore((s) => s.startTour);
   const profile = project.profiles.find(
     (p) => p.id === project.timetables.find((t) => t.id === project.activeTimetableId)?.profileId,
   );
@@ -143,6 +146,11 @@ export function SettingsPage() {
           className="mt-1 block w-20 rounded border border-slate-300 px-2 py-1"
         />
       </label>
+      <div className="mt-6 border-t border-slate-100 pt-4">
+        <button type="button" onClick={startTour} className="rounded border border-slate-300 px-3 py-1 text-sm hover:bg-slate-50">
+          Replay the guided tour
+        </button>
+      </div>
     </PageShell>
   );
 }
@@ -158,6 +166,7 @@ export function BlocksPage() {
   return (
     <PageShell
       title="Blocks"
+      glossary={<Glossary term="block" />}
       subtitle="Multi-class blocks like ELGA: several classes regroup together and a set of teachers are occupied for the whole block."
     >
       <ul className="mb-4 space-y-2">

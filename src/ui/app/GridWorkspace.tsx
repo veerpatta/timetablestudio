@@ -7,6 +7,7 @@ import { WeekGrid } from "../grid/WeekGrid";
 import { ViolationsPanel } from "../panels/ViolationsPanel";
 import { TeacherLoadPanel } from "../panels/TeacherLoadPanel";
 import { QuotaPanel } from "../panels/QuotaPanel";
+import { Glossary } from "../common/Glossary";
 
 interface Props {
   project: Project;
@@ -107,7 +108,7 @@ export function GridWorkspace({ project, timetable, violations, maps, quota, day
                 violations={violations}
               />
               <p className="no-print mt-2 text-xs text-slate-400">
-                Drag a cell to move it within the day · pin to lock it · ELGA shows as one block.
+                Drag a cell to move it within the day · pin<Glossary term="pin" /> to lock it · ELGA shows as one block.
               </p>
             </>
           ) : scope ? (

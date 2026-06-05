@@ -5,6 +5,8 @@ import { useUiStore } from "../../store/uiStore";
 import { useDerived } from "./hooks";
 import { useHashRoute } from "./useHashRoute";
 import { Sidebar } from "./Sidebar";
+import { Tour } from "./Tour";
+import { nextStep } from "../../solver/guidance";
 import { GridWorkspace } from "./GridWorkspace";
 import { DraftSwitcher } from "./DraftSwitcher";
 import { CompleteButton } from "../solverui/CompleteButton";
@@ -68,6 +70,12 @@ export function App() {
   const { timetable, violations, maps, quota } = derived;
   const hardCount = violations.filter((v) => v.severity === "hard").length;
   const days = project.profiles.find((p) => p.id === timetable.profileId)?.days ?? [];
+  const hint = nextStep(project, timetable.id, hardCount);
+  const onHint = () => {
+    if (!hint) return;
+    if (hint.cta === "Create timetable") setShowGenerate(true);
+    else navigate(hint.view);
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
@@ -89,6 +97,18 @@ export function App() {
             Download a backup
           </button>
         </div>
+      )}
+      {hint && (
+        <button
+          type="button"
+          onClick={onHint}
+          className="no-print flex w-full items-center justify-between gap-2 border-b border-indigo-100 bg-indigo-50 px-4 py-1.5 text-left text-sm text-indigo-900 hover:bg-indigo-100 sm:px-6"
+        >
+          <span>
+            <span className="font-medium">Next step:</span> {hint.message}
+          </span>
+          <span className="shrink-0 font-medium text-indigo-700">{hint.cta} →</span>
+        </button>
       )}
       <header className="no-print flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-slate-200 bg-white px-4 py-3 sm:px-6">
         <div className="flex items-center gap-3">
@@ -185,6 +205,7 @@ export function App() {
       {showGenerate && <CandidateCompare onClose={() => setShowGenerate(false)} />}
       {showIO && <ExportImport onClose={() => setShowIO(false)} />}
       {showWizard && <SetupWizard onClose={() => setShowWizard(false)} />}
+      <Tour />
     </div>
   );
 }

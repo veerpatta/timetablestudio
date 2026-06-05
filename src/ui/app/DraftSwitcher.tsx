@@ -1,5 +1,6 @@
 import { useProjectStore } from "../../store/projectStore";
 import { useEditorStore } from "../../store/editorStore";
+import { Glossary } from "../common/Glossary";
 
 /** Top-bar selector for the active timetable draft (e.g. original vs a created
  * option vs a filled-in draft). Switching resets the editor's undo history. */
@@ -14,6 +15,7 @@ export function DraftSwitcher() {
       <label className="sr-only" htmlFor="draft-switcher">
         Timetable draft
       </label>
+      <span className="hidden text-slate-500 sm:inline">Draft<Glossary term="draft" /></span>
       <select
         id="draft-switcher"
         value={project.activeTimetableId ?? ""}
