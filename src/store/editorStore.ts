@@ -27,15 +27,22 @@ function currentSnapshot(): Snapshot | null {
   return { activities: project.activities, placements: tt.placements };
 }
 
+export type WeekScope = { kind: "class" | "teacher"; id: string };
+
 interface EditorState {
   selectedDay: Day;
   viewMode: "class" | "teacher";
+  /** "day" = whole-school day grid (editable); "week" = one class/teacher week. */
+  gridView: "day" | "week";
+  weekScope: WeekScope | null;
   selection: PlacementRef | null;
   past: Snapshot[];
   future: Snapshot[];
 
   setSelectedDay: (day: Day) => void;
   setViewMode: (mode: "class" | "teacher") => void;
+  setGridView: (view: "day" | "week") => void;
+  setWeekScope: (scope: WeekScope | null) => void;
   select: (ref: PlacementRef | null) => void;
 
   move: (ref: PlacementRef, toDay: Day, toPeriod: number) => void;
@@ -59,12 +66,16 @@ export const useEditorStore = create<EditorState>((set, get) => {
   return {
     selectedDay: "Mon",
     viewMode: "class",
+    gridView: "day",
+    weekScope: null,
     selection: null,
     past: [],
     future: [],
 
     setSelectedDay: (day) => set({ selectedDay: day }),
     setViewMode: (viewMode) => set({ viewMode }),
+    setGridView: (gridView) => set({ gridView }),
+    setWeekScope: (weekScope) => set({ weekScope }),
     select: (selection) => set({ selection }),
 
     move: (ref, toDay, toPeriod) =>

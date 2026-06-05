@@ -3,10 +3,7 @@ import { useProjectStore } from "../../store/projectStore";
 import { useEditorStore } from "../../store/editorStore";
 import { useUiStore } from "../../store/uiStore";
 import { useDerived } from "./hooks";
-import { TimetableGrid } from "../grid/TimetableGrid";
-import { ViolationsPanel } from "../panels/ViolationsPanel";
-import { TeacherLoadPanel } from "../panels/TeacherLoadPanel";
-import { QuotaPanel } from "../panels/QuotaPanel";
+import { GridWorkspace } from "./GridWorkspace";
 import { CompleteButton } from "../solverui/CompleteButton";
 import { CandidateCompare } from "../solverui/CandidateCompare";
 import { SubstitutionView } from "../substitution/SubstitutionView";
@@ -26,8 +23,8 @@ export function App() {
   const [showIO, setShowIO] = useState(false);
   const [showWizard, setShowWizard] = useState(false);
   const [showData, setShowData] = useState(false);
-  const { selectedDay, viewMode, past, future } = useEditorStore();
-  const { setSelectedDay, setViewMode, undo, redo } = useEditorStore.getState();
+  const { past, future } = useEditorStore();
+  const { undo, redo } = useEditorStore.getState();
   const advanced = useUiStore((s) => s.advanced);
   const toggleAdvanced = useUiStore((s) => s.toggleAdvanced);
 
@@ -141,58 +138,14 @@ export function App() {
         </div>
       </header>
 
-      <div className="no-print flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white px-6 py-2">
-        <div className="flex gap-1" role="tablist" aria-label="Day">
-          {days.map((d) => (
-            <button
-              key={d}
-              type="button"
-              role="tab"
-              aria-selected={d === selectedDay}
-              onClick={() => setSelectedDay(d)}
-              className={`rounded px-3 py-1 text-sm ${
-                d === selectedDay ? "bg-slate-800 text-white" : "bg-slate-100 text-slate-700"
-              }`}
-            >
-              {d}
-            </button>
-          ))}
-        </div>
-        <div className="ml-auto flex gap-1">
-          {(["class", "teacher"] as const).map((m) => (
-            <button
-              key={m}
-              type="button"
-              onClick={() => setViewMode(m)}
-              className={`rounded px-3 py-1 text-sm capitalize ${
-                m === viewMode ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-700"
-              }`}
-            >
-              {m} view
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <main className="grid grid-cols-1 gap-4 p-6 lg:grid-cols-[1fr_320px]">
-        <div className="overflow-auto rounded border border-slate-200 bg-white p-2">
-          <TimetableGrid
-            project={project}
-            timetable={timetable}
-            day={selectedDay}
-            viewMode={viewMode}
-            violations={violations}
-          />
-          <p className="no-print mt-2 text-xs text-slate-400">
-            Drag a cell to move it within the day · 📍/📌 to pin · ELGA moves as one block.
-          </p>
-        </div>
-        <aside className="no-print flex flex-col gap-4">
-          <ViolationsPanel violations={violations} onJump={(d) => setSelectedDay(d)} />
-          <TeacherLoadPanel project={project} maps={maps} day={selectedDay} />
-          <QuotaPanel project={project} quota={quota} />
-        </aside>
-      </main>
+      <GridWorkspace
+        project={project}
+        timetable={timetable}
+        violations={violations}
+        maps={maps}
+        quota={quota}
+        days={days}
+      />
       </div>
 
       {showGenerate && <CandidateCompare onClose={() => setShowGenerate(false)} />}
