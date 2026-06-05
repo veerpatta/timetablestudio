@@ -10,6 +10,7 @@ import { CandidateCompare } from "../solverui/CandidateCompare";
 import { SubstitutionView } from "../substitution/SubstitutionView";
 import { ExportImport } from "../io/ExportImport";
 import { EmptyState } from "./EmptyState";
+import { RecoveryScreen } from "./RecoveryScreen";
 import { SetupWizard } from "../manage/SetupWizard";
 import { DataManager } from "../manage/DataManager";
 
@@ -17,6 +18,8 @@ export function App() {
   const init = useProjectStore((s) => s.init);
   const loadDemo = useProjectStore((s) => s.loadDemo);
   const initialized = useProjectStore((s) => s.initialized);
+  const storageStatus = useProjectStore((s) => s.storageStatus);
+  const saveFailed = useProjectStore((s) => s.saveFailed);
   const project = useProjectStore((s) => s.project);
   const derived = useDerived();
   const [showGenerate, setShowGenerate] = useState(false);
@@ -33,7 +36,13 @@ export function App() {
     void init();
   }, [init]);
 
+  // Storage wedged/erroring — show a recovery screen, never an endless spinner.
+  if (storageStatus === "error") {
+    return <RecoveryScreen variant="storage-error" />;
+  }
   if (!initialized) {
+    // Bounded: init() always settles within the storage timeout (~3s) and flips
+    // this to ready/error, so this spinner can't linger.
     return <div className="p-6 text-slate-500">Loading…</div>;
   }
   if (!project) {
@@ -50,7 +59,9 @@ export function App() {
     );
   }
   if (!derived) {
-    return <div className="p-6 text-slate-500">Loading…</div>;
+    // Project loaded but its active timetable is missing (corrupt/truncated
+    // save). Don't strand on a spinner — offer backup + start-fresh.
+    return <RecoveryScreen variant="corrupt-data" project={project} />;
   }
   const { timetable, violations, maps, quota } = derived;
   const hardCount = violations.filter((v) => v.severity === "hard").length;
@@ -59,6 +70,24 @@ export function App() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
       <div className="app-shell">
+      {saveFailed && (
+        <div
+          role="alert"
+          className="no-print flex flex-wrap items-center justify-between gap-2 bg-amber-100 px-4 py-2 text-sm text-amber-900 sm:px-6"
+        >
+          <span>
+            Your changes aren't being saved to this browser right now. Download a backup so you
+            don't lose your work.
+          </span>
+          <button
+            type="button"
+            onClick={() => setShowIO(true)}
+            className="rounded border border-amber-400 bg-white px-2 py-1 font-medium hover:bg-amber-50"
+          >
+            Download a backup
+          </button>
+        </div>
+      )}
       <header className="no-print flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-slate-200 bg-white px-4 py-3 sm:px-6">
         <div className="flex items-center gap-3">
           <div>

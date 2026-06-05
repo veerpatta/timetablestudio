@@ -3,7 +3,7 @@
 
 import { create } from "zustand";
 import type { Activity, Placement, Project } from "../domain/types";
-import { loadProject, saveProject } from "../persistence/db";
+import { loadProject, saveProject, deleteAllData, resetDbConnection } from "../persistence/db";
 import { importLegacyRawData } from "../domain/legacyImport";
 import { normalizeProject } from "../domain/requirements";
 import { deserializeProject } from "../persistence/projectFile";
@@ -16,8 +16,13 @@ const AUTOSAVE_MS = 400;
 function scheduleSave(project: Project): void {
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
-    void saveProject(project);
     saveTimer = null;
+    // saveProject is timeout-bounded, so a wedged IndexedDB rejects here
+    // instead of hanging — that flips the non-blocking "not saving" banner on.
+    saveProject(project).then(
+      () => useProjectStore.setState({ saveFailed: false }),
+      () => useProjectStore.setState({ saveFailed: true }),
+    );
   }, AUTOSAVE_MS);
 }
 
@@ -33,13 +38,27 @@ export function makeDemoProject(): Project {
   return deserializeProject(JSON.stringify(demoJson));
 }
 
+/** Storage health, so the UI can distinguish loading / ready / wedged. */
+export type StorageStatus = "loading" | "ready" | "error";
+
 interface ProjectState {
   project: Project | null;
   /** True once init() has run, so the UI can tell "loading" from "empty". */
   initialized: boolean;
+  /** Whether IndexedDB opened cleanly. "error" drives the recovery screen. */
+  storageStatus: StorageStatus;
+  /** True when the debounced autosave last failed — drives a non-blocking banner. */
+  saveFailed: boolean;
   /** Load the stored project from IndexedDB if any. Never auto-seeds — a fresh
    * user gets the empty state and chooses a path (wizard / import / demo). */
   init: () => Promise<void>;
+  /** Re-attempt the storage open after a failure (recovery: "Try again"). */
+  retryStorage: () => Promise<void>;
+  /** Read the saved project via a fresh, timeout-bounded attempt (recovery:
+   * "Download a backup"). Returns null if storage is still unreadable. */
+  readBackup: () => Promise<Project | null>;
+  /** Wipe storage and start from a clean empty state (recovery: "Start fresh"). */
+  startFresh: () => Promise<void>;
   /** Load the demo dataset and make it the active project (explicit user action). */
   loadDemo: () => void;
   setProject: (project: Project, persist?: boolean) => void;
@@ -57,15 +76,42 @@ interface ProjectState {
 export const useProjectStore = create<ProjectState>((set, get) => ({
   project: null,
   initialized: false,
+  storageStatus: "loading",
+  saveFailed: false,
 
   init: async () => {
     // Don't clobber a project already created in-memory (wizard/import/tests).
     if (get().project) {
-      set({ initialized: true });
+      set({ initialized: true, storageStatus: "ready" });
       return;
     }
-    const stored = await loadProject();
-    set({ project: stored ?? null, initialized: true });
+    try {
+      const stored = await loadProject();
+      set({ project: stored ?? null, initialized: true, storageStatus: "ready" });
+    } catch {
+      // Wedged/erroring IndexedDB — never strand on "Loading…"; show recovery.
+      set({ project: null, initialized: true, storageStatus: "error" });
+    }
+  },
+
+  retryStorage: async () => {
+    resetDbConnection();
+    set({ project: null, initialized: false, storageStatus: "loading" });
+    await get().init();
+  },
+
+  readBackup: async () => {
+    resetDbConnection();
+    try {
+      return (await loadProject()) ?? null;
+    } catch {
+      return null;
+    }
+  },
+
+  startFresh: async () => {
+    await deleteAllData();
+    set({ project: null, initialized: true, storageStatus: "ready", saveFailed: false });
   },
 
   loadDemo: () => {

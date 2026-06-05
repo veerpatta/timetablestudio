@@ -6,16 +6,18 @@ This file is the bridge between work sessions. The agent MUST update it after ev
 
 ## Current state
 
-- **Last completed milestone**: M10 — Trust & polish. **v2 roadmap (M7–M10) COMPLETE.** 105 tests green; `npm run build` (87 KB gzip) and `npm run lint` clean. Verified live on the demo: 9 amber soft-suggestion cells (0 red), modal focus trap works, week sheet is printable; no console errors.
-  - **AC met**: (1) a11y — shared `Modal` focus trap + restore; all icon buttons labelled; live audit shows 0 unnamed buttons (of 127), 0 unlabeled fields, lang+title+alt all good → structural Lighthouse a11y audits pass (numeric score to confirm on deploy). (2) soft violations visible in-grid — `useDerived` feeds `scoreTimetable().violations` (hard+soft); S3/S5/S6 color cells amber, hard rings take precedence (`gridModel.test`). (3) four print layouts via `@media print`: master grid (day view), per-class week sheet, per-teacher week sheet, substitution day sheet (WeekGrid lives outside `.no-print`).
-  - NOT built (optional, non-AC): coach-marks tour, undo toast, autosave indicator, subject colors, cell popovers, free-slot highlighting, left-sidebar. Listed below for a future pass.
-- **In-progress milestone**: none — **v1 (M0–M6) and v2 (M7–M10) both complete and deployed.**
-- **Tests**: green — 105 tests across 30 files
-- **Build**: green — typechecks + builds (87 KB gzip, well under the 300 KB budget)
+- **Last completed milestone**: M11 — Storage resilience (never brick). **v3 in progress.** 107 tests green; `npm run build` (88 KB gzip) and `npm run lint` clean. Verified live: demo still boots to a clean grid, 0 console errors.
+  - **AC met**: (1) a test simulating a never-resolving `indexedDB.open` renders the recovery screen under fake timers (`src/ui/app/storageRecovery.test.tsx`); (2) "Start fresh" wipes storage and lands on the empty state (same test); (3) no "Loading…" path lingers — every `db.ts` op is `withTimeout`-bounded (3 s), `init` catches failure → recovery, and the old second infinite-spinner path (`!derived`) now routes to a corrupt-data recovery screen.
+  - Built: timeout-wrapped `persistence/db.ts` (+`resetDbConnection`, `deleteAllData`, `StorageTimeoutError`); `projectStore` `storageStatus`/`saveFailed`/`retryStorage`/`readBackup`/`startFresh`; `ui/app/RecoveryScreen.tsx` (two variants); non-blocking amber autosave-failure banner in `App.tsx`.
+- **In-progress milestone**: none between — M11 done, **M12 is next**.
+- **Tests**: green — 107 tests across 31 files
+- **Build**: green — typechecks + builds (88 KB gzip, well under the 300 KB budget)
 
-## Next action (v3 — start M11)
+## Next action (v3 — start M12)
 
-Owner review #2 (2026-06-05) after the v2 ship: still not usable by a non-technical person. v3 roadmap added (M11–M14 in docs/ROADMAP.md) — storage resilience (live repro: wedged IndexedDB = infinite "Loading…" with no recovery), real VPPS data as the spine (the REAL 6-day rawData snapshot is now at docs/sources/rawData.vpps.txt — the long-missing fixture), sidebar pages instead of modals + a quota matrix editor (quotas are currently one-row-at-a-time: impractical at ~100 rows), wizard Blocks step (M7 promise), guided tour + generate pre-flight. SCHOOL_CONTEXT corrected to 16 classes. Use Prompt D in docs/PROMPTS.md. Start M11.
+M12 — Real VPPS data as the spine. The REAL full 6-day snapshot is at `docs/sources/rawData.vpps.txt` (16 classes, Mon–Sat). Tasks: (a) add the tolerant/semantic round-trip test that v1/v2 deferred, using the real snapshot as fixture; fix whatever it flushes out (multi-teacher cells, "English compulsory", senior streams); (b) make the demo the REAL VPPS school (drop/relegate synthetic demo to tests only); (c) import → editable inferred-quota review flow after a legacy import. AC: importing the snapshot yields 6 day-tabs, 16 classes, 0 hard conflicts, ELGA as bands; semantic round-trip green; inferred-quota review screen shown + editable.
+
+**Rule-13 contradiction to fix in M12** (flagged by advisor): the real snapshot runs ELGA on **Mon–Thu, P3–P5** (4 days), but SCHOOL_CONTEXT/HANDOFF/demo assume "Mon+Thu". The snapshot is law — update SCHOOL_CONTEXT.md (and any demo assumption) to Mon–Thu and log it in DECISIONS.md.
 
 ## Previous next-action (v2, superseded)
 
