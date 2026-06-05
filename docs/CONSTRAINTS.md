@@ -1,5 +1,7 @@
 # Constraint Catalog
 
+> **v4 note**: §"v4 Rule system" below supersedes the fixed S1–S6 list as the product direction — constraints become user-configurable Rules. H1–H10 remain the structural core. See docs/TIMETABLE_ANALYSIS.md for the real-school evidence behind each rule type.
+
 Every constraint has a stable ID used in code (`Violation.constraintId`), tests, and UI. Hard constraints (H*) must never be violated in a generated timetable; the editor shows them as red. Soft constraints (S*) carry weights; the editor shows them as amber.
 
 ## Hard constraints
@@ -31,6 +33,30 @@ Every constraint has a stable ID used in code (`Violation.constraintId`), tests,
 ## Scoring
 
 `score(timetable) = Σ hardViolations × 10_000 + Σ softViolations × weight`. Lower is better. A timetable is *feasible* iff hard violations = 0. The solver reports both the score and the violation list.
+
+## v4 Rule system (user-configurable constraints)
+
+Modeled on how mature timetablers (FET, aSc Timetables, Untis) expose constraints, but with plain-language UI labels. A **Rule** is a stored entity the user creates from templates; each rule has `severity: "must" | "prefer"` (must = hard, prefer = weighted soft) and a scope (subject / class / teacher / activity, with class-group and "board classes" selectors).
+
+| ID | Template (UI label) | Parameters | VPPS example |
+|----|--------------------|------------|--------------|
+| R1 | "{subject} only in periods {set}" | subject(s), scope classes, period set | Maths in P1–P3 |
+| R2 | "{subject} never in period {set}" | subject(s), scope, period set | CCS never in P1; Revision not in P6? owner decides |
+| R3 | "{subject} in the first/second half of the day" | subject(s), scope, half | board subjects first half |
+| R4 | "{teacher} is class teacher of {class} — takes period 1 daily" | teacher, class, optional fixed subject | Bindu = Class 1 (Maths) |
+| R5 | "{subject} same period every day in {class}" | subject, class, optional period | Accountancy P1–P2 daily, 12 Commerce |
+| R6 | "{subject} as a double period ({n}×/week) in {class}" | subject, class, count | Maths double in primary |
+| R7 | "Block {name} runs only on {days}, starting period {p}" | block, day set, start | ELGA Mon–Thu @P3 |
+| R8 | "{teacher} not available {slots}" | teacher, slot set | part-timers, duties |
+| R9 | "{class} is a board class — protect core subjects" | class, core subject set | 10, 12A/12C/12S |
+| R10 | "{subject} spread across ≥{n} different days" | subject, class scope, n | SST across 4 days |
+| R11 | "Max {n} periods/day of {subject} for {class}" | subject, class, n | default 2, doubles = 2 |
+| R12 | "{teacher} max {n} periods per day / {m} per week" | teacher, n, m | caps |
+| R13 | "Teachers' days compact (few free gaps)" | global weight | existing S1 |
+| R14 | "{subject A} before/after {subject B} on the same day" | two subjects, class, order | practice after theory |
+| R15 | "Teacher {T} max {n} consecutive periods" | teacher, n | fatigue control |
+
+Engine mapping: every Rule compiles to a predicate over `(project, timetable)` reusing the existing `Violation` shape (`constraintId: "R4"` etc.); `prefer` rules contribute weight × violations to the soft score; `must` rules join the hard count. Rule templates ship with sensible defaults; the importer (M-real-data) auto-proposes rules it detects in the existing timetable (anchors, doubles, block days) for one-click confirmation.
 
 ## ELGA worked example (tests must cover this)
 

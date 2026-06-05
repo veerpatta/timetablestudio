@@ -128,6 +128,47 @@ v2 shipped its ACs, but a second owner review + source audit found the product s
 - Plain-language glossary popovers (quota, block, draft, pin) on first encounter.
 - **AC**: a deliberately under-quota'd project shows the right hint and the pre-flight names the class and the missing count; tour renders on a fresh project and never again unless replayed; a non-technical tester (the owner) completes import → adjust → generate → print unaided.
 
-## Parked (post-v3)
+---
 
-Rooms/labs, multi-school config, teacher preference forms, statistics dashboard, share links.
+# v4 — The real workflow: rules + scenario workbench (owner deep-dive, 2026-06-05)
+
+Owner supplied the REAL working timetable as PDFs (docs/sources/*.pdf) and stated the true use case: **iterate on the existing timetable over the session** — not generate-from-scratch. Deep analysis in docs/TIMETABLE_ANALYSIS.md found seven implicit constraint families (P1 class-teacher anchors, ELGA Mon–Thu only, intentional double periods, heavy-early/light-late, board-class protection, specialist teacher coupling, subject spread). The fixed S1–S6 set cannot express these → v4 builds the configurable Rule system (CONSTRAINTS.md § v4) and the what-if workbench. Strict order, AC-gated; marathon rules + Prompt C/D additions apply.
+
+## M15 — Domain: rules, anchors, doubles, block days
+
+- `Rule` entity (DATA_MODEL.md addendum to be written in the same commit, per the doc-first rule): template id R1–R15, params, severity must/prefer, weight; compiled to predicates reusing `Violation`; rules evaluated in both `validate()` (musts) and `scoreTimetable()` (prefers).
+- Activities support `duration: 2` (double periods placed/moved/deleted as one unit; H-checks treat them atomically like mini-blocks).
+- Blocks gain `allowedDays` + optional `fixedStartPeriod` (ELGA Mon–Thu @P3).
+- Class-teacher field on SchoolClass (`classTeacherId`) powering R4; board-class flag powering R9.
+- Schedule profile supports a positioned break (after P4, 10:10–10:25) and per-period times as data.
+- Schema migration v2 with back-compat load of v1 projects.
+- **AC**: each rule template R1–R15 has a unit test (satisfied + violated case, plain-language message); a duration-2 activity moves as one unit; v1 project file loads and migrates.
+
+## M16 — Rules UI: plain-language rule builder
+
+- "Rules" sidebar section: rule list as readable sentences with on/off toggles and must/prefer chips; "Add rule" = template picker → fill-in-the-blanks sentence (pickers for subject/class/teacher/periods/days) — modeled on how aSc/Untis express constraints but sentence-first, zero jargon.
+- Violations panel groups by rule and explains in the rule's own words ("CCS is in Period 1 on Tue for Class 8 — rule says never in P1") with click-to-jump.
+- **Import auto-detection**: importing the real timetable proposes detected rules (P1 anchors, doubles, ELGA days, board flags) as pre-filled sentences for one-click accept — the owner confirms reality instead of authoring from scratch.
+- Presets bundle: "Indian K-12 defaults" (heavy-early, light-not-P1, spread ≥3 days, teacher caps) applied optionally at setup.
+- **AC**: the seven implicit VPPS constraint families are all expressible via the UI without code; auto-detect on the real import proposes ≥ the P1 anchors, ELGA days and 12-Commerce Accountancy double; every violation message names entities and slots.
+
+## M17 — Scenario workbench: explore changes safely
+
+- "Try a change" mode: any draft can be branched (one click), edited/regenerated, and **compared side-by-side** with the live timetable — diff grid plus a change ledger ("3 cells changed · fixes 2 problems · creates 1 new problem · Hemlata gains a free P6 Tue").
+- **Impact preview on hover/drop**: before committing a drag, show what it would break/fix (reuses validate on a speculative copy).
+- **Swap finder**: select a cell → "show legal swaps" lists conflict-free exchanges (the everyday operation when a teacher requests a change).
+- Targeted regenerate: freeze everything except a selection (class, teacher, day, or subject) and re-solve only that — marginal change, not big-bang.
+- Promote: a branch replaces the live timetable (with undo); export as usual.
+- **AC**: branch→edit→compare→promote loop works with full undo; swap finder returns only swaps that keep hard violations at 0 (property test); targeted regenerate changes ONLY the unfrozen scope.
+
+## M18 — Real-data reconciliation + everyday ops polish
+
+- Reconcile the app's dataset with the PDFs (subjects missing from rawData: CCS, Revision, practices, Sanskrit, streams' electives; the break; board flags; anchors) so the in-app timetable equals the printed truth.
+- Entity lifecycle ease: add/remove/rename teacher, subject, class, period count — each with a guided impact flow ("Removing Maya affects 11 placements — reassign to whom?").
+- Period-count change wizard (6→7 or 6→5) remapping placements with explicit owner decisions.
+- Print/export parity with the current PDFs (class-wise, teacher-wise, day-wise sheets).
+- **AC**: in-app grid matches Class_Wise.pdf cell-for-cell after reconciliation (scripted comparison against a transcribed fixture); removing a teacher walks through reassignment without ever leaving a dangling reference; the three print views visually match the school's current formats.
+
+## Parked (post-v4)
+
+Rooms/labs, multi-school config, teacher preference forms, statistics dashboard, share links, mid-week timetable versioning (effective-from dates).

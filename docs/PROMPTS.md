@@ -45,6 +45,16 @@ The session handoff protocol both modes rely on is defined in `AGENTS.md` § 6 a
 >
 > Begin with M11.
 
+## Prompt E — v4 marathon (rule system + scenario workbench, M15–M18)
+
+> The owner has supplied the REAL working timetable (docs/sources/Class_Wise.pdf is authoritative; Teacher_Wise/Day_Wise are projections; rawData.vpps.txt is the machine-readable subset). The analysis of it is docs/TIMETABLE_ANALYSIS.md and the v4 spec is docs/ROADMAP.md § v4 + docs/CONSTRAINTS.md § v4 Rule system. Read AGENTS.md, docs/HANDOFF.md, docs/TIMETABLE_ANALYSIS.md, docs/CONSTRAINTS.md, docs/ROADMAP.md § v4. Verify reality first: `git log --oneline -10`, `npm test`, `npm run build`. Then work M15 → M18 in strict order under the marathon rules (Prompt A rules 1–7) plus rules 8–13 from Prompts C/D, and:
+>
+> 14. Doc-first: M15 must add the `Rule` types to docs/DATA_MODEL.md in the same commit as `src/domain/types.ts` — the doc and code may never disagree.
+> 15. Sentence-first UI: every rule renders as a readable sentence; parameter pickers fill blanks in the sentence. If a rule can't be read aloud naturally, redesign it.
+> 16. The PDFs are ground truth: where Class_Wise.pdf disagrees with rawData.vpps.txt or any fixture, the PDF wins (note differences in DECISIONS.md). M18's cell-for-cell AC is against the PDF.
+>
+> Begin with M15.
+
 ## Per-milestone prompts (single-milestone mode)
 
 Always start a session with the kickoff line.

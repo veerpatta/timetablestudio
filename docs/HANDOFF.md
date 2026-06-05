@@ -13,9 +13,10 @@ This file is the bridge between work sessions. The agent MUST update it after ev
 - **Tests**: green — 126 tests across 35 files
 - **Build**: green — typechecks + builds (92 KB gzip, well under the 300 KB budget)
 
-## Next action
+## Next action (v4 — start M15 after merging v3)
 
-v3 complete. All milestones shipped and AC-verified. Branch `v3-m11-m14` (M11→M14, six commits) — ready to push / open a PR to `main`.
+1. Merge/push branch `v3-m11-m14` to `main` (v3 is complete and AC-verified).
+2. Then start **v4**: the owner supplied the real timetable PDFs (docs/sources/Class_Wise.pdf = ground truth) and the true use case — iterate on the existing timetable, not generate from scratch. Deep analysis → docs/TIMETABLE_ANALYSIS.md; configurable Rule system (R1–R15) → docs/CONSTRAINTS.md § v4; milestones M15–M18 → docs/ROADMAP.md § v4. Use **Prompt E** in docs/PROMPTS.md. Key new domain facts: P1 class-teacher anchors, ELGA runs Mon–Thu only @P3, intentional double periods (duration-2), board-class priority flags (10, 12A/C/S), break after P4 (10:10–10:25), subjects missing from rawData (CCS, Revision, Sanskrit, practices, electives).
 
 Honest carried claims (unchanged discipline): AC#3 "non-technical tester unaided" is owner-side; Lighthouse a11y/PWA numeric scores confirm on deploy; the live legacy-viewer paste check is owner-side (the byte-exact M1 + semantic M12 round-trip tests back it in-repo).
 
