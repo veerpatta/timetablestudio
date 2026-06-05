@@ -4,8 +4,11 @@ import { useEditorStore } from "../../store/editorStore";
 import { useWeightsStore } from "../../store/weightsStore";
 import { useUiStore } from "../../store/uiStore";
 import { scoreTimetable } from "../../solver/score";
+import { diagnose, type Blocker } from "../../solver/diagnose";
+import { diffTimetables } from "../../domain/diff";
 import { runSolver } from "./runSolver";
 import { WeightEditor } from "./WeightEditor";
+import { BlockerReport } from "./BlockerReport";
 import { Modal } from "../common/Modal";
 import type { Placement, Project, Timetable } from "../../domain/types";
 
@@ -32,6 +35,13 @@ export function CandidateCompare({ onClose }: { onClose: () => void }) {
   const [n, setN] = useState(3);
   const [seedBase, setSeedBase] = useState(1);
   const [error, setError] = useState<string | null>(null);
+  const [blockers, setBlockers] = useState<Blocker[] | null>(null);
+  const [diffSeed, setDiffSeed] = useState<number | null>(null);
+
+  const currentPlacements = useMemo(
+    () => (project ? active(project).placements : []),
+    [project],
+  );
 
   const scored = useMemo(() => {
     if (!project || !candidates) return null;
@@ -39,17 +49,29 @@ export function CandidateCompare({ onClose }: { onClose: () => void }) {
       .map((c) => {
         const proj = withPlacements(project, c.placements);
         const b = scoreTimetable(proj, active(proj), weights);
-        const softCounts: Record<string, number> = {};
-        for (const v of b.soft) softCounts[v.constraintId] = (softCounts[v.constraintId] ?? 0) + 1;
-        return { ...c, score: b.score, hard: b.hard, softCounts };
+        const changes = diffTimetables(project, currentPlacements, c.placements).length;
+        return { ...c, score: b.score, hard: b.hard, changes };
       })
       .sort((a, b) => a.score - b.score);
-  }, [project, candidates, weights]);
+  }, [project, candidates, weights, currentPlacements]);
+
+  const diffChanges = useMemo(() => {
+    if (!project || diffSeed === null || !candidates) return null;
+    const c = candidates.find((x) => x.seed === diffSeed);
+    if (!c) return null;
+    return diffTimetables(project, currentPlacements, c.placements);
+  }, [project, diffSeed, candidates, currentPlacements]);
 
   if (!project) return null;
 
   const generate = async () => {
     setError(null);
+    setDiffSeed(null);
+    const pre = diagnose(project, project.activeTimetableId!);
+    if (!pre.ok) {
+      setBlockers(pre.blockers);
+      return;
+    }
     setBusy(true);
     setCandidates(null);
     const out: Candidate[] = [];
@@ -122,7 +144,7 @@ export function CandidateCompare({ onClose }: { onClose: () => void }) {
                   <tr className="text-slate-500">
                     <th className="px-2 py-1 text-left">Option</th>
                     <th className="px-2 py-1 text-right">Conflicts</th>
-                    <th className="px-2 py-1 text-left">Quality</th>
+                    <th className="px-2 py-1 text-right">Changes</th>
                     {advanced && <th className="px-2 py-1 text-right">seed</th>}
                     {advanced && <th className="px-2 py-1 text-right">score</th>}
                     <th className="px-2 py-1" />
@@ -135,8 +157,14 @@ export function CandidateCompare({ onClose }: { onClose: () => void }) {
                       <td className={`px-2 py-1 text-right ${c.hard ? "text-hard" : "text-emerald-600"}`}>
                         {c.hard === 0 ? "None" : c.hard}
                       </td>
-                      <td className="px-2 py-1 text-slate-500">
-                        {i === 0 ? "Best fit" : "Good"}
+                      <td className="px-2 py-1 text-right">
+                        <button
+                          type="button"
+                          onClick={() => setDiffSeed(diffSeed === c.seed ? null : c.seed)}
+                          className="text-sky-600 hover:underline"
+                        >
+                          {c.changes} {diffSeed === c.seed ? "▾" : ""}
+                        </button>
                       </td>
                       {advanced && <td className="px-2 py-1 text-right font-mono">{c.seed}</td>}
                       {advanced && <td className="px-2 py-1 text-right font-mono">{c.score}</td>}
@@ -144,7 +172,9 @@ export function CandidateCompare({ onClose }: { onClose: () => void }) {
                         <button
                           type="button"
                           onClick={() => applyCandidate(c)}
-                          className="rounded bg-slate-800 px-2 py-0.5 text-white"
+                          disabled={c.hard > 0}
+                          title={c.hard > 0 ? "This option still has conflicts" : "Use this option"}
+                          className="rounded bg-slate-800 px-2 py-0.5 text-white disabled:opacity-40"
                         >
                           Use this
                         </button>
@@ -153,6 +183,26 @@ export function CandidateCompare({ onClose }: { onClose: () => void }) {
                   ))}
                 </tbody>
               </table>
+            )}
+            {diffChanges && (
+              <div className="mt-3 rounded border border-slate-200 p-2">
+                <p className="mb-1 text-xs font-semibold">
+                  Changes vs the current timetable ({diffChanges.length})
+                </p>
+                {diffChanges.length === 0 ? (
+                  <p className="text-xs text-slate-400">Identical to the current timetable.</p>
+                ) : (
+                  <ul className="max-h-40 space-y-0.5 overflow-auto text-xs">
+                    {diffChanges.slice(0, 60).map((ch, j) => (
+                      <li key={j} className="text-slate-600">
+                        <span className="font-medium">{ch.className}</span> {ch.day} P{ch.period}:{" "}
+                        <span className="text-slate-400">{ch.before || "—"}</span> →{" "}
+                        <span className="text-slate-700">{ch.after || "—"}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             )}
             {!scored && !busy && (
               <p className="text-xs text-slate-400">
@@ -164,6 +214,7 @@ export function CandidateCompare({ onClose }: { onClose: () => void }) {
 
           <WeightEditor />
         </div>
+        {blockers && <BlockerReport blockers={blockers} onClose={() => setBlockers(null)} />}
     </Modal>
   );
 }

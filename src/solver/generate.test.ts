@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { solve } from "./engine";
 import { validate } from "../domain/validate";
 import { scoreTimetable, type SoftWeights } from "./score";
-import { makeSampleProject } from "../store/projectStore";
+import { makeSampleProject, makeDemoProject } from "../store/projectStore";
 import type { Day, Project, Timetable } from "../domain/types";
 
 const active = (p: Project): Timetable =>
@@ -25,6 +25,17 @@ const withPlacements = (p: Project, placements: Timetable["placements"]): Projec
   timetables: p.timetables.map((t) =>
     t.id === p.activeTimetableId ? { ...t, placements } : t,
   ),
+});
+
+describe("solver — M9 full generation from real quotas", () => {
+  it("generates a full feasible 6-day timetable from the demo quotas in < 10s", () => {
+    const base = makeDemoProject(); // 16 classes, real quotas, ELGA pinned
+    const r = solve(base, base.activeTimetableId!, { mode: "generate", seed: 5, maxMillis: 10000 });
+    expect(r.complete).toBe(true);
+    expect(r.millis).toBeLessThan(10000);
+    const fp = withPlacements(base, r.placements);
+    expect(validate(fp, active(fp)).filter((v) => v.severity === "hard")).toEqual([]);
+  });
 });
 
 describe("solver — M4 full generation", () => {
