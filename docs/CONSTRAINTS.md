@@ -56,6 +56,22 @@ Modeled on how mature timetablers (FET, aSc Timetables, Untis) expose constraint
 | R14 | "{subject A} before/after {subject B} on the same day" | two subjects, class, order | practice after theory |
 | R15 | "Teacher {T} max {n} consecutive periods" | teacher, n | fatigue control |
 
+### v5 additions (R16–R24) — owner brainstorm + modern-timetabler parity
+
+| ID | Template (UI label) | Parameters | Why |
+|----|--------------------|------------|-----|
+| R16 | "{teacher} gets {day} free (no periods)" | teacher, day | free-day requests |
+| R17 | "Share first/last-period duties fairly among teachers" | scope teachers, tolerance | aSc "distribute first/last lessons equally" |
+| R18 | "No two separate {subject} lessons on the same day for {class} (doubles exempt)" | subject, class | prevents accidental same-day repeats |
+| R19 | "{subject A} and {subject B} not back-to-back for {class}" | two subjects, class | two heavy subjects in a row |
+| R20 | "{subject} right after the break / never right after the break" | subject, scope, polarity | post-break energy slotting |
+| R21 | "{class} sees at most {n} different teachers per day" | class, n | stability for young classes |
+| R22 | "{teacher} prefers to teach in periods {set}" | teacher, period set | soft availability |
+| R23 | "No teacher takes {class} for 3+ consecutive periods (blocks exempt)" | class scope, n | configurable version of S6 |
+| R24 | "{practice subject} comes after {theory subject} on the same day" | two subjects, class | Sci. Practice after Science |
+
+Weight presets (one-click bundles applied to prefer-rule weights): **Teacher comfort** (gaps/fairness up), **Student focus** (heavy-early/spread up), **Board exam mode** (R9 scope widened, revision protected). Presets are data, not code.
+
 Engine mapping: every Rule compiles to a predicate over `(project, timetable)` reusing the existing `Violation` shape (`constraintId: "R4"` etc.); `prefer` rules contribute weight × violations to the soft score; `must` rules join the hard count. Rule templates ship with sensible defaults; the importer (M-real-data) auto-proposes rules it detects in the existing timetable (anchors, doubles, block days) for one-click confirmation.
 
 ## ELGA worked example (tests must cover this)

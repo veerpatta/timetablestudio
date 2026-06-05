@@ -14,7 +14,11 @@ This file is the bridge between work sessions. The agent MUST update it after ev
 - **Tests**: green — 192 tests across 43 files
 - **Build**: green — typechecks + builds (103 KB gzip, well under the 300 KB budget); lint clean
 
-## Next action
+## Next action (v5 — start M19)
+
+Owner review #3 (2026-06-05): two blockers found live — (1) returning browsers keep the OLD stored project, so the M18 real dataset never reaches existing users (the owner sees stale wrong data); (2) the suggestions panel floods (275 raw lines, duplicate items, [S1]/[S4] codes leaking). v5 spec: docs/ROADMAP.md § v5 (M19 zero-setup bundled real timetable + stale-data banner; M20 health score + grouped top-5 + one-click fixes + Tidy-up; M21 teacher-load heatmap/fairness/free-teacher finder; M22 rule templates R16–R24 + weight presets + suggest-rules). Use **Prompt F**. Begin with M19.
+
+## Superseded v4 next-action
 
 v4 is complete. No milestone is in progress. Parked (post-v4) follow-ups, none blocking:
 1. **Period-count change wizard (6→7 / 6→5)** — a ROADMAP M18 feature bullet, NOT one of the three M18 AC clauses, so it was parked. `setActiveProfile` already resizes the period array; add a placement-remap + guided modal ("which lessons drop when shrinking; where the new column goes when growing").
@@ -54,20 +58,4 @@ Roadmap complete (M0–M10). Live at https://veerpatta.github.io/timetablestudio
 
 ## Known TODOs / stubs in code
 
-- M8 work (next): shared modal shell w/ Escape+overlay close; plain-language relabel (no jargon, rule 8); ELGA-as-band rendering; responsive/mobile read-only grid (rule 10); per-class & per-teacher week views; sidebar nav + draft switcher.
-- M9 work: replace `deriveRequirements` circularity with owner quotas from M7 (keep it only as a one-time "infer from imported timetable" suggestion); engine forward-checking + min-conflicts; never silently apply infeasible — blocker report naming the bottleneck.
-- Data manager has no Block (ELGA) CRUD yet — ELGA arrives via demo/import only. Add block editing (classes/teachers/length/days) when needed.
-- `domain/legacyImport.ts` — block detection keyed on the literal "ELGA" token; generalize only if a second block type appears.
-- No real `rawData` snapshot — `fixtures/legacyRaw.sample.ts` (2-day) and the M7 demo are synthetic-but-faithful; replace/augment when the owner provides one.
-- Soft constraints (S1–S6) drive scoring/weights/ranking but are NOT yet shown as per-cell amber badges in the grid (M10 AC; wire `scoreTimetable().soft` into the grid overlay).
-
----
-
-## Template (replace sections above; do not append)
-
-- Last completed milestone + one-line proof (e.g. "M2 — all AC pass, 47 tests green")
-- In-progress milestone + exactly where you stopped
-- Tests / build status (green/red, counts)
-- Next action: the single concrete first step for the next session
-- Mid-milestone notes: tricky context the next session needs (gotchas, half-done refactors)
-- Open questions / TODO stubs: anything blocked on the owner
+- M8 work (next): shared modal shell w/ Escape+overlay close; plain-language relabel (no jargon, rule 8); ELGA-as-band rendering; responsive/mobile read-only 

@@ -55,6 +55,16 @@ The session handoff protocol both modes rely on is defined in `AGENTS.md` § 6 a
 >
 > Begin with M15.
 
+## Prompt F — v5 marathon (zero-setup + zero-noise, M19–M22)
+
+> v4 is complete but the owner's live review found the product still fails its dailyiest job: returning browsers keep stale data (the real dataset never arrives), and the suggestions panel is an unusable flood (275 raw lines, codes leaking). The spec is docs/ROADMAP.md § v5 and docs/CONSTRAINTS.md § v5 additions. Read AGENTS.md, docs/HANDOFF.md, docs/ROADMAP.md § v5, docs/CONSTRAINTS.md. Verify reality: `git log --oneline -10`, `npm test`, `npm run build`. Work M19 → M22 in strict order under all prior rules (Prompt A 1–7, C 8–10, D 11–13, E 14–16), and:
+>
+> 17. Nothing automatic is silent: every auto-fix, tidy-up, or data update presents a readable diff/ledger and applies only on accept, with one-step undo.
+> 18. Noise budget: the default UI may never show more than ~20 suggestion items or any constraint code; if a list can exceed that, group and rank it first.
+> 19. The bundled dataset version is sacred: bump `bundledDataVersion` whenever the built-in timetable changes, and never overwrite a user's project without keeping it as a draft.
+>
+> Begin with M19.
+
 ## Per-milestone prompts (single-milestone mode)
 
 Always start a session with the kickoff line.

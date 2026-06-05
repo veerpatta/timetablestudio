@@ -169,6 +169,44 @@ Owner supplied the REAL working timetable as PDFs (docs/sources/*.pdf) and state
 - Print/export parity with the current PDFs (class-wise, teacher-wise, day-wise sheets).
 - **AC**: in-app grid matches Class_Wise.pdf cell-for-cell after reconciliation (scripted comparison against a transcribed fixture); removing a teacher walks through reassignment without ever leaving a dangling reference; the three print views visually match the school's current formats.
 
-## Parked (post-v4)
+---
+
+# v5 — Zero-setup + zero-noise: the owner's daily driver (owner review #3, 2026-06-05)
+
+Live review after v4: (a) **returning browsers keep their old stored project forever** — the M18 reconciled real dataset never reaches an existing user, so the owner sees a stale synthetic timetable and thinks the data is wrong; (b) the suggestions panel is a flood (275 raw lines, "Bindu uneven daily load" ×3, `[S1]` codes leaking outside Advanced) — exactly the "too complex" feeling; (c) insights exist but aren't glanceable (no load heatmap, no fairness view, no free-teacher finder); (d) everything the owner asked for ("play with it, most work automatic") needs suggestions to be *actionable*, not descriptive. Strict order, AC-gated, all prior prompt rules apply.
+
+## M19 — The school timetable IS the app (zero setup)
+
+- Bundle the PDF-true VPPS dataset (data + detected rules R1–R15, board flags, anchors, ELGA config) as the built-in default project with a `bundledDataVersion`.
+- First run: open straight into the real timetable — full grid, 0 conflicts, rules pre-enabled. The empty-state/wizard moves behind "Start a different school" (Settings / File).
+- Stale-data detection: if the stored project derives from an older bundled version, show a banner — "The built-in school timetable has been updated. Load the latest? (your current one is kept as a draft)". One click migrates; nothing is silently overwritten.
+- Settings: "Reset to school timetable" (always available, undoable via the kept draft).
+- **AC**: a cleared browser shows the real timetable (cell-for-cell vs the M18 fixture) with rules on and 0 conflicts, with NO user action; a simulated older stored project triggers the banner and the one-click update keeps the old timetable as a draft.
+
+## M20 — Health panel: 275 lines → 5 actions
+
+- **Health score 0–100** in the header (soft-weight based, plain words: "Good — 3 things could be better"), replacing raw counts.
+- Suggestion pipeline: dedupe → group by person/class ("Bindu: 2 idle gaps · uneven Mon/Tue load — view") → rank by impact → show top 5 with "Show me" (jump + highlight) on every item.
+- **"Fix it" on suggestions where a safe fix exists**: precompute the best conflict-free swap/move; clicking shows a mini diff ("Move Tue P4 Maths → Tue P2; Bindu's gap disappears") and applies with one click, fully undoable.
+- **"Tidy up" button**: scoped soft-optimization pass (musts frozen, budgeted) that presents its whole result as a change ledger to accept/reject — "most of the work done automatically", but never behind the owner's back.
+- No constraint codes anywhere outside Advanced (regression test on rendered strings).
+- **AC**: the bundled project shows ≤ 20 grouped suggestions and a top-5; at least 60% of top-5 items on the bundled data carry a working "Fix it"; one undo reverts any fix; Tidy-up improves the health score on the bundled data and applies only after accept.
+
+## M21 — Glanceable insights (modern teacher-load views)
+
+- Teachers page upgrades: **load heatmap** (teacher × day, intensity = periods), week total vs cap bars, gap count, P1/P6 duty counts, **fairness meter** (spread across teachers) — the "teacher load" modern view the owner asked for.
+- **Free-teacher finder**: pick any (day, period) → who is free, sorted by lightest load (also powers substitutions).
+- Click any teacher chip anywhere → highlight all their cells across the grid + a mini day-strip popover.
+- Class insights: subject-mix bar per class (planned vs quota), heaviest-day indicator.
+- **AC**: heatmap numbers equal derive() counts (property test); free-teacher finder excludes everyone occupied incl. blocks; teacher-click highlighting works from grid, panels, and heatmap.
+
+## M22 — Constraint catalog v2 + auto-tuning
+
+- Implement rule templates **R16–R24** (CONSTRAINTS.md § v5): teacher free day, fair first/last duties, no same-day repeats, heavy-pair separation, after-break slotting, max teachers/day for juniors, teacher preferred periods, consecutive-class cap, practice-after-theory.
+- **Weight presets**: "Teacher comfort" / "Student focus" / "Board exam mode" — one click re-weights prefer-rules (data-driven, shown as sentences).
+- **"Suggest rules"**: scan the current timetable for strong patterns not yet captured as rules (like the M16 import-detection, but runnable anytime) and propose them as pre-filled sentences.
+- **AC**: each new template has satisfied+violated tests with plain-language messages; presets change candidate ranking deterministically; Suggest-rules on the bundled data proposes ≥ 3 sensible candidates and zero already-existing duplicates.
+
+## Parked (post-v5)
 
 Rooms/labs, multi-school config, teacher preference forms, statistics dashboard, share links, mid-week timetable versioning (effective-from dates).
