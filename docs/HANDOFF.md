@@ -18,11 +18,9 @@ This file is the bridge between work sessions. The agent MUST update it after ev
 
 ## Next action
 
-v1 roadmap (M0–M6) is complete and DEPLOYED. Live at https://veerpatta.github.io/timetablestudio/ (GitHub Pages enabled via API with `build_type=workflow`; deploy workflow green; root + manifest + sw.js all 200, relative `./` asset paths resolve under the `/timetablestudio/` subpath). Suggested next steps (none blocking), in rough priority:
-1. Paste exported rawData into the LIVE legacy viewer to close the last AC empirically (no viewer instance was available in-session). Optionally install the PWA from the live URL to confirm Lighthouse "installable".
-2. Replace the synthetic `fixtures/legacyRaw.sample.ts` with a real `rawData` snapshot from the viewer; add a tolerant (semantic) round-trip comparison alongside the exact one.
-3. Owner-authoritative data: real per-class subject quotas + teacher caps/unavailability (currently fixture-derived) — see Open questions. Then the solver targets real requirements.
-4. Polish: soft (amber) badges in the editor grid; a timetable/draft switcher UI; generalize block detection beyond the literal "ELGA" token if a second block type appears.
+v1 (M0–M6) complete and deployed at https://veerpatta.github.io/timetablestudio/. Owner live-review (2026-06-05) found major usability gaps → **v2 roadmap added (M7–M10 in docs/ROADMAP.md)**. Start **M7** (onboarding + data manager). Key review findings driving v2: no in-app way to enter school data (only file import); boots into a conflicted 2-day synthetic sample with "infeasible" in the header; dev jargon (seeds, S1–S6, H-codes) user-facing; ELGA rendered as 15 duplicate cells; modals don't close on Escape; solver requirements are fixture-derived (circular) instead of owner quotas.
+
+The v1 suggested next steps are folded into v2: real rawData snapshot/fixture → M7 demo dataset; owner quotas → M7 wizard + M9 solver input; soft badges + draft switcher → M8/M10.
 
 ## Mid-milestone notes (empty if between milestones)
 

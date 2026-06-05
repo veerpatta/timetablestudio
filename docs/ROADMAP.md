@@ -50,6 +50,49 @@ Each milestone has acceptance criteria (AC). Do not start the next milestone unt
 - Deploy: GitHub Pages workflow (or Firebase Hosting); document in README.
 - **AC**: Lighthouse PWA installable; full flow works offline; exported rawData pasted into the legacy viewer renders correctly.
 
-## Parked (post-v1)
+---
+
+# v2 — Usability & solver overhaul (post-ship review, 2026-06-05)
+
+Live review of v1 found: no way to enter school data in the UI (only file import), boots into a conflicted 2-day synthetic sample labeled "infeasible", developer jargon throughout, noisy grid, and a solver driven by fixture-derived (circular) requirements instead of real quotas. v2 fixes product usability on top of the sound v1 core. Same rules: strict order, AC-gated.
+
+## M7 — Real data in: onboarding + data manager
+
+The single biggest gap: a user must be able to build their school inside the app.
+
+- First-run empty state with three clear paths: **Set up my school** (wizard) / **Import existing timetable** (legacy rawData or JSON) / **Explore demo**.
+- Setup wizard (stepper): 1) school + days + periods/timings (ScheduleProfile editor) → 2) classes → 3) teachers (subjects taught, daily/weekly caps, unavailable slots) → 4) per-class subject quotas (CurriculumRequirement editor with a periods/week grid) → 5) blocks (ELGA: classes, teachers, length, allowed days/start).
+- Persistent left-nav sections: Timetable, Teachers, Classes, Subjects & Quotas, Blocks, Settings — full CRUD on every entity (`ui/manage/`, per ARCHITECTURE.md).
+- Replace the conflicted 2-day sample: demo = clean 6-day dataset built from the real viewer rawData snapshot (also closes the v1 real-data round-trip gap). Never auto-load the demo into a returning user's project.
+- Quota dashboard: per class × subject, placed vs required, with shortfall/excess chips; same data feeds the solver in M9.
+- **AC**: a fresh user can create teachers/classes/quotas and see a full Mon–Sat grid without touching files or docs; importing the real VPPS rawData shows 6 days with zero hard conflicts; refresh persists everything.
+
+## M8 — UI overhaul: modern app shell + readable grid
+
+- App shell: left sidebar nav, top bar = project name + draft/timetable switcher + primary actions; modals close on Escape and overlay click; full keyboard navigation; responsive down to tablet (teachers check phones — read-only grid must work on mobile).
+- Grid redesign: subject color coding (port the viewer's palette idea); compact cells (subject + abbreviated teacher, full detail in popover); **ELGA rendered as one merged band** spanning Classes 1–5 × its periods instead of 15 duplicate cells; pin = subtle corner dot, not an emoji per cell.
+- Plain-language everywhere: "Complete (seed 1)" → **"Fill the gaps"**; "Generate…" → **"Create timetables"**; seeds/scores behind an "Advanced" disclosure; S1–S6 → sentence-labeled sliders ("Keep teachers' days compact", "Spread a subject across the week"); conflict messages as sentences with **click-to-jump-to-cell** ("Rashmita is in Class 2 and Class 3 at Mon P1 — view both").
+- Views: per-class week view and per-teacher week view (not just whole-school day view); free-slot highlighting.
+- Status header shows human state ("Draft · 2 conflicts to fix", never "seed 14, infeasible").
+- **AC**: five tasks completable by a non-technical user without docs — change a lesson, find out why a cell is red and fix it, fill gaps, print a teacher's week, mark a teacher absent. Escape closes every modal. ELGA appears once as a band per day.
+
+## M9 — Solver v2: real requirements, explainable results
+
+- Solver input = owner-authoritative quotas from M7 (delete `deriveRequirements` circularity; keep it only as a one-time "infer quotas from imported timetable" suggestion the user confirms/edits).
+- Engine upgrade: constraint propagation (forward-checking on teacher/class domains) + min-conflicts repair phase + soft optimization with random restarts within budget.
+- **Never silently apply an infeasible result.** Infeasible → a blocker report: which constraints can't be met, which entities are over-committed (e.g. "Kusum is required for 8 periods on Mon but only 6 exist"), and concrete relaxation suggestions. Feasible-but-poor → show soft-violation summary before applying.
+- Candidate compare v2: visual diff grid (changed cells highlighted), per-teacher load delta, soft-violation breakdown — scores demoted to advanced.
+- "What-if" affordances: freeze a day, lock a teacher's day, regenerate the rest.
+- **AC**: with real VPPS quotas entered, a full 6-day feasible timetable generates in < 10 s; deliberately over-constrained input yields a readable blocker report naming the bottleneck (verified by test); candidate diff renders correctly for a changed cell.
+
+## M10 — Trust & polish
+
+- First-run guided tour (coach marks on grid, conflicts panel, fill-gaps); inline "?" help per screen.
+- Amber soft-violation badges in the grid (wire `scoreTimetable().soft` into the overlay — known v1 TODO); teacher-gap visualization in Teacher View.
+- Print layouts: master grid, per-class sheet, per-teacher sheet, substitution day sheet.
+- Undo toast ("Moved Maths · Undo"), autosave indicator.
+- **AC**: Lighthouse a11y ≥ 90; soft violations visible in-grid; all four print layouts correct.
+
+## Parked (post-v2)
 
 Rooms/labs, multi-school config, teacher preference forms, statistics dashboard, share links.

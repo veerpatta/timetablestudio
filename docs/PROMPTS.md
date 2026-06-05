@@ -25,6 +25,16 @@ The session handoff protocol both modes rely on is defined in `AGENTS.md` § 6 a
 
 > Continue building this project. Read AGENTS.md, then docs/HANDOFF.md (current state), then docs/ROADMAP.md. Verify reality before trusting the handoff: run `git log --oneline -10`, `npm test`, and `npm run build`. If tests are red, fix them before anything else. Then resume from "Next action" in docs/HANDOFF.md and continue under the marathon rules in docs/PROMPTS.md Prompt A (rules 1–7). Do not re-plan or refactor completed milestones unless a test failure forces it.
 
+## Prompt C — v2 overhaul marathon (UX + solver, M7–M10)
+
+> v1 is live but a product review found serious usability gaps — they are documented in docs/ROADMAP.md § v2 and docs/HANDOFF.md. Read AGENTS.md, docs/HANDOFF.md, then the v2 section of docs/ROADMAP.md in full. Verify reality first: `git log --oneline -10`, `npm test`, `npm run build`. Then work M7 → M10 in strict order under the marathon rules in Prompt A (rules 1–7), with these additions:
+>
+> 8. UX copy rule: no user-facing developer jargon — no "seed", "infeasible", "H1", "S1", or constraint codes outside an "Advanced" disclosure. Every conflict message is a plain sentence naming teacher/class/day/period.
+> 9. Do not regress v1: the legacy rawData export, solver determinism, and all 66+ existing tests must stay green; extend, don't rewrite, `domain/` and `solver/` (M9's engine upgrade may refactor `solver/engine.ts` internals but must keep the worker protocol and determinism-per-seed contract).
+> 10. Mobile matters: teachers will open the grid on phones — M8's responsive AC is not optional polish.
+>
+> Begin with M7.
+
 ## Per-milestone prompts (single-milestone mode)
 
 Always start a session with the kickoff line.
