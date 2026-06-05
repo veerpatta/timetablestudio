@@ -18,6 +18,7 @@ import { RecoveryScreen } from "./RecoveryScreen";
 import { SetupWizard } from "../manage/SetupWizard";
 import { QuotaMatrix } from "../manage/QuotaMatrix";
 import { ClassesPage, TeachersPage, SettingsPage, BlocksPage } from "../manage/ManagePages";
+import { RulesPage } from "../manage/RulesPage";
 
 export function App() {
   const init = useProjectStore((s) => s.init);
@@ -196,6 +197,7 @@ export function App() {
           {view === "classes" && <ClassesPage />}
           {view === "quotas" && <QuotaMatrix />}
           {view === "blocks" && <BlocksPage />}
+          {view === "rules" && <RulesPage />}
           {view === "substitutions" && <SubstitutionView />}
           {view === "settings" && <SettingsPage />}
         </main>

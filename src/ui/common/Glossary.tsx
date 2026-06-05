@@ -6,6 +6,7 @@ export const TERMS = {
   block: "A lesson several classes attend together (like ELGA). It keeps its teachers busy for the whole time and moves as one piece.",
   draft: "A version of the timetable. You can keep several drafts and switch between them without losing your work.",
   pin: "A locked lesson. Filling the gaps and creating timetables will never move a pinned lesson.",
+  rule: "A plain-language constraint your timetable should follow — e.g. ‘Maths only in periods 1–3’. ‘Must’ rules are strict; ‘Prefer’ rules are gentle nudges.",
 } as const;
 
 export type Term = keyof typeof TERMS;

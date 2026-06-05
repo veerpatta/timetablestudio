@@ -11,6 +11,7 @@
 
 import { openDB, deleteDB, type IDBPDatabase } from "idb";
 import type { Project } from "../domain/types";
+import { migrate } from "./migrations";
 
 const DB_NAME = "timetable-studio";
 const STORE = "projects";
@@ -92,10 +93,13 @@ export async function loadProject(
   key = CURRENT_KEY,
   timeoutMs = STORAGE_TIMEOUT_MS,
 ): Promise<Project | undefined> {
-  return runWithDb(
-    (db) => db.get(STORE, key) as Promise<Project | undefined>,
+  const stored = await runWithDb(
+    (db) => db.get(STORE, key) as Promise<unknown>,
     timeoutMs,
   );
+  // Migrate on load so a project persisted under an older schema (e.g. a v1
+  // project with no `rules`) is brought current before any UI touches it.
+  return stored === undefined ? undefined : migrate(stored);
 }
 
 export async function deleteProject(

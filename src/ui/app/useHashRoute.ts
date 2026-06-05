@@ -9,6 +9,7 @@ export const VIEWS = [
   "classes",
   "quotas",
   "blocks",
+  "rules",
   "substitutions",
   "settings",
 ] as const;

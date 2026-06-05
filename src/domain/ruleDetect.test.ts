@@ -26,8 +26,11 @@ describe("import auto-detection on the REAL VPPS timetable (M16 AC)", () => {
 
   it("proposes ELGA running Mon–Thu starting period 3 (read from placements)", () => {
     const r7 = proposals.filter((p) => p.rule.template === "R7");
-    expect(r7.length).toBeGreaterThanOrEqual(1);
-    const elga = r7.find((p) => (p.rule as R7Rule).blockId.toLowerCase().includes("elga")) ?? r7[0]!;
+    // ONLY the genuine multi-period block (ELGA) — NOT the length-1 combined
+    // senior sections (joint Hindi/Economics/English), which aren't scheduled runs.
+    expect(r7).toHaveLength(1);
+    const elga = r7[0]!;
+    expect((elga.rule as R7Rule).blockId.toLowerCase()).toContain("elga");
     const upd = elga.entityUpdates.find((u) => u.type === "blockSchedule");
     expect(upd && upd.type === "blockSchedule" && upd.allowedDays).toEqual(["Mon", "Tue", "Wed", "Thu"]);
     expect(upd && upd.type === "blockSchedule" && upd.fixedStartPeriod).toBe(3);
@@ -43,6 +46,12 @@ describe("import auto-detection on the REAL VPPS timetable (M16 AC)", () => {
   it("every proposal renders as a sentence and carries entity-named slots", () => {
     expect(proposals.length).toBeGreaterThan(0);
     for (const p of proposals) expect(p.sentence.length).toBeGreaterThan(0);
+  });
+
+  it("accepting ALL detected rules keeps the real timetable at 0 hard conflicts", () => {
+    let next = project;
+    for (const p of proposals) next = acceptProposal(next, p);
+    expect(validate(next, tt).filter((v) => v.severity === "hard")).toHaveLength(0);
   });
 
   it("accepting an anchor adds the rule AND sets the class-teacher field (one path)", () => {

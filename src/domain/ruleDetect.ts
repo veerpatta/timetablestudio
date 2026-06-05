@@ -83,7 +83,10 @@ export function detectRules(project: Project, timetable: Timetable): RuleProposa
       }
     }
     if (!best || bestN < threshold) continue;
-    // Fix the subject only if that teacher's most-common P1 subject also clears the bar.
+    // Fix the subject ONLY if it's the P1 subject on EVERY day this teacher
+    // anchors — otherwise (e.g. Class 6: Hemlata is in P1 daily but the subject
+    // varies) keep the anchor teacher-only so accepting it doesn't create a
+    // spurious "wrong subject" conflict on the off-days.
     const sm = subjectByTeacher.get(best)!;
     let subjectId: Id | undefined;
     let subjN = 0;
@@ -93,15 +96,22 @@ export function detectRules(project: Project, timetable: Timetable): RuleProposa
         subjN = n;
       }
     }
-    const fixedSubject = subjN >= threshold ? subjectId : undefined;
+    const fixedSubject = subjN === bestN ? subjectId : undefined;
     const id = freshId("R4");
-    const rule: Rule = { id, template: "R4", enabled: true, severity: "must", weight: weightOf("R4"), classId: cls.id, ...(fixedSubject ? { subjectId: fixedSubject } : {}) };
+    // Detected anchors are PREFER (soft): the pattern is strong but real data has
+    // off-days (Class 6 etc.), so accepting them must not turn a clean import into
+    // a conflicted one. The owner can harden a confirmed anchor to "must".
+    const rule: Rule = { id, template: "R4", enabled: true, severity: "prefer", weight: weightOf("R4"), classId: cls.id, ...(fixedSubject ? { subjectId: fixedSubject } : {}) };
     out.push(proposal(project, rule, [{ type: "classTeacher", classId: cls.id, teacherId: best }]));
   }
 
   // --- R7: block days + start, from actual placements ---
+  // Only GENUINE multi-period blocks (ELGA, length ≥ 2). Combined senior sections
+  // (joint Hindi/Economics/English) are modeled as length-1 blocks (M12) but are
+  // not scheduled "runs on these days" constraints — skip them or we'd propose a
+  // meaningless R7 per joint lesson.
   for (const a of project.activities) {
-    if (a.kind !== "block") continue;
+    if (a.kind !== "block" || a.length < 2) continue;
     const placed = timetable.placements.filter((p) => p.activityId === a.id);
     if (placed.length === 0) continue;
     const blockDays = DAY_ORDER.filter((d) => placed.some((p) => p.day === d));

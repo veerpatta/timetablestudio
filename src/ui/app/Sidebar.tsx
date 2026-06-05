@@ -6,6 +6,7 @@ const META: Record<View, { label: string; icon: string }> = {
   classes: { label: "Classes", icon: "🏫" },
   quotas: { label: "Subjects & Quotas", icon: "📚" },
   blocks: { label: "Blocks", icon: "🧩" },
+  rules: { label: "Rules", icon: "📏" },
   substitutions: { label: "Substitutions", icon: "🔁" },
   settings: { label: "Settings", icon: "⚙️" },
 };

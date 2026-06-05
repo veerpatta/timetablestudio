@@ -6,23 +6,26 @@ This file is the bridge between work sessions. The agent MUST update it after ev
 
 ## Current state
 
-- **Last completed milestone**: M15 — Domain: rules, anchors, doubles, block days. **v4 started.** 149 tests green (36 files); `npm run build` (94 KB gzip) and `npm run lint` clean.
-  - **AC met**: (1) each rule template R1–R15 has a satisfied + violated unit test with a plain-language message naming entities/slots (`domain/rules.test.ts`, 23 tests); (2) a duration-2 lesson occupies two periods and moves as ONE unit (`movePlacement` + `occupiedPeriods`); a double past the day-end trips H4; (3) a v1 project file loads and migrates to v2 with `rules: []` (asserted on a synthetic v1 file; the committed v1 JSON fixtures also load via `deserializeProject`→`migrate`).
-  - Built (doc-first — DATA_MODEL.md + types.ts same change): `Rule` discriminated union R1–R15 + `RuleSeverity`/`HalfOfDay`; `Lesson.duration`; `BlockActivity.allowedDays`/`fixedStartPeriod`; `SchoolClass.classTeacherId`/`isBoardClass`; `ScheduleProfile.break`; `Project.rules` + `schemaVersion: 2`. Engine: `domain/rules.ts` (thin: must→validate hard, prefer→score soft with rule.weight) + `domain/ruleChecks.ts` (15 predicates) + `domain/occupancy.ts` (shared stats) + `domain/ruleText.ts` (`ruleSentence` + `RULE_TEMPLATES`) + `domain/names.ts`. `validate()` H4 generalized to any multi-period unit, H8 counts periods; `score.ts` adds prefer-rule weight; `migrations.ts` v1→v2.
-- **In-progress milestone**: none — M15 complete, M16 next.
-- **Tests**: green — 149 tests across 36 files
-- **Build**: green — typechecks + builds (94 KB gzip, well under the 300 KB budget); lint clean
+- **Last completed milestone**: M16 — Rules UI: plain-language rule builder, import auto-detection, presets. **170 tests green (38 files);** build (100 KB gzip) + lint clean. Verified LIVE on the real VPPS demo: Detect proposes the 16 P1 anchors + ELGA Mon–Thu@P3 + per-class Accountancy/Maths doubles as sentences; Accept all → 43 rules and "Ready — no conflicts"; Add-rule builder shows the live sentence ("Mahesh is class teacher of Class 11 Science and takes period 1 daily") as fields fill, with inline validation.
+  - **AC met**: (1) all seven VPPS families expressible via the UI without code (`ui/manage/rulesUi.test.tsx` buildRule cases); (2) auto-detect on the real import proposes ≥ the P1 anchors, ELGA days, and the 12-Commerce Accountancy double (`domain/ruleDetect.test.ts` against `makeRealVppsProject`); (3) every violation message names entities + slots (M15) and the panel groups R* by rule.
+  - Built — 16a (pure domain): `domain/ruleEdit.ts` (CRUD + entity-aware `addRuleWithBacking`), `domain/ruleDetect.ts` (P1 anchors as PREFER, ELGA from placements, recurring doubles; accept keeps 0 hard conflicts — guaranteed by test), `domain/rulePresets.ts` (guarded Indian K-12 defaults). 16b (UI): `ui/manage/RulesPage.tsx`, `RuleBuilder.tsx` + `ruleFields.ts` (one ~8-kind field schema + live `ruleSentence` preview), `DetectProposals.tsx`; ViolationsPanel groups by rule; "rules" view wired (useHashRoute/Sidebar/App).
+  - **Fix landed (caught live):** `persistence/db.loadProject` now runs `migrate` — a persisted v1 project (no `rules`) was crashing the app on load.
+- **Previous milestone**: M15 — domain rules/durations/block-days/schema v2 (doc-first: DATA_MODEL.md + types.ts together; `Rule` union R1–R15, `Lesson.duration`, block `allowedDays`/`fixedStartPeriod`, `SchoolClass.classTeacherId`/`isBoardClass`, `ScheduleProfile.break`).
+- **In-progress milestone**: none — M16 complete, M17 next.
+- **Tests**: green — 170 tests across 38 files
+- **Build**: green — typechecks + builds (100 KB gzip, well under the 300 KB budget); lint clean
 
-## Next action (v4 — M16: Rules UI, plain-language rule builder)
+## Next action (v4 — M17: Scenario workbench)
 
-Start **M16** (docs/ROADMAP.md § v4). Build on the M15 domain:
-1. "Rules" sidebar section: rule list as readable sentences (`ruleSentence`) with on/off toggles + must/prefer chips; "Add rule" = template picker (`RULE_TEMPLATES`) → fill-in-the-blanks sentence (pickers for subject/class/teacher/periods/days), zero jargon.
-2. Violations panel groups by rule, explains in the rule's own words with click-to-jump (rule violations already carry `constraintId: "R4"` etc. + entity-named messages + slots).
-3. **Import auto-detection**: importing the real timetable proposes detected rules (P1 anchors, doubles, ELGA Mon–Thu, board flags) as pre-filled sentences for one-click accept.
-4. Presets bundle: "Indian K-12 defaults" applied optionally at setup.
-- **AC**: the seven implicit VPPS constraint families all expressible via UI without code; auto-detect on the real import proposes ≥ P1 anchors, ELGA days, and the 12-Commerce Accountancy double; every violation message names entities + slots.
+Start **M17** (docs/ROADMAP.md § v4): "Try a change" mode for safe exploration.
+1. Branch any draft in one click; edit/regenerate; compare side-by-side with the live timetable (diff grid + a change ledger: "3 cells changed · fixes 2 problems · creates 1 new problem"). `domain/diff.ts` already does cell-diff; build the ledger on top (count fixes/new-problems via `validate` before/after).
+2. **Impact preview on hover/drop**: before committing a drag, show what it would break/fix (run `validate` on a speculative copy).
+3. **Swap finder**: select a cell → list conflict-free exchanges (property test: swaps keep hard violations at 0).
+4. Targeted regenerate: freeze everything except a selection (class/teacher/day/subject) and re-solve only that.
+5. Promote a branch to live (with undo); export as usual.
+- **AC**: branch→edit→compare→promote loop works with full undo; swap finder returns only swaps that keep hard violations at 0 (property test); targeted regenerate changes ONLY the unfrozen scope.
 
-Key new domain facts already in the model: P1 class-teacher anchors (R4 + `classTeacherId`), ELGA Mon–Thu @P3 (R7 + block `allowedDays`/`fixedStartPeriod`), double periods (`Lesson.duration: 2`, R6), board flags (R9 + `isBoardClass`), break after P4 (`ScheduleProfile.break`). Subjects missing from rawData (CCS, Revision, Sanskrit, practices, electives) are M18's reconciliation.
+Domain facts now modeled (M15/M16): rules R1–R15 + auto-detect/presets; P1 anchors (R4+`classTeacherId`), ELGA Mon–Thu@P3 (R7+block fields), doubles (`Lesson.duration`/R6), board flags (R9+`isBoardClass`), break (`ScheduleProfile.break`). M18 handles reconciliation of subjects missing from rawData (CCS, Revision, Sanskrit, practices, electives) + cell-for-cell match to Class_Wise.pdf.
 
 Honest carried claims (unchanged discipline): AC#3 "non-technical tester unaided" is owner-side; Lighthouse a11y/PWA numeric scores confirm on deploy; the live legacy-viewer paste check is owner-side (the byte-exact M1 + semantic M12 round-trip tests back it in-repo).
 

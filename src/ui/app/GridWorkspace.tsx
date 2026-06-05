@@ -116,7 +116,7 @@ export function GridWorkspace({ project, timetable, violations, maps, quota, day
           ) : null}
         </div>
         <aside className="no-print flex flex-col gap-4">
-          <ViolationsPanel violations={violations} onJump={(d) => setSelectedDay(d)} />
+          <ViolationsPanel violations={violations} project={project} onJump={(d) => setSelectedDay(d)} />
           <TeacherLoadPanel project={project} maps={maps} day={selectedDay} />
           <QuotaPanel project={project} quota={quota} />
         </aside>
