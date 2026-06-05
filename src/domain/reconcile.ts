@@ -44,6 +44,7 @@ export const PDF_SUBJECT_ALIASES: Readonly<Record<string, string>> = {
   "Political Science": "Pol. Sci.",
   "Business Studies": "B. Studies",
   "English Revision": "Eng. Revision",
+  "Science Practice": "Sci. Practice",
 };
 
 /** The PDF label for a raw subject name (identity if there is no alias). */
