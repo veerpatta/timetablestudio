@@ -154,12 +154,67 @@ export function importLegacyRawData(rawData: string, name = "Imported"): Project
     }
   }
 
-  // --- Lessons (every non-free, non-ELGA cell) ---
+  // --- Detect combined sections ---
+  // Cells sharing IDENTICAL (subject, teachers) across ≥2 classes in the same
+  // slot are one lesson taught to those classes together — e.g. the senior
+  // streams' shared Hindi / English compulsory, or any joint section. The
+  // legacy viewer duplicates such a cell in every class row (like ELGA), which
+  // would otherwise read as a teacher double-booking. We model it as a length-1
+  // multi-class BlockActivity so derive/validate count the teacher as occupied
+  // once and export reproduces the per-row text. (A real, working timetable's
+  // co-located identical cells are intentional combined sections, not clashes —
+  // see docs/DECISIONS.md.)
+  const consumed = new Set<string>(); // `${class}#${day}#${period}` taken by a combined block
+  const combinedBySig = new Map<string, BlockActivity>();
+  let combinedSeq = 0;
+  for (const day of grid.dayOrder) {
+    for (let p = 1; p <= grid.periodCount; p++) {
+      const groups = new Map<
+        string,
+        { classIds: string[]; subject: string; teachers: string[] }
+      >();
+      for (const c of grid.classOrder) {
+        const cell = grid.cells.get(`${c}#${day}#${p}`);
+        if (!cell || cell.free || cell.subject === ELGA) continue;
+        const sig = `${cell.subject}|${cell.teachers.join("/")}`;
+        const g = groups.get(sig) ?? {
+          classIds: [],
+          subject: cell.subject,
+          teachers: cell.teachers,
+        };
+        g.classIds.push(c);
+        groups.set(sig, g);
+      }
+      for (const g of groups.values()) {
+        if (g.classIds.length < 2) continue; // single-class cell → a normal lesson below
+        note(g.subject, g.teachers);
+        const key = `1|${[...g.classIds].sort().join(",")}|${g.subject}|${g.teachers.join("/")}`;
+        let block = combinedBySig.get(key);
+        if (!block) {
+          block = {
+            kind: "block",
+            id: `block-combined-${combinedSeq++}`,
+            name: g.subject,
+            classIds: g.classIds,
+            teacherIds: g.teachers,
+            length: 1,
+          };
+          combinedBySig.set(key, block);
+          activities.push(block);
+        }
+        placements.push({ activityId: block.id, day, period: p, pinned: true });
+        for (const c of g.classIds) consumed.add(`${c}#${day}#${p}`);
+      }
+    }
+  }
+
+  // --- Lessons (every remaining non-free, non-ELGA, non-combined cell) ---
   for (const className of grid.classOrder) {
     for (const day of grid.dayOrder) {
       for (let p = 1; p <= grid.periodCount; p++) {
         const cell = grid.cells.get(`${className}#${day}#${p}`);
         if (!cell || cell.free || cell.subject === ELGA) continue;
+        if (consumed.has(`${className}#${day}#${p}`)) continue;
         note(cell.subject, cell.teachers);
         const lesson: Lesson = {
           kind: "lesson",

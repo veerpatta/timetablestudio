@@ -8,6 +8,7 @@ import { importLegacyRawData } from "../domain/legacyImport";
 import { normalizeProject } from "../domain/requirements";
 import { deserializeProject } from "../persistence/projectFile";
 import { legacyRawSample } from "../fixtures/legacyRaw.sample";
+import { makeRealVppsProject } from "../fixtures/vppsReal";
 import demoJson from "../fixtures/vpps.demo.ttproj.json";
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -33,7 +34,10 @@ export function makeSampleProject(): Project {
   return normalizeProject(imported, imported.activeTimetableId!);
 }
 
-/** The bundled clean 6-day demo project (built by scripts/buildDemoFixture.ts). */
+/** Synthetic clean 6-day project (built by scripts/buildDemoFixture.ts).
+ * TEST fixture only since M12 — the app's "Explore demo" now loads the REAL
+ * VPPS school (`makeRealVppsProject`); this stays as a representative 16-class
+ * project for the many solver/grid/edit tests that depend on it. */
 export function makeDemoProject(): Project {
   return deserializeProject(JSON.stringify(demoJson));
 }
@@ -115,8 +119,9 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   },
 
   loadDemo: () => {
-    const demo = makeDemoProject();
-    set({ project: demo, initialized: true });
+    // M12: the demo IS the real VPPS school (16 classes, 6 days, ELGA Mon–Thu).
+    const demo = makeRealVppsProject();
+    set({ project: demo, initialized: true, storageStatus: "ready" });
     scheduleSave(demo);
   },
 

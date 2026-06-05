@@ -25,7 +25,9 @@ describe("IndexedDB persistence", () => {
   it("loadDemo seeds the demo, and init restores it after a refresh", async () => {
     useProjectStore.getState().loadDemo();
     const demo = useProjectStore.getState().project!;
-    expect(demo.school.name).toMatch(/Demo/);
+    // M12: the demo is the real VPPS school (16 classes, 6 days).
+    expect(demo.school.name).toMatch(/Veer Patta/);
+    expect(demo.classes).toHaveLength(16);
     await saveProject(demo); // loadDemo autosaves (debounced); persist now for the test
 
     // Simulate a page refresh: a fresh store reads back from IndexedDB.

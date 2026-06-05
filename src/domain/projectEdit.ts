@@ -142,6 +142,24 @@ export function addQuota(
   };
 }
 
+/** Adjust a requirement's weekly periods (the inferred-quota review screen). */
+export function setQuotaPeriods(
+  project: Project,
+  requirementId: Id,
+  periodsPerWeek: number,
+): Project {
+  const clamped = Math.max(0, Math.floor(periodsPerWeek));
+  return {
+    ...project,
+    requirements: {
+      ...project.requirements,
+      curriculum: project.requirements.curriculum.map((r) =>
+        r.id === requirementId ? { ...r, periodsPerWeek: clamped } : r,
+      ),
+    },
+  };
+}
+
 export function removeQuota(project: Project, requirementId: Id): Project {
   const req = project.requirements.curriculum.find((r) => r.id === requirementId);
   if (!req) return project;

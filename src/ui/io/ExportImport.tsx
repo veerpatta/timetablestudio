@@ -7,6 +7,8 @@ import { normalizeProject } from "../../domain/requirements";
 import { serializeProject, deserializeProject, suggestFilename } from "../../persistence/projectFile";
 import { downloadText, copyText, readFileText } from "./download";
 import { Modal } from "../common/Modal";
+import { QuotaReview } from "../manage/QuotaReview";
+import type { Project } from "../../domain/types";
 
 export function ExportImport({ onClose }: { onClose: () => void }) {
   const project = useProjectStore((s) => s.project);
@@ -14,6 +16,9 @@ export function ExportImport({ onClose }: { onClose: () => void }) {
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+  // After a legacy import we show an editable inferred-quota review before
+  // committing (M12 AC3) — the user confirms reality instead of retyping it.
+  const [review, setReview] = useState<{ project: Project; label: string } | null>(null);
 
   const rawData = useMemo(() => {
     if (!project || !project.activeTimetableId) return "";
@@ -50,13 +55,30 @@ export function ExportImport({ onClose }: { onClose: () => void }) {
     if (!file) return;
     try {
       const imported = importLegacyRawData(await readFileText(file), file.name.replace(/\.[^.]+$/, ""));
-      afterImport(normalizeProject(imported, imported.activeTimetableId!), `legacy rawData "${file.name}"`);
+      const normalized = normalizeProject(imported, imported.activeTimetableId!);
+      // Don't commit yet — let the user confirm the inferred quotas first.
+      setReview({ project: normalized, label: `legacy rawData "${file.name}"` });
+      setError(null);
     } catch (err) {
       setError((err as Error).message);
     } finally {
       e.target.value = "";
     }
   };
+
+  if (review) {
+    return (
+      <QuotaReview
+        project={review.project}
+        onCancel={() => setReview(null)}
+        onConfirm={(confirmed) => {
+          afterImport(confirmed, review.label);
+          setReview(null);
+          onClose();
+        }}
+      />
+    );
+  }
 
   return (
     <Modal onClose={onClose} maxWidth="max-w-2xl" label="Export / Import">

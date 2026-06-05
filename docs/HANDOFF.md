@@ -6,18 +6,18 @@ This file is the bridge between work sessions. The agent MUST update it after ev
 
 ## Current state
 
-- **Last completed milestone**: M11 — Storage resilience (never brick). **v3 in progress.** 107 tests green; `npm run build` (88 KB gzip) and `npm run lint` clean. Verified live: demo still boots to a clean grid, 0 console errors.
-  - **AC met**: (1) a test simulating a never-resolving `indexedDB.open` renders the recovery screen under fake timers (`src/ui/app/storageRecovery.test.tsx`); (2) "Start fresh" wipes storage and lands on the empty state (same test); (3) no "Loading…" path lingers — every `db.ts` op is `withTimeout`-bounded (3 s), `init` catches failure → recovery, and the old second infinite-spinner path (`!derived`) now routes to a corrupt-data recovery screen.
-  - Built: timeout-wrapped `persistence/db.ts` (+`resetDbConnection`, `deleteAllData`, `StorageTimeoutError`); `projectStore` `storageStatus`/`saveFailed`/`retryStorage`/`readBackup`/`startFresh`; `ui/app/RecoveryScreen.tsx` (two variants); non-blocking amber autosave-failure banner in `App.tsx`.
-- **In-progress milestone**: none between — M11 done, **M12 is next**.
-- **Tests**: green — 107 tests across 31 files
-- **Build**: green — typechecks + builds (88 KB gzip, well under the 300 KB budget)
+- **Last completed milestone**: M12 — Real VPPS data as the spine. **v3 in progress.** 113 tests green; `npm run build` (86 KB gzip) and `npm run lint` clean. Verified live: "Explore demo" now loads the REAL VPPS school — header "Veer Patta Public School · Ready — no conflicts", 6 day tabs, 16 classes, ELGA as a merged band, Class 1 Mon = Maths(Bindu)/EVS(Ravina)/ELGA/Hindi(Anjana) (matches snapshot), 0 console errors.
+  - **AC met**: (1) importing `docs/sources/rawData.vpps.txt` → 6 days, 16 classes, 18 teachers, 0 hard, ELGA bands (`vppsReal.test.ts`, live); (2) semantic round-trip green (tolerant of the viewer's blank lines between days); (3) editable inferred-quota review (`ui/manage/QuotaReview`) shown after a legacy import before commit (`ExportImport.test.tsx`).
+  - Built: combined-section detection in `legacyImport` (senior shared Hindi/English/Economics → length-1 multi-class blocks, 0 false clashes); `fixtures/vppsReal.ts` (snapshot via Vite `?raw`, single source); `loadDemo` → real school; `QuotaReview` + `setQuotaPeriods`. SCHOOL_CONTEXT corrected (ELGA Mon–Thu, 18 teachers); synthetic demo kept test-only.
+- **In-progress milestone**: none between — M12 done, **M13 is next**.
+- **Tests**: green — 113 tests across 31 files
+- **Build**: green — typechecks + builds (86 KB gzip, well under the 300 KB budget)
 
-## Next action (v3 — start M12)
+## Next action (v3 — start M13)
 
-M12 — Real VPPS data as the spine. The REAL full 6-day snapshot is at `docs/sources/rawData.vpps.txt` (16 classes, Mon–Sat). Tasks: (a) add the tolerant/semantic round-trip test that v1/v2 deferred, using the real snapshot as fixture; fix whatever it flushes out (multi-teacher cells, "English compulsory", senior streams); (b) make the demo the REAL VPPS school (drop/relegate synthetic demo to tests only); (c) import → editable inferred-quota review flow after a legacy import. AC: importing the snapshot yields 6 day-tabs, 16 classes, 0 hard conflicts, ELGA as bands; semantic round-trip green; inferred-quota review screen shown + editable.
+M13 — Pages, not modals + the quota matrix. (a) Left sidebar nav with hash-routed real views: Timetable · Teachers · Classes · Subjects & Quotas · Blocks · Substitutions · Settings; modals remain only for confirmations + the wizard; mobile = collapsible bottom nav/hamburger. (b) **Quota matrix editor** (make-or-break): grid of classes × subjects with number cells, per-class running total vs available ("31 of 36 periods planned"), assign a teacher per class-subject from the cell, bulk tools (copy one class's quotas to others, fill a subject column) — no one-row-at-a-time. (c) Wizard v2: chips/tag inputs replace newline/comma textareas; inline validation messages; **Blocks step added** (ELGA: classes, teachers, length, days) per the original M7 promise; wizard progress autosaved. AC: full VPPS data enterable from scratch in <15 min via matrix + bulk (scripted walkthrough test); every sidebar view reachable at 390 px; zero textarea-based structured data entry left.
 
-**Rule-13 contradiction to fix in M12** (flagged by advisor): the real snapshot runs ELGA on **Mon–Thu, P3–P5** (4 days), but SCHOOL_CONTEXT/HANDOFF/demo assume "Mon+Thu". The snapshot is law — update SCHOOL_CONTEXT.md (and any demo assumption) to Mon–Thu and log it in DECISIONS.md.
+Note: `QuotaReview` (M12) already provides a class-grouped editable quota list with inline validation + block-aware per-class totals — a strong base to factor the M13 matrix editor from.
 
 ## Previous next-action (v2, superseded)
 
