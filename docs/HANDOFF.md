@@ -6,30 +6,30 @@ This file is the bridge between work sessions. The agent MUST update it after ev
 
 ## Current state
 
-- **Last completed milestone**: M9 — Solver v2 (explainable results). 103 tests green; `npm run build` (87 KB gzip) and `npm run lint` clean. Verified live on the demo: "Create timetables" yields 3 options (Conflicts: None) with a "Changes vs current" diff (413 concrete cell changes); no console errors.
-  - **AC met**: (1) full feasible 6-day generation from the demo's real quotas in ~0.6 s (`generate.test.ts`, < 10 s); (2) over-constrained input → readable blocker report naming the bottleneck (`solver/diagnose.test.ts` + `CompleteButton.test.tsx`: "Asha is needed for 40 periods a week, but can teach at most 36."); (3) candidate diff renders a changed cell (`domain/diff.test.ts` + live).
-  - `solver/diagnose.ts` (pure): structural necessary-condition checks (teacher weekly demand > cap; demand > days×maxPerDay; class demand > week slots; counts block periods) → plain blockers + suggestions. `BlockerReport` modal.
-  - Never silently apply infeasible: Fill/Create run `diagnose` BEFORE solving; solver `feasible:false` → generic report, no apply; "Use this" disabled on conflicted options. Worker protocol + determinism UNCHANGED (rule 9).
-  - `domain/diff.ts` (pure) + CandidateCompare "Changes" column + expandable diff list.
-  - Engine internals NOT rewritten (existing backtracker meets the <10 s AC; rule-9 rewrite optional) — see DECISIONS. `deriveRequirements` circularity resolved (wizard/demo use real `buildProject` quotas; derive only for legacy import).
-- **In-progress milestone**: M10 (not started)
-- **Tests**: green — 103 tests across 30 files
-- **Build**: green — typechecks + builds (87 KB gzip)
+- **Last completed milestone**: M10 — Trust & polish. **v2 roadmap (M7–M10) COMPLETE.** 105 tests green; `npm run build` (87 KB gzip) and `npm run lint` clean. Verified live on the demo: 9 amber soft-suggestion cells (0 red), modal focus trap works, week sheet is printable; no console errors.
+  - **AC met**: (1) a11y — shared `Modal` focus trap + restore; all icon buttons labelled; live audit shows 0 unnamed buttons (of 127), 0 unlabeled fields, lang+title+alt all good → structural Lighthouse a11y audits pass (numeric score to confirm on deploy). (2) soft violations visible in-grid — `useDerived` feeds `scoreTimetable().violations` (hard+soft); S3/S5/S6 color cells amber, hard rings take precedence (`gridModel.test`). (3) four print layouts via `@media print`: master grid (day view), per-class week sheet, per-teacher week sheet, substitution day sheet (WeekGrid lives outside `.no-print`).
+  - NOT built (optional, non-AC): coach-marks tour, undo toast, autosave indicator, subject colors, cell popovers, free-slot highlighting, left-sidebar. Listed below for a future pass.
+- **In-progress milestone**: none — **v1 (M0–M6) and v2 (M7–M10) both complete and deployed.**
+- **Tests**: green — 105 tests across 30 files
+- **Build**: green — typechecks + builds (87 KB gzip, well under the 300 KB budget)
 
 ## Next action
 
-Start **M10** (Trust & polish). AC: Lighthouse a11y ≥ 90; soft violations visible in-grid; all four print layouts correct (master grid, per-class sheet, per-teacher sheet, substitution day sheet). Work items: (1) **Amber soft-violation badges in the grid** — wire `scoreTimetable().soft` into the grid overlay (known TODO; `gridModel`/`weekModel` already compute a `severity`, but only `validate()` HARD violations are fed in — also feed soft from `scoreTimetable`). (2) Print layouts: the substitution sheet + grid already print; add per-class and per-teacher week sheets (the `WeekGrid` already exists — ensure it prints cleanly via the `@media print` default target) and a master grid sheet. (3) a11y to ≥ 90: labels/roles on all controls (many added in M8/M9), focus management in the shared `Modal` (focus trap + return focus), color-contrast pass, alt/aria on icon-only buttons. (4) Polish: first-run guided tour (coach marks) — OPTIONAL, do last; undo toast ("Moved Maths · Undo"); autosave indicator. (5) Fold in M8 deferred polish: subject colors, compact-cell popover, free-slot highlighting, optional left-sidebar. First concrete step: wire soft badges into the grid (it's an explicit AC and a long-standing TODO) + a small test; then a Lighthouse a11y pass on the running app (focus trap in Modal is the highest-value a11y fix). NOTE rule 8 (no jargon) still applies to any new copy.
+Roadmap complete (M0–M10). Live at https://veerpatta.github.io/timetablestudio/ (auto-deploys on push to `main`). Suggested follow-ups, none blocking, rough priority:
+1. Owner-side empirical checks: run Lighthouse on the deployed site (confirm a11y ≥ 90 and PWA installable); paste exported rawData into the LIVE legacy viewer (the one M6/v1 AC never verifiable in-session).
+2. Replace the SYNTHETIC data with reality: a real legacy `rawData` snapshot (→ second round-trip fixture + tolerant compare) and owner-authoritative per-class quotas / teacher caps / ELGA days (currently faithful synthetic). Fix the SCHOOL_CONTEXT "14 vs 16 classes" miscount.
+3. Optional polish parked from M8/M10: subject color coding (Subject.color exists), compact-cell popover, free-slot highlighting, left-sidebar nav, coach-marks tour, undo toast + autosave indicator, teacher-gap visualization, "Print all teacher sheets".
+4. Data manager: Block (ELGA) CRUD (currently arrives only via demo/import).
+5. Solver: forward-checking/min-conflicts engine upgrade IF a real over-constrained-but-feasible instance proves too slow (current backtracker meets the <10 s AC).
 
 ## Mid-milestone notes (empty if between milestones)
 
-(between milestones)
+(between milestones — roadmap complete)
 
-- Soft badges: `gridModel`/`weekModel` take `violations: Violation[]` and color cells by severity. Currently `App`/`GridWorkspace` pass only `derived.violations` (hard, from `validate()`). To show amber soft, also compute `scoreTimetable(project, tt, weights).soft` and merge into the violations passed to the grids (or extend `useDerived` to include soft). Keep hard ring > soft ring precedence.
-- Print layouts to verify/produce (M10 AC): master grid (whole-school day — exists), per-class week sheet (WeekGrid scope=class), per-teacher week sheet (WeekGrid scope=teacher), substitution day sheet (exists). The `@media print` default target prints the visible grid; per-class/per-teacher just need the week view selected before printing. Consider a "Print all teacher sheets" later.
-- a11y: the shared `Modal` should trap focus and restore it on close (highest-value fix); icon-only buttons (Undo/Redo ↶↷, draft delete ✕) need aria-labels (some have them); check contrast on slate-400 text.
-- Carried honest claim: no real legacy `rawData` snapshot — M1 round-trip + M7 demo use faithful SYNTHETIC data; live-viewer paste check remains owner-side.
-- ELGA-as-band merges only when block classes are contiguous in display order (documented fallback). Block CRUD still absent in the data manager.
-- Keep `domain/`+`solver/` pure; keep the worker protocol stable (rule 9). UI tests jsdom via `environmentMatchGlobs`.
+- Carried honest claims: (a) no real legacy `rawData` snapshot — M1 round-trip + M7 demo use faithful SYNTHETIC data; live-viewer paste check remains owner-side. (b) Lighthouse a11y/PWA numeric scores: structural audits pass in-app, exact numbers to confirm on the deployed site.
+- ELGA-as-band merges only when block classes are contiguous in display order (documented fallback).
+- Architecture invariants held throughout: `domain/`+`solver/` pure (Node-tested), worker protocol + determinism-per-seed stable (rule 9), no new runtime deps beyond the pre-approved list, all files < 300 lines, strict layering, no `any`.
+- UI tests jsdom via `environmentMatchGlobs` (`src/ui/**`); domain/solver under Node.
 
 ## Open questions for the owner
 

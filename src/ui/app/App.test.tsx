@@ -16,7 +16,7 @@ describe("App (jsdom) — live editor", () => {
   it("renders the seeded sample grid and reports no conflicts in plain language", async () => {
     render(<App />);
     expect(await screen.findByText("Maths (Bindu)")).toBeInTheDocument();
-    expect(screen.getByText(/No conflicts/)).toBeInTheDocument();
+    expect(screen.getByText(/no conflicts/i)).toBeInTheDocument();
     // No developer jargon (constraint codes) in the default UI.
     expect(screen.queryByText("H1")).not.toBeInTheDocument();
   });
@@ -49,6 +49,6 @@ describe("App (jsdom) — live editor", () => {
     await waitFor(() =>
       expect(screen.queryByText(/Kusum is double-booked/)).not.toBeInTheDocument(),
     );
-    expect(screen.getByText(/No conflicts/)).toBeInTheDocument();
+    expect(screen.getByText(/no conflicts/i)).toBeInTheDocument();
   });
 });

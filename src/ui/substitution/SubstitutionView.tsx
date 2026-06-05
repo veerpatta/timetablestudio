@@ -57,7 +57,7 @@ export function SubstitutionView({ onClose }: { onClose: () => void }) {
             >
               🖨 Print day sheet
             </button>
-            <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600">
+            <button type="button" onClick={onClose} aria-label="Close" className="text-slate-400 hover:text-slate-600">
               ✕
             </button>
           </div>

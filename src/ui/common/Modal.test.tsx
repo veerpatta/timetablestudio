@@ -23,4 +23,23 @@ describe("Modal (shared shell)", () => {
     fireEvent.click(screen.getByRole("dialog"));
     expect(onClose).toHaveBeenCalledTimes(1);
   });
+
+  it("moves focus into the dialog on open and restores it on close (a11y)", () => {
+    const trigger = document.createElement("button");
+    trigger.textContent = "Open";
+    document.body.appendChild(trigger);
+    trigger.focus();
+    expect(document.activeElement).toBe(trigger);
+
+    const { unmount } = render(
+      <Modal onClose={() => {}}>
+        <button type="button">Inside</button>
+      </Modal>,
+    );
+    expect(document.activeElement).toBe(screen.getByText("Inside"));
+
+    unmount();
+    expect(document.activeElement).toBe(trigger);
+    trigger.remove();
+  });
 });

@@ -2,8 +2,9 @@ import { describe, it, expect } from "vitest";
 import { buildClassRows, buildTeacherRows } from "./gridModel";
 import { makeSampleProject } from "../../store/projectStore";
 import { validate } from "../../domain/validate";
+import { scoreTimetable } from "../../solver/score";
 import { addPlacement } from "../../domain/edit";
-import { lesson } from "../../fixtures/synthetic";
+import { elgaFixture, lesson, place } from "../../fixtures/synthetic";
 import type { Project, Timetable } from "../../domain/types";
 
 const active = (p: Project): Timetable =>
@@ -54,6 +55,18 @@ describe("gridModel", () => {
     const rows = buildClassRows(p, tt, "Mon", violations);
     const class7 = rows.find((r) => r.label === "Class 7")!;
     expect(class7.cells[3]!.severity).toBe("hard"); // P4 Kusum clash
+  });
+
+  it("colors a soft-suggestion cell amber (M10: heavy subject late)", () => {
+    // Maths (a heavy subject) placed at P5 → soft S3 with a per-cell slot.
+    const p = elgaFixture();
+    p.activities.push(lesson("m", "c1", "Maths", ["Bindu"]));
+    p.timetables[0]!.placements = [place("m", "Tue", 5)];
+    const soft = scoreTimetable(p, p.timetables[0]!).soft;
+    expect(soft.some((v) => v.constraintId === "S3")).toBe(true);
+    const rows = buildClassRows(p, p.timetables[0]!, "Tue", soft);
+    const class1 = rows.find((r) => r.label === "Class 1")!;
+    expect(class1.cells[4]!.severity).toBe("soft"); // P5
   });
 
   it("teacher view: a teacher row shows their occupied periods", () => {

@@ -62,7 +62,7 @@ export function ExportImport({ onClose }: { onClose: () => void }) {
     <Modal onClose={onClose} maxWidth="max-w-2xl" label="Export / Import">
         <header className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
           <h2 className="font-semibold">Export / Import</h2>
-          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600">
+          <button type="button" onClick={onClose} aria-label="Close" className="text-slate-400 hover:text-slate-600">
             ✕
           </button>
         </header>

@@ -1,12 +1,14 @@
 import { useMemo } from "react";
 import { useProjectStore } from "../../store/projectStore";
-import { validate, quotaStatus, type QuotaStatus } from "../../domain/validate";
+import { quotaStatus, type QuotaStatus } from "../../domain/validate";
+import { scoreTimetable, DEFAULT_WEIGHTS } from "../../solver/score";
 import { deriveMaps, type DerivedMaps } from "../../domain/derive";
 import type { Project, Timetable, Violation } from "../../domain/types";
 
 export interface Derived {
   project: Project;
   timetable: Timetable;
+  /** Hard (clashes) + soft (suggestions). Grids ring hard red, soft amber. */
   violations: Violation[];
   maps: DerivedMaps;
   quota: QuotaStatus[];
@@ -20,10 +22,13 @@ export function useDerived(): Derived | null {
     if (!project) return null;
     const timetable = project.timetables.find((t) => t.id === project.activeTimetableId);
     if (!timetable) return null;
+    // Soft list is independent of weights (weights only scale the score number),
+    // so default weights are fine for display.
+    const { violations } = scoreTimetable(project, timetable, DEFAULT_WEIGHTS);
     return {
       project,
       timetable,
-      violations: validate(project, timetable),
+      violations,
       maps: deriveMaps(project, timetable),
       quota: quotaStatus(project, timetable),
     };

@@ -28,7 +28,7 @@ describe("M7 onboarding (jsdom)", () => {
     fireEvent.click(await screen.findByText("Open demo"));
     // Saturday tab proves a 6-day week; "No conflicts" proves it's feasible.
     expect(await screen.findByRole("tab", { name: "Sat" })).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByText(/No conflicts/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/no conflicts/i)).toBeInTheDocument());
   });
 
   it("Start setup opens the guided wizard", async () => {
