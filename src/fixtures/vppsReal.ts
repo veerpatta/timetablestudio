@@ -8,6 +8,7 @@
 import rawData from "../../docs/sources/rawData.vpps.txt?raw";
 import { importLegacyRawData } from "../domain/legacyImport";
 import { normalizeProject } from "../domain/requirements";
+import { reconcileWithPdf } from "../domain/reconcile";
 import type { Project } from "../domain/types";
 
 /** The verbatim legacy rawData snapshot (real VPPS, 6 days, 16 classes). */
@@ -20,5 +21,7 @@ export const VPPS_SCHOOL_NAME = "Veer Patta Public School";
  * blocks; per-class single lessons become curriculum requirements. */
 export function makeRealVppsProject(): Project {
   const imported = importLegacyRawData(rawData, VPPS_SCHOOL_NAME);
-  return normalizeProject(imported, imported.activeTimetableId!);
+  // Reconcile with the authoritative Class_Wise.pdf: real clock + break + board
+  // flags the rawData subset drops (AGENTS rule 16). Cell data is already a match.
+  return reconcileWithPdf(normalizeProject(imported, imported.activeTimetableId!));
 }
