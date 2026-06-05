@@ -10,13 +10,21 @@ import { CompleteButton } from "../solverui/CompleteButton";
 import { CandidateCompare } from "../solverui/CandidateCompare";
 import { SubstitutionView } from "../substitution/SubstitutionView";
 import { ExportImport } from "../io/ExportImport";
+import { EmptyState } from "./EmptyState";
+import { SetupWizard } from "../manage/SetupWizard";
+import { DataManager } from "../manage/DataManager";
 
 export function App() {
   const init = useProjectStore((s) => s.init);
+  const loadDemo = useProjectStore((s) => s.loadDemo);
+  const initialized = useProjectStore((s) => s.initialized);
+  const project = useProjectStore((s) => s.project);
   const derived = useDerived();
   const [showGenerate, setShowGenerate] = useState(false);
   const [showSubs, setShowSubs] = useState(false);
   const [showIO, setShowIO] = useState(false);
+  const [showWizard, setShowWizard] = useState(false);
+  const [showData, setShowData] = useState(false);
   const { selectedDay, viewMode, past, future } = useEditorStore();
   const { setSelectedDay, setViewMode, undo, redo } = useEditorStore.getState();
 
@@ -24,10 +32,26 @@ export function App() {
     void init();
   }, [init]);
 
+  if (!initialized) {
+    return <div className="p-6 text-slate-500">Loading…</div>;
+  }
+  if (!project) {
+    return (
+      <>
+        <EmptyState
+          onSetup={() => setShowWizard(true)}
+          onImport={() => setShowIO(true)}
+          onDemo={loadDemo}
+        />
+        {showWizard && <SetupWizard onClose={() => setShowWizard(false)} />}
+        {showIO && <ExportImport onClose={() => setShowIO(false)} />}
+      </>
+    );
+  }
   if (!derived) {
     return <div className="p-6 text-slate-500">Loading…</div>;
   }
-  const { project, timetable, violations, maps, quota } = derived;
+  const { timetable, violations, maps, quota } = derived;
   const days = project.profiles.find((p) => p.id === timetable.profileId)?.days ?? [];
 
   return (
@@ -48,6 +72,13 @@ export function App() {
             className="rounded bg-indigo-600 px-3 py-1 font-medium text-white hover:bg-indigo-700"
           >
             ⚖ Generate…
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowData(true)}
+            className="rounded border border-slate-300 px-3 py-1 hover:bg-slate-50"
+          >
+            🏫 Data
           </button>
           <button
             type="button"
@@ -147,6 +178,8 @@ export function App() {
       {showGenerate && <CandidateCompare onClose={() => setShowGenerate(false)} />}
       {showSubs && <SubstitutionView onClose={() => setShowSubs(false)} />}
       {showIO && <ExportImport onClose={() => setShowIO(false)} />}
+      {showData && <DataManager onClose={() => setShowData(false)} />}
+      {showWizard && <SetupWizard onClose={() => setShowWizard(false)} />}
     </div>
   );
 }

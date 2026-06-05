@@ -2,12 +2,13 @@ import "fake-indexeddb/auto";
 import { describe, it, expect, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { App } from "./App";
-import { useProjectStore } from "../../store/projectStore";
+import { useProjectStore, makeSampleProject } from "../../store/projectStore";
 import { useEditorStore } from "../../store/editorStore";
 import { lesson } from "../../fixtures/synthetic";
 
 beforeEach(() => {
-  useProjectStore.setState({ project: null });
+  // Seed an in-memory project so the editor renders (init() won't clobber it).
+  useProjectStore.setState({ project: makeSampleProject(), initialized: true });
   useEditorStore.setState({ past: [], future: [], selectedDay: "Mon", viewMode: "class" });
 });
 

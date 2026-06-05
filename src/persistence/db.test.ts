@@ -6,6 +6,7 @@ import { useProjectStore, makeSampleProject } from "../store/projectStore";
 describe("IndexedDB persistence", () => {
   beforeEach(async () => {
     await deleteProject(CURRENT_KEY);
+    useProjectStore.setState({ project: null, initialized: false });
   });
 
   it("saves and loads a project (the refresh-restore path)", async () => {
@@ -15,16 +16,22 @@ describe("IndexedDB persistence", () => {
     expect(loaded).toEqual(project);
   });
 
-  it("projectStore.init seeds the sample when storage is empty, and reloads it", async () => {
-    useProjectStore.setState({ project: null });
+  it("init leaves an empty project null on first run (v2: no auto-seed)", async () => {
     await useProjectStore.getState().init();
-    const seeded = useProjectStore.getState().project!;
-    expect(seeded.school.name).toBe("VPPS (sample)");
+    expect(useProjectStore.getState().project).toBeNull();
+    expect(useProjectStore.getState().initialized).toBe(true);
+  });
+
+  it("loadDemo seeds the demo, and init restores it after a refresh", async () => {
+    useProjectStore.getState().loadDemo();
+    const demo = useProjectStore.getState().project!;
+    expect(demo.school.name).toMatch(/Demo/);
+    await saveProject(demo); // loadDemo autosaves (debounced); persist now for the test
 
     // Simulate a page refresh: a fresh store reads back from IndexedDB.
-    useProjectStore.setState({ project: null });
+    useProjectStore.setState({ project: null, initialized: false });
     await useProjectStore.getState().init();
-    expect(useProjectStore.getState().project).toEqual(seeded);
+    expect(useProjectStore.getState().project).toEqual(demo);
   });
 
   it("lists keys and deletes", async () => {

@@ -6,7 +6,9 @@ import type { Activity, Placement, Project } from "../domain/types";
 import { loadProject, saveProject } from "../persistence/db";
 import { importLegacyRawData } from "../domain/legacyImport";
 import { normalizeProject } from "../domain/requirements";
+import { deserializeProject } from "../persistence/projectFile";
 import { legacyRawSample } from "../fixtures/legacyRaw.sample";
+import demoJson from "../fixtures/vpps.demo.ttproj.json";
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 const AUTOSAVE_MS = 400;
@@ -19,17 +21,27 @@ function scheduleSave(project: Project): void {
   }, AUTOSAVE_MS);
 }
 
-/** Default starting project: the bundled VPPS sample (imported from rawData),
- * normalized into a requirement-driven project so quotas + the solver work. */
+/** The 2-day synthetic VPPS sample — TEST fixture only (used by ~60 unit tests).
+ * NOT the app's first-run data; the app uses the demo (see `loadDemo`). */
 export function makeSampleProject(): Project {
   const imported = importLegacyRawData(legacyRawSample, "VPPS (sample)");
   return normalizeProject(imported, imported.activeTimetableId!);
 }
 
+/** The bundled clean 6-day demo project (built by scripts/buildDemoFixture.ts). */
+export function makeDemoProject(): Project {
+  return deserializeProject(JSON.stringify(demoJson));
+}
+
 interface ProjectState {
   project: Project | null;
-  /** Load from IndexedDB if present, else seed with the sample and persist it. */
+  /** True once init() has run, so the UI can tell "loading" from "empty". */
+  initialized: boolean;
+  /** Load the stored project from IndexedDB if any. Never auto-seeds — a fresh
+   * user gets the empty state and chooses a path (wizard / import / demo). */
   init: () => Promise<void>;
+  /** Load the demo dataset and make it the active project (explicit user action). */
+  loadDemo: () => void;
   setProject: (project: Project, persist?: boolean) => void;
   /** Replace the active timetable's placements (and project activities). */
   commitActive: (activities: Activity[], placements: Placement[]) => void;
@@ -40,16 +52,22 @@ interface ProjectState {
 
 export const useProjectStore = create<ProjectState>((set, get) => ({
   project: null,
+  initialized: false,
 
   init: async () => {
-    const stored = await loadProject();
-    if (stored) {
-      set({ project: stored });
+    // Don't clobber a project already created in-memory (wizard/import/tests).
+    if (get().project) {
+      set({ initialized: true });
       return;
     }
-    const seeded = makeSampleProject();
-    set({ project: seeded });
-    await saveProject(seeded);
+    const stored = await loadProject();
+    set({ project: stored ?? null, initialized: true });
+  },
+
+  loadDemo: () => {
+    const demo = makeDemoProject();
+    set({ project: demo, initialized: true });
+    scheduleSave(demo);
   },
 
   setProject: (project, persist = true) => {

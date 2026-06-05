@@ -6,42 +6,44 @@ This file is the bridge between work sessions. The agent MUST update it after ev
 
 ## Current state
 
-- **Last completed milestone**: M6 — ship. **All milestones M0–M6 complete.** 66 tests green; `npm run build` (74 KB gzip main + worker chunk, well under the 300 KB budget) and `npm run lint` clean. Verified in a production `vite preview`: SW registers and controls the page, cache holds the shell + JS/CSS, manifest exposes 192/512 icons; no console errors.
-  - Export/Import (`ui/io/ExportImport.tsx` + `download.ts`): legacy rawData (copy + download) via `exportLegacyRawData`, JSON backup via `serializeProject`/`suggestFilename`, import of JSON (`deserializeProject`) and legacy rawData (`importLegacyRawData`→`normalizeProject`). Reads files via `readFileText` (FileReader, jsdom-safe). Tested in jsdom.
-  - Print: two `@media print` targets — default prints the grid (chrome `.no-print`), `body.print-subs` prints the substitution sheet. Toolbar "Print" button.
-  - PWA: `public/manifest.webmanifest` + hand-rolled `public/sw.js` (cache-first shell + runtime asset caching), registered PROD-only in `main.tsx`; icons via `scripts/makeIcons.mjs` (dependency-free PNG encoder). No new deps.
-  - Deploy: `.github/workflows/deploy.yml` (lint+test+build → GitHub Pages); README documents the one-time Pages setting. `base: "./"` already set.
-  - M0–M5 carryover still green.
-- **In-progress milestone**: none — v1 roadmap complete.
-- **Tests**: green — 66 tests across 18 files
-- **Build**: green — typechecks + builds (74 KB gzip main, separate worker chunk)
+- **Last completed milestone**: M7 — onboarding + data manager. 80 tests green; `npm run build` (83 KB gzip, under the 300 KB budget) and `npm run lint` clean. Verified live in the dev server: fresh user sees the empty state (no auto-seed); "Explore demo" loads a 16-class Mon–Sat grid with 0 conflicts; the wizard creates a project ("Maple High", 5 classes, 6 days); refresh restores; no console errors.
+  - First-run empty state (`ui/app/EmptyState.tsx`): three paths — Set up / Import / Explore demo. `projectStore.init` no longer auto-seeds (loads from IndexedDB only; `initialized` flag distinguishes loading vs empty; early-returns if a project is in memory). `loadDemo()` loads the static demo.
+  - Demo dataset: `fixtures/demoSchool.ts` (real roster, moderate quotas) → shared pure `domain/projectBuilder.ts` → solved ONCE at build time by `scripts/buildDemoFixture.ts` → committed `fixtures/vpps.demo.ttproj.json` (16 classes × 6 days, 322 placements, 0 hard). Gated by `fixtures/demo.test.ts`.
+  - Setup wizard (`ui/manage/SetupWizard.tsx`, 5 steps) builds a project via `buildProject`. Data manager (`ui/manage/DataManager.tsx`) = CRUD for school/classes/teachers/quotas via pure cascading `domain/projectEdit.ts`. Toolbar "Data" button.
+  - v1 untouched: `makeSampleProject`/`legacyRawSample` (2-day fixture) unchanged; the 2 tests asserting v1 auto-seed were re-specified (not deleted) to the v2 empty-state contract.
+- **In-progress milestone**: M8 (not started)
+- **Tests**: green — 80 tests across 22 files
+- **Build**: green — typechecks + builds (83 KB gzip)
 
 ## Next action
 
-v1 (M0–M6) complete and deployed at https://veerpatta.github.io/timetablestudio/. Owner live-review (2026-06-05) found major usability gaps → **v2 roadmap added (M7–M10 in docs/ROADMAP.md)**. Start **M7** (onboarding + data manager). Key review findings driving v2: no in-app way to enter school data (only file import); boots into a conflicted 2-day synthetic sample with "infeasible" in the header; dev jargon (seeds, S1–S6, H-codes) user-facing; ELGA rendered as 15 duplicate cells; modals don't close on Escape; solver requirements are fixture-derived (circular) instead of owner quotas.
-
-The v1 suggested next steps are folded into v2: real rawData snapshot/fixture → M7 demo dataset; owner quotas → M7 wizard + M9 solver input; soft badges + draft switcher → M8/M10.
+Start **M8** (UI overhaul: modern app shell + readable grid). The App is still one monolithic `ui/app/App.tsx` with emoji-toolbar buttons and a whole-school day grid — M8 replaces this. Key AC: five tasks completable by a non-technical user without docs (change a lesson; find why a cell is red and fix it; fill gaps; print a teacher's week; mark a teacher absent); Escape closes every modal; ELGA appears once as a band per day. Plus: left-sidebar nav + draft switcher; subject color coding; compact cells (subject + abbreviated teacher, detail in popover); **ELGA as one merged band** (not 15 duplicate cells — currently `gridModel` emits a cell per class×period); plain-language relabel ("Complete (seed 1)" → "Fill the gaps"; "Generate…" → "Create timetables"; seeds/scores behind "Advanced"; S1–S6 → sentence sliders); conflict messages as click-to-jump sentences; per-class & per-teacher week views; responsive to tablet/phone (read-only grid on mobile). First concrete step: a shared modal shell with Escape + overlay-click close (refactor the 5 existing modals onto it), since it's reused everywhere and is a discrete AC. NOTE rule 8 (no jargon) + rule 10 (mobile) apply throughout.
 
 ## Mid-milestone notes (empty if between milestones)
 
 (between milestones)
 
-- IMPORTANT honest claim: the M1 round-trip is an EXACT-string match against a canonical-format fixture written to the DATA_MODEL.md spec — NOT against real legacy-viewer output (no snapshot exists in this repo). A real-data round-trip will need a semantic compare; the true "paste into the legacy viewer" end-to-end check is the M6 AC. If a real `rawData` snapshot arrives, add it as a second fixture and a tolerant comparison.
-- `domain/` + `solver/` tests run under Node (Vitest default); UI tests will auto-use jsdom via `environmentMatchGlobs` (`src/ui/**`). Keep validate() pure.
+- Modals to migrate onto the shared Escape/overlay-close shell: `CandidateCompare`, `SubstitutionView`, `ExportImport`, `DataManager`, `SetupWizard` (all use `.modal-overlay`/`.modal-card` classes already — good hook).
+- ELGA-as-band: `ui/grid/gridModel.ts` currently sets one `GridCell` per (class, period) for the block. For the merged band, the grid renderer needs block-span info (rowSpan across the 5 primary classes + colSpan across its periods) — extend gridModel to emit a band descriptor, or handle in `TimetableGrid` from placements. Keep the underlying model (one BlockActivity) — purely a rendering change.
+- Jargon still user-facing (to fix in M8): `CompleteButton` "Complete (seed N)"; `CandidateCompare` "seed"/"Score"/"Hard"; `WeightEditor` "S1…S6" labels; `ViolationsPanel`/grid badges show "H1"/"S2" constraint codes; substitution/quota use "infeasible"-adjacent wording. Move codes/seeds/scores behind an "Advanced" disclosure.
+- IMPORTANT honest claim (carried from v1): no real legacy-viewer `rawData` snapshot exists; M1 round-trip + M7 demo both use faithful SYNTHETIC data. Real-snapshot import and the live-viewer paste check remain owner-side.
+- `domain/` + `solver/` tests run under Node; UI tests auto-use jsdom via `environmentMatchGlobs` (`src/ui/**`). Keep `domain/`+`solver/` pure.
 
 ## Open questions for the owner
 
-1. Per-class subject quotas (periods/week of each subject per class) — needed before M3; M1–M2 can use fixture estimates clearly marked TODO.
-2. Teacher max loads and unavailable slots — defaults in DATA_MODEL.md apply until specified.
-3. Which days carry the ELGA block, and is start period P3 fixed?
+1. Per-class subject quotas (periods/week of each subject per class) — M7 demo uses faithful SYNTHETIC quotas (moderate, free periods left). Real quotas feed M9's solver; until then the wizard/data-manager let the owner enter their own.
+2. Teacher max loads and unavailable slots — defaults (6/day, 36/week) apply; editable per teacher in the data manager.
+3. Which days carry the ELGA block, and is start period P3 fixed? — demo ASSUMES Mon+Thu, P3–P5. Confirm.
+4. Class count: SCHOOL_CONTEXT says "14" but enumerates 16 (Class 1–10 + 11/12 × Arts/Commerce/Science). The demo uses the enumerated 16. Confirm the true count / fix the doc.
 
 ## Known TODOs / stubs in code
 
-- `domain/legacyImport.ts` — block detection is keyed on the literal "ELGA" subject token; generalize only if a second block type appears (DECISIONS).
-- No real `rawData` snapshot — `fixtures/legacyRaw.sample.ts` is synthetic-but-faithful; replace/augment when the owner provides one.
-- Solver requirements are FIXTURE-DERIVED (`deriveRequirements` reads them off the sample timetable), not owner-authoritative quotas. Replace with real per-class subject quotas when the owner provides them (Open question 1). `maxPerDay` is inferred as `max(2, observed/day)`.
-- Soft constraints (S1–S6) drive scoring + the weight editor + candidate ranking, but are NOT shown as per-cell amber badges in the editor grid (the grid overlay only reflects `validate()` hard violations). Optional polish; wire `scoreTimetable().soft` into `gridModel` overlay if desired.
-- "generate" mode reaches 0 hard on both the roomy 6-day variant (tested) and the live 2-day sample (verified in-app); diversity is limited on the rigid 2-day data (expected).
+- M8 work (next): shared modal shell w/ Escape+overlay close; plain-language relabel (no jargon, rule 8); ELGA-as-band rendering; responsive/mobile read-only grid (rule 10); per-class & per-teacher week views; sidebar nav + draft switcher.
+- M9 work: replace `deriveRequirements` circularity with owner quotas from M7 (keep it only as a one-time "infer from imported timetable" suggestion); engine forward-checking + min-conflicts; never silently apply infeasible — blocker report naming the bottleneck.
+- Data manager has no Block (ELGA) CRUD yet — ELGA arrives via demo/import only. Add block editing (classes/teachers/length/days) when needed.
+- `domain/legacyImport.ts` — block detection keyed on the literal "ELGA" token; generalize only if a second block type appears.
+- No real `rawData` snapshot — `fixtures/legacyRaw.sample.ts` (2-day) and the M7 demo are synthetic-but-faithful; replace/augment when the owner provides one.
+- Soft constraints (S1–S6) drive scoring/weights/ranking but are NOT yet shown as per-cell amber badges in the grid (M10 AC; wire `scoreTimetable().soft` into the grid overlay).
 
 ---
 
