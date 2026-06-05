@@ -19,6 +19,10 @@ export interface GridCell {
   pinned: boolean;
   isBlock: boolean;
   severity?: "hard" | "soft"; // worst conflict touching this cell
+  // Band rendering (e.g. ELGA shown once across its classes × periods):
+  rowSpan?: number; // origin cell of a band spans this many rows
+  colSpan?: number; // origin cell of a band spans this many periods
+  covered?: boolean; // covered by a band origin above/left — renderer skips it
 }
 
 export interface GridRow {
@@ -104,6 +108,35 @@ export function buildClassRows(
           isBlock: activity.kind === "block",
           severity: overlay.get(`${classId}#${period}`),
         });
+      }
+    }
+  }
+
+  // Merge each block into ONE band when its classes are contiguous in the
+  // displayed order (e.g. ELGA over Classes 1–5 × P3–P5 = a single cell, not 15).
+  const classOrder = project.classes.map((c) => c.id);
+  for (const placement of timetable.placements) {
+    if (placement.day !== day) continue;
+    const activity = index.get(placement.activityId);
+    if (!activity || activity.kind !== "block") continue;
+    const idxs = activity.classIds.map((id) => classOrder.indexOf(id)).sort((a, b) => a - b);
+    const contiguous =
+      idxs.length > 0 && idxs[0]! >= 0 && idxs[idxs.length - 1]! - idxs[0]! === idxs.length - 1;
+    if (!contiguous) continue; // fall back to per-cell rendering
+    const periods = occupiedPeriods(activity, placement.period);
+    const originClass = classOrder[idxs[0]!]!;
+    const originPeriod = periods[0]!;
+    for (const ci of idxs) {
+      const classId = classOrder[ci]!;
+      for (const period of periods) {
+        const cell = byKey.get(`${classId}#${period}`);
+        if (!cell) continue;
+        if (classId === originClass && period === originPeriod) {
+          cell.rowSpan = idxs.length;
+          cell.colSpan = periods.length;
+        } else {
+          cell.covered = true;
+        }
       }
     }
   }

@@ -24,6 +24,25 @@ describe("gridModel", () => {
     expect(class1.cells[0]!.label).toBe("Maths (Bindu)");
   });
 
+  it("renders ELGA as ONE band: origin spans 5 classes × 3 periods, rest covered", () => {
+    const p = makeSampleProject();
+    const rows = buildClassRows(p, active(p), "Mon", []);
+    const class1 = rows.find((r) => r.label === "Class 1")!;
+    const origin = class1.cells[2]!; // Class 1, P3 = band origin
+    expect(origin.rowSpan).toBe(5);
+    expect(origin.colSpan).toBe(3);
+    expect(class1.cells[3]!.covered).toBe(true); // Class 1 P4 covered
+    expect(class1.cells[4]!.covered).toBe(true); // Class 1 P5 covered
+    // Classes 2–5 have all three ELGA periods covered (no duplicate ELGA cells)
+    for (const name of ["Class 2", "Class 3", "Class 4", "Class 5"]) {
+      const row = rows.find((r) => r.label === name)!;
+      expect([2, 3, 4].every((i) => row.cells[i]!.covered)).toBe(true);
+    }
+    // exactly one rendered ELGA cell across the whole class view
+    const rendered = rows.flatMap((r) => r.cells).filter((c) => c.isBlock && !c.covered);
+    expect(rendered).toHaveLength(1);
+  });
+
   it("marks a hard-conflict cell with severity 'hard'", () => {
     const p = makeSampleProject();
     const tt = active(p);

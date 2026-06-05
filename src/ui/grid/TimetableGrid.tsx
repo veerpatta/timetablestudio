@@ -34,6 +34,7 @@ function CellView({ rowId, cell }: { rowId: string; cell: GridCell }) {
     disabled: !cell.ref,
   });
 
+  const isBand = (cell.rowSpan ?? 1) > 1 || (cell.colSpan ?? 1) > 1;
   const base =
     "relative h-14 border border-slate-200 p-1 text-xs leading-tight align-top select-none";
   const sev = cell.severity ? sevClass[cell.severity] : "";
@@ -41,6 +42,26 @@ function CellView({ rowId, cell }: { rowId: string; cell: GridCell }) {
     droppable.setNodeRef(node);
     draggable.setNodeRef(node);
   };
+
+  if (isBand) {
+    // A merged block band (e.g. ELGA across its classes × periods) — one cell.
+    return (
+      <td
+        ref={dragRef}
+        rowSpan={cell.rowSpan}
+        colSpan={cell.colSpan}
+        className={`${base} ${sev} cursor-grab bg-indigo-50 text-center align-middle`}
+        {...draggable.listeners}
+        {...draggable.attributes}
+        title={cell.label}
+      >
+        <span className="font-semibold text-indigo-700">{cell.label}</span>
+        {cell.pinned && (
+          <span aria-label="Pinned" className="absolute right-1 top-1 h-2 w-2 rounded-full bg-amber-500" />
+        )}
+      </td>
+    );
+  }
 
   return (
     <td
@@ -52,20 +73,21 @@ function CellView({ rowId, cell }: { rowId: string; cell: GridCell }) {
       {...draggable.attributes}
       title={cell.label}
     >
+      {cell.pinned && cell.ref && (
+        <span aria-label="Pinned" className="absolute right-1 top-1 h-2 w-2 rounded-full bg-amber-500" />
+      )}
       {cell.label && (
         <div className="flex items-start justify-between gap-1">
-          <span className={cell.isBlock ? "font-semibold text-indigo-700" : ""}>
-            {cell.label}
-          </span>
+          <span className={cell.isBlock ? "font-semibold text-indigo-700" : ""}>{cell.label}</span>
           {cell.ref && (
             <button
               type="button"
               aria-label={cell.pinned ? "Unpin" : "Pin"}
               onPointerDown={(e) => e.stopPropagation()}
               onClick={() => pin(cell.ref!)}
-              className={`shrink-0 rounded px-1 ${cell.pinned ? "text-amber-600" : "text-slate-300 hover:text-slate-500"}`}
+              className="shrink-0 rounded px-1 text-[10px] text-slate-300 hover:text-slate-500"
             >
-              {cell.pinned ? "📌" : "📍"}
+              {cell.pinned ? "unpin" : "pin"}
             </button>
           )}
         </div>
@@ -116,9 +138,9 @@ export function TimetableGrid({ project, timetable, day, viewMode, violations }:
               <th className="border border-slate-200 bg-slate-50 p-2 text-xs font-medium">
                 {row.label}
               </th>
-              {row.cells.map((cell) => (
-                <CellView key={cell.period} rowId={row.id} cell={cell} />
-              ))}
+              {row.cells.map((cell) =>
+                cell.covered ? null : <CellView key={cell.period} rowId={row.id} cell={cell} />,
+              )}
             </tr>
           ))}
         </tbody>
