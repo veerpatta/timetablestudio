@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useProjectStore } from "../../store/projectStore";
 import {
   addClass,
@@ -106,9 +106,24 @@ export function TeachersPage() {
   );
 }
 
-export function SettingsPage() {
+/** Human-readable date from a `previous:<iso>:<n>` snapshot key. */
+function previousLabel(key: string): string {
+  const iso = key.slice("previous:".length).replace(/:\d+$/, "");
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? "earlier" : d.toLocaleString();
+}
+
+export function SettingsPage({ onStartDifferent }: { onStartDifferent?: () => void }) {
   const [project, apply] = useApply();
   const startTour = useUiStore((s) => s.startTour);
+  const adoptBundled = useProjectStore((s) => s.adoptBundled);
+  const previousKeys = useProjectStore((s) => s.previousKeys);
+  const refreshPreviousKeys = useProjectStore((s) => s.refreshPreviousKeys);
+  const restorePrevious = useProjectStore((s) => s.restorePrevious);
+  const deletePrevious = useProjectStore((s) => s.deletePrevious);
+  useEffect(() => {
+    void refreshPreviousKeys();
+  }, [refreshPreviousKeys]);
   const profile = project.profiles.find(
     (p) => p.id === project.timetables.find((t) => t.id === project.activeTimetableId)?.profileId,
   );
@@ -156,6 +171,60 @@ export function SettingsPage() {
           className="mt-1 block w-20 rounded border border-slate-300 px-2 py-1"
         />
       </label>
+      <div className="mt-6 border-t border-slate-100 pt-4">
+        <h3 className="text-sm font-semibold text-slate-700">School timetable</h3>
+        <p className="mt-1 text-xs text-slate-500">
+          The app opens with the built-in school timetable. You can return to it at any time —
+          your current timetable is kept as a draft you can restore.
+        </p>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => void adoptBundled()}
+            className="rounded border border-slate-300 px-3 py-1 text-sm hover:bg-slate-50"
+          >
+            Reset to school timetable
+          </button>
+          {onStartDifferent && (
+            <button
+              type="button"
+              onClick={onStartDifferent}
+              className="rounded border border-slate-300 px-3 py-1 text-sm hover:bg-slate-50"
+            >
+              Start a different school
+            </button>
+          )}
+        </div>
+        {previousKeys.length > 0 && (
+          <div className="mt-3">
+            <p className="text-xs font-medium text-slate-600">Saved drafts (before updates)</p>
+            <ul className="mt-1 space-y-1">
+              {previousKeys.map((key) => (
+                <li key={key} className="flex items-center justify-between gap-2 text-xs">
+                  <span className="text-slate-600">Timetable saved {previousLabel(key)}</span>
+                  <span className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void restorePrevious(key)}
+                      className="rounded border border-slate-300 px-2 py-0.5 hover:bg-slate-50"
+                    >
+                      Restore
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void deletePrevious(key)}
+                      aria-label="Delete saved draft"
+                      className="rounded border border-slate-300 px-2 py-0.5 text-slate-400 hover:text-hard"
+                    >
+                      ✕
+                    </button>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
       <div className="mt-6 border-t border-slate-100 pt-4">
         <button type="button" onClick={startTour} className="rounded border border-slate-300 px-3 py-1 text-sm hover:bg-slate-50">
           Replay the guided tour

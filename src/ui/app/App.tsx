@@ -26,7 +26,12 @@ export function App() {
   const initialized = useProjectStore((s) => s.initialized);
   const storageStatus = useProjectStore((s) => s.storageStatus);
   const saveFailed = useProjectStore((s) => s.saveFailed);
+  const bundledStale = useProjectStore((s) => s.bundledStale);
+  const adoptBundled = useProjectStore((s) => s.adoptBundled);
+  const dismissStale = useProjectStore((s) => s.dismissStale);
+  const restorePrevious = useProjectStore((s) => s.restorePrevious);
   const project = useProjectStore((s) => s.project);
+  const [undoKey, setUndoKey] = useState<string | null>(null);
   const derived = useDerived();
   const [view, navigate] = useHashRoute();
   const [showGenerate, setShowGenerate] = useState(false);
@@ -77,6 +82,14 @@ export function App() {
     if (hint.cta === "Create timetable") setShowGenerate(true);
     else navigate(hint.view);
   };
+  const onUpdateBundled = async () => {
+    const ok = await adoptBundled();
+    if (ok) setUndoKey(useProjectStore.getState().lastPreviousKey);
+  };
+  const onUndoUpdate = async () => {
+    if (undoKey) await restorePrevious(undoKey);
+    setUndoKey(null);
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
@@ -97,6 +110,60 @@ export function App() {
           >
             Download a backup
           </button>
+        </div>
+      )}
+      {bundledStale && (
+        <div
+          role="alert"
+          className="no-print flex flex-wrap items-center justify-between gap-2 bg-indigo-100 px-4 py-2 text-sm text-indigo-900 sm:px-6"
+        >
+          <span>
+            The built-in school timetable has been updated. Load the latest? Your current
+            timetable is kept as a draft you can restore anytime.
+          </span>
+          <div className="flex shrink-0 gap-2">
+            <button
+              type="button"
+              onClick={() => void onUpdateBundled()}
+              className="rounded bg-indigo-600 px-2 py-1 font-medium text-white hover:bg-indigo-700"
+            >
+              Update timetable
+            </button>
+            <button
+              type="button"
+              onClick={dismissStale}
+              className="rounded border border-indigo-400 bg-white px-2 py-1 font-medium hover:bg-indigo-50"
+            >
+              Not now
+            </button>
+          </div>
+        </div>
+      )}
+      {undoKey && (
+        <div
+          role="status"
+          className="no-print flex flex-wrap items-center justify-between gap-2 bg-emerald-100 px-4 py-2 text-sm text-emerald-900 sm:px-6"
+        >
+          <span>
+            Updated to the latest school timetable. Your previous timetable is saved as a draft.
+          </span>
+          <div className="flex shrink-0 gap-2">
+            <button
+              type="button"
+              onClick={() => void onUndoUpdate()}
+              className="rounded border border-emerald-500 bg-white px-2 py-1 font-medium hover:bg-emerald-50"
+            >
+              Undo
+            </button>
+            <button
+              type="button"
+              onClick={() => setUndoKey(null)}
+              aria-label="Dismiss"
+              className="rounded border border-emerald-400 bg-white px-2 py-1 font-medium hover:bg-emerald-50"
+            >
+              Dismiss
+            </button>
+          </div>
         </div>
       )}
       {hint && (
@@ -199,7 +266,9 @@ export function App() {
           {view === "blocks" && <BlocksPage />}
           {view === "rules" && <RulesPage />}
           {view === "substitutions" && <SubstitutionView />}
-          {view === "settings" && <SettingsPage />}
+          {view === "settings" && (
+            <SettingsPage onStartDifferent={() => setShowWizard(true)} />
+          )}
         </main>
       </div>
       </div>

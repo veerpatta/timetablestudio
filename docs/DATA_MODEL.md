@@ -129,6 +129,7 @@ interface BlockRequirement {
 ```ts
 interface Project {
   schemaVersion: 2;
+  bundledDataVersion?: number;  // v5: built-in-timetable revision this project was seeded from (bundled-derived projects only)
   school: { name: string };
   teachers: Teacher[];
   classes: SchoolClass[];
@@ -143,6 +144,8 @@ interface Project {
 ```
 
 A v1 project (no `rules`, `schemaVersion: 1`) loads via `persistence/migrations.migrate`, which adds `rules: []` and bumps to v2 (back-compat, AGENTS §5).
+
+`bundledDataVersion` (v5) is an optional field — no `schemaVersion` bump. It is stamped only on projects seeded from the bundled VPPS timetable (`BUNDLED_DATA_VERSION` in `src/fixtures/bundled.ts`), so its absence on a stored VPPS project means "older than v5" and triggers the one-click update banner (M19). Bump `BUNDLED_DATA_VERSION` whenever the built-in timetable changes; a stale project is never overwritten — the prior project is kept under a `previous:<stamp>` storage key and restorable from Settings.
 
 ## Rules — user-configurable constraints (v2, R1–R15)
 

@@ -2,6 +2,7 @@ import "fake-indexeddb/auto";
 import { describe, it, expect, beforeEach } from "vitest";
 import { saveProject, loadProject, deleteProject, listProjectKeys, CURRENT_KEY } from "./db";
 import { useProjectStore, makeSampleProject } from "../store/projectStore";
+import { BUNDLED_DATA_VERSION } from "../fixtures/bundled";
 
 describe("IndexedDB persistence", () => {
   beforeEach(async () => {
@@ -16,9 +17,16 @@ describe("IndexedDB persistence", () => {
     expect(loaded).toEqual(project);
   });
 
-  it("init leaves an empty project null on first run (v2: no auto-seed)", async () => {
+  it("init seeds the bundled real timetable on first run (M19 zero setup)", async () => {
     await useProjectStore.getState().init();
-    expect(useProjectStore.getState().project).toBeNull();
+    const seeded = useProjectStore.getState().project;
+    expect(seeded).not.toBeNull();
+    // The built-in school: real VPPS, 16 classes, rules on, current bundled version.
+    expect(seeded!.school.name).toMatch(/Veer Patta/);
+    expect(seeded!.classes).toHaveLength(16);
+    expect(seeded!.rules.length).toBeGreaterThan(0);
+    expect(seeded!.bundledDataVersion).toBe(BUNDLED_DATA_VERSION);
+    expect(useProjectStore.getState().bundledStale).toBe(false);
     expect(useProjectStore.getState().initialized).toBe(true);
   });
 

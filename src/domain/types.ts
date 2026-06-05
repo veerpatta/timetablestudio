@@ -130,6 +130,11 @@ export interface BlockRequirement {
 
 export interface Project {
   schemaVersion: 2;
+  /** v5: the built-in-timetable revision this project was seeded from. Stamped
+   * only on bundled-derived projects (the real VPPS school); absent on
+   * user-built/imported projects. Drives stale-data detection — a stored VPPS
+   * project older than the current bundled version offers a one-click update. */
+  bundledDataVersion?: number;
   school: { name: string };
   teachers: Teacher[];
   classes: SchoolClass[];

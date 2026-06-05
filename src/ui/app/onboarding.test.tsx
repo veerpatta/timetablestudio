@@ -4,38 +4,38 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { App } from "./App";
 import { useProjectStore } from "../../store/projectStore";
 import { useEditorStore } from "../../store/editorStore";
+import { useUiStore } from "../../store/uiStore";
 import { deleteProject, CURRENT_KEY } from "../../persistence/db";
 
 beforeEach(async () => {
   await deleteProject(CURRENT_KEY);
-  useProjectStore.setState({ project: null, initialized: false });
+  useProjectStore.setState({
+    project: null,
+    initialized: false,
+    bundledStale: false,
+    lastPreviousKey: null,
+    previousKeys: [],
+  });
   useEditorStore.setState({ past: [], future: [], selectedDay: "Mon", viewMode: "class" });
+  useUiStore.setState({ tourOpen: false }); // keep the guided tour out of the way
 });
 
-describe("M7 onboarding (jsdom)", () => {
-  it("a fresh user sees the empty state with three start paths (no auto-loaded sample)", async () => {
+describe("M19 zero-setup onboarding (jsdom)", () => {
+  it("a fresh user opens straight into the real school timetable — no welcome screen", async () => {
     render(<App />);
-    expect(await screen.findByText(/Welcome to Timetable Studio/)).toBeInTheDocument();
-    expect(screen.getByText("Set up my school")).toBeInTheDocument();
-    expect(screen.getByText("Import existing timetable")).toBeInTheDocument();
-    expect(screen.getByText(/Explore the demo/)).toBeInTheDocument();
-    // It must NOT auto-load a conflicted sample.
-    expect(screen.queryByText(/No conflicts|conflict/)).not.toBeInTheDocument();
-  });
-
-  it("Explore demo loads a full Mon–Sat timetable with no conflicts", async () => {
-    render(<App />);
-    fireEvent.click(await screen.findByText("Open demo"));
-    // Saturday tab proves a 6-day week; "No conflicts" proves it's feasible.
+    // The built-in school is live with a full 6-day week and no conflicts —
+    // no empty state, no user action.
     expect(await screen.findByRole("tab", { name: "Sat" })).toBeInTheDocument();
     await waitFor(() => expect(screen.getByText(/no conflicts/i)).toBeInTheDocument());
+    expect(screen.getAllByText(/Veer Patta Public School/).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/Welcome to Timetable Studio/)).not.toBeInTheDocument();
   });
 
-  it("Start setup opens the guided wizard", async () => {
+  it("'Start a different school' (Settings) opens the guided wizard", async () => {
     render(<App />);
-    fireEvent.click(await screen.findByText("Start setup"));
-    // Wizard step 1 content (the card title "Set up my school" also exists behind it).
-    expect(await screen.findByText("Teaching days")).toBeInTheDocument();
-    expect(screen.getByText("Periods per day")).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("button", { name: /Settings/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "Start a different school" }));
+    // The guided wizard modal (its heading is unique to the wizard).
+    expect(await screen.findByRole("heading", { name: "Set up my school" })).toBeInTheDocument();
   });
 });

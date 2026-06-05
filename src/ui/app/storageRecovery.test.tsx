@@ -42,7 +42,7 @@ describe("App — storage resilience (M11)", () => {
     expect(screen.queryByText("Loading…")).not.toBeInTheDocument();
   });
 
-  it("'Start fresh' clears storage and lands on a working empty state", async () => {
+  it("'Start fresh' clears storage and re-seeds the bundled school timetable", async () => {
     render(<App />);
     await act(async () => {
       await vi.advanceTimersByTimeAsync(3100);
@@ -54,9 +54,11 @@ describe("App — storage resilience (M11)", () => {
       await vi.advanceTimersByTimeAsync(3100);
     });
 
-    // Empty state with the three onboarding paths — a usable starting point.
-    expect(screen.getByText("Welcome to Timetable Studio")).toBeInTheDocument();
-    expect(screen.getByText("Set up my school")).toBeInTheDocument();
+    // M19 zero setup: a cleared browser lands on the real timetable, not a blank
+    // welcome screen — a usable starting point with no further user action.
+    expect(screen.getByRole("tab", { name: "Sat" })).toBeInTheDocument();
+    expect(screen.queryByText("Welcome to Timetable Studio")).not.toBeInTheDocument();
+    expect(useProjectStore.getState().project).not.toBeNull();
     expect(useProjectStore.getState().storageStatus).toBe("ready");
   });
 });
