@@ -4,6 +4,7 @@ import { useEditorStore } from "../../store/editorStore";
 import { useUiStore } from "../../store/uiStore";
 import { useDerived } from "./hooks";
 import { GridWorkspace } from "./GridWorkspace";
+import { DraftSwitcher } from "./DraftSwitcher";
 import { CompleteButton } from "../solverui/CompleteButton";
 import { CandidateCompare } from "../solverui/CandidateCompare";
 import { SubstitutionView } from "../substitution/SubstitutionView";
@@ -58,21 +59,24 @@ export function App() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
       <div className="app-shell">
-      <header className="no-print flex items-center justify-between border-b border-slate-200 bg-white px-6 py-3">
-        <div>
-          <h1 className="text-lg font-semibold">Timetable Studio</h1>
-          <p className="text-xs text-slate-500">
-            {project.school.name} · <span className="text-slate-400">{timetable.name}</span> ·{" "}
-            {hardCount === 0 ? (
-              <span className="text-emerald-600">Ready — no conflicts</span>
-            ) : (
-              <span className="text-hard">
-                {hardCount} {hardCount === 1 ? "conflict" : "conflicts"} to fix
-              </span>
-            )}
-          </p>
+      <header className="no-print flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-slate-200 bg-white px-4 py-3 sm:px-6">
+        <div className="flex items-center gap-3">
+          <div>
+            <h1 className="text-lg font-semibold">Timetable Studio</h1>
+            <p className="text-xs text-slate-500">
+              {project.school.name} ·{" "}
+              {hardCount === 0 ? (
+                <span className="text-emerald-600">Ready — no conflicts</span>
+              ) : (
+                <span className="text-hard">
+                  {hardCount} {hardCount === 1 ? "conflict" : "conflicts"} to fix
+                </span>
+              )}
+            </p>
+          </div>
+          <DraftSwitcher />
         </div>
-        <div className="flex items-center gap-2 text-sm">
+        <div className="flex flex-wrap items-center gap-2 text-sm">
           <CompleteButton />
           <button
             type="button"

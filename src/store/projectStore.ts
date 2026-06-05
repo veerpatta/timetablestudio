@@ -48,6 +48,10 @@ interface ProjectState {
   /** Add a new timetable draft (e.g. a solver result) and make it active.
    * Never overwrites the source draft. Returns the new timetable id. */
   addDraft: (name: string, placements: Placement[]) => string | null;
+  /** Switch the active timetable draft. */
+  setActiveTimetable: (id: string) => void;
+  /** Delete a draft (keeps at least one); re-points active if needed. */
+  deleteTimetable: (id: string) => void;
 }
 
 export const useProjectStore = create<ProjectState>((set, get) => ({
@@ -104,5 +108,24 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     set({ project: next });
     scheduleSave(next);
     return id;
+  },
+
+  setActiveTimetable: (id) => {
+    const project = get().project;
+    if (!project || !project.timetables.some((t) => t.id === id)) return;
+    const next = { ...project, activeTimetableId: id };
+    set({ project: next });
+    scheduleSave(next);
+  },
+
+  deleteTimetable: (id) => {
+    const project = get().project;
+    if (!project || project.timetables.length <= 1) return;
+    const timetables = project.timetables.filter((t) => t.id !== id);
+    const activeTimetableId =
+      project.activeTimetableId === id ? timetables[0]!.id : project.activeTimetableId;
+    const next = { ...project, timetables, activeTimetableId };
+    set({ project: next });
+    scheduleSave(next);
   },
 }));
