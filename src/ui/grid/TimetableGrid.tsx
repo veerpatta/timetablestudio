@@ -27,6 +27,14 @@ const sevClass: Record<"hard" | "soft", string> = {
 
 function CellView({ rowId, cell }: { rowId: string; cell: GridCell }) {
   const pin = useEditorStore((s) => s.pin);
+  const select = useEditorStore((s) => s.select);
+  const selection = useEditorStore((s) => s.selection);
+  const isSelected =
+    !!cell.ref &&
+    !!selection &&
+    selection.activityId === cell.ref.activityId &&
+    selection.day === cell.ref.day &&
+    selection.period === cell.ref.period;
   const droppable = useDroppable({ id: `${rowId}#${cell.period}` });
   const draggable = useDraggable({
     id: `${rowId}#${cell.period}#drag`,
@@ -66,9 +74,10 @@ function CellView({ rowId, cell }: { rowId: string; cell: GridCell }) {
   return (
     <td
       ref={dragRef}
+      onClick={() => cell.ref && select(isSelected ? null : cell.ref)}
       className={`${base} ${sev} ${cell.ref ? "cursor-grab bg-white" : "bg-slate-50"} ${
         droppable.isOver ? "outline outline-2 outline-sky-400" : ""
-      }`}
+      } ${isSelected ? "ring-2 ring-sky-500" : ""}`}
       {...draggable.listeners}
       {...draggable.attributes}
       title={cell.label}

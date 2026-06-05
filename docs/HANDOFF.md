@@ -6,26 +6,24 @@ This file is the bridge between work sessions. The agent MUST update it after ev
 
 ## Current state
 
-- **Last completed milestone**: M16 — Rules UI: plain-language rule builder, import auto-detection, presets. **170 tests green (38 files);** build (100 KB gzip) + lint clean. Verified LIVE on the real VPPS demo: Detect proposes the 16 P1 anchors + ELGA Mon–Thu@P3 + per-class Accountancy/Maths doubles as sentences; Accept all → 43 rules and "Ready — no conflicts"; Add-rule builder shows the live sentence ("Mahesh is class teacher of Class 11 Science and takes period 1 daily") as fields fill, with inline validation.
-  - **AC met**: (1) all seven VPPS families expressible via the UI without code (`ui/manage/rulesUi.test.tsx` buildRule cases); (2) auto-detect on the real import proposes ≥ the P1 anchors, ELGA days, and the 12-Commerce Accountancy double (`domain/ruleDetect.test.ts` against `makeRealVppsProject`); (3) every violation message names entities + slots (M15) and the panel groups R* by rule.
-  - Built — 16a (pure domain): `domain/ruleEdit.ts` (CRUD + entity-aware `addRuleWithBacking`), `domain/ruleDetect.ts` (P1 anchors as PREFER, ELGA from placements, recurring doubles; accept keeps 0 hard conflicts — guaranteed by test), `domain/rulePresets.ts` (guarded Indian K-12 defaults). 16b (UI): `ui/manage/RulesPage.tsx`, `RuleBuilder.tsx` + `ruleFields.ts` (one ~8-kind field schema + live `ruleSentence` preview), `DetectProposals.tsx`; ViolationsPanel groups by rule; "rules" view wired (useHashRoute/Sidebar/App).
-  - **Fix landed (caught live):** `persistence/db.loadProject` now runs `migrate` — a persisted v1 project (no `rules`) was crashing the app on load.
-- **Previous milestone**: M15 — domain rules/durations/block-days/schema v2 (doc-first: DATA_MODEL.md + types.ts together; `Rule` union R1–R15, `Lesson.duration`, block `allowedDays`/`fixedStartPeriod`, `SchoolClass.classTeacherId`/`isBoardClass`, `ScheduleProfile.break`).
-- **In-progress milestone**: none — M16 complete, M17 next.
-- **Tests**: green — 170 tests across 38 files
-- **Build**: green — typechecks + builds (100 KB gzip, well under the 300 KB budget); lint clean
+- **Last completed milestone**: M17 — Scenario workbench. **181 tests green (40 files);** build (102 KB gzip) + lint clean. Verified LIVE on the real VPPS demo: "Try a change" branches the live timetable; swap finder lists conflict-free exchanges for a selected lesson; targeted regenerate of Class 8 changed **16 cells, all Class 8, 0 new problems** and honestly surfaced a partial refit; Compare shows the change ledger; Promote to live then Undo (no errors).
+  - **AC met**: (1) branch→edit→compare→promote loop with full undo (`store/scenarioStore.test.ts`); (2) swap finder returns only swaps that keep hard violations at 0 — property test re-validates each returned swap with an INDEPENDENT oracle + a negative case (`domain/scenario.test.ts`); (3) targeted regenerate changes ONLY the unfrozen scope — asserted changed-cells ⊆ scope on the real VPPS import.
+  - Built — 17a (pure domain): `domain/scenario.ts` (`changeLedger` fixed/created via hard-key set-difference, `impactOfMove`, `legalSwaps`/`applySwap`, `withClearedScope`/`placementInScope` for targeted regen via the existing complete-solve — no engine/worker change). 17b (UI): `store/scenarioStore.ts` (session-only branch/discard/promote), `ui/scenario/` (ScenarioBar, ScenarioCompare, SwapFinder, RegenerateControl), `editorStore.swap`/`replaceActivePlacements` (undoable), grid click-to-select.
+- **Previous milestones**: M16 — rules UI (builder + auto-detect + presets); M15 — domain rules/durations/block-days/schema v2.
+- **In-progress milestone**: none — M17 complete, M18 next (the LAST v4 milestone).
+- **Tests**: green — 181 tests across 40 files
+- **Build**: green — typechecks + builds (102 KB gzip, well under the 300 KB budget); lint clean
 
-## Next action (v4 — M17: Scenario workbench)
+## Next action (v4 — M18: Real-data reconciliation + everyday-ops polish)
 
-Start **M17** (docs/ROADMAP.md § v4): "Try a change" mode for safe exploration.
-1. Branch any draft in one click; edit/regenerate; compare side-by-side with the live timetable (diff grid + a change ledger: "3 cells changed · fixes 2 problems · creates 1 new problem"). `domain/diff.ts` already does cell-diff; build the ledger on top (count fixes/new-problems via `validate` before/after).
-2. **Impact preview on hover/drop**: before committing a drag, show what it would break/fix (run `validate` on a speculative copy).
-3. **Swap finder**: select a cell → list conflict-free exchanges (property test: swaps keep hard violations at 0).
-4. Targeted regenerate: freeze everything except a selection (class/teacher/day/subject) and re-solve only that.
-5. Promote a branch to live (with undo); export as usual.
-- **AC**: branch→edit→compare→promote loop works with full undo; swap finder returns only swaps that keep hard violations at 0 (property test); targeted regenerate changes ONLY the unfrozen scope.
+Start **M18** (docs/ROADMAP.md § v4) — the LAST v4 milestone. Rule 16: the PDFs are ground truth; M18's cell-for-cell AC is against `docs/sources/Class_Wise.pdf`.
+1. **Reconcile the dataset with the PDFs** so the in-app grid equals the printed truth: subjects missing from rawData (CCS, Revision, Sanskrit, practices, streams' electives — many ARE already in `rawData.vpps.txt`; cross-check against `Class_Wise.pdf`), the break (`ScheduleProfile.break` after P4), board flags (R9/`isBoardClass` for 10, 12A/C/S), P1 anchors (R4/`classTeacherId`).
+2. **Entity lifecycle ease**: add/remove/rename teacher, subject, class, period-count — each with a guided impact flow ("Removing Maya affects 11 placements — reassign to whom?"). `domain/projectEdit.ts` already cascades deletes; add rename + an impact-preview before destructive ops.
+3. **Period-count change wizard** (6→7 or 6→5) remapping placements with explicit owner decisions.
+4. **Print/export parity** with the current PDFs (class-wise, teacher-wise, day-wise sheets) — week views + print CSS exist (M10/M13); align formatting.
+- **AC**: in-app grid matches `Class_Wise.pdf` cell-for-cell after reconciliation (scripted comparison against a transcribed fixture — likely transcribe `Class_Wise.pdf` to a fixture and diff vs the imported grid); removing a teacher walks through reassignment without ever leaving a dangling reference; the three print views visually match the school's current formats.
 
-Domain facts now modeled (M15/M16): rules R1–R15 + auto-detect/presets; P1 anchors (R4+`classTeacherId`), ELGA Mon–Thu@P3 (R7+block fields), doubles (`Lesson.duration`/R6), board flags (R9+`isBoardClass`), break (`ScheduleProfile.break`). M18 handles reconciliation of subjects missing from rawData (CCS, Revision, Sanskrit, practices, electives) + cell-for-cell match to Class_Wise.pdf.
+Note: `rawData.vpps.txt` is the machine-readable SUBSET; `Class_Wise.pdf` is authoritative and RICHER. Where they differ, the PDF wins (note in DECISIONS). The current demo import (`makeRealVppsProject`) reads `rawData.vpps.txt`; M18 must reconcile any gaps the PDF reveals. Domain facts already modeled across M15–M17 (rules R1–R15, durations, block days, anchors, board flags, break, scenario workbench) are the substrate.
 
 Honest carried claims (unchanged discipline): AC#3 "non-technical tester unaided" is owner-side; Lighthouse a11y/PWA numeric scores confirm on deploy; the live legacy-viewer paste check is owner-side (the byte-exact M1 + semantic M12 round-trip tests back it in-repo).
 

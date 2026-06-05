@@ -8,6 +8,8 @@ import { ViolationsPanel } from "../panels/ViolationsPanel";
 import { TeacherLoadPanel } from "../panels/TeacherLoadPanel";
 import { QuotaPanel } from "../panels/QuotaPanel";
 import { Glossary } from "../common/Glossary";
+import { ScenarioBar } from "../scenario/ScenarioBar";
+import { SwapFinder } from "../scenario/SwapFinder";
 
 interface Props {
   project: Project;
@@ -27,6 +29,9 @@ export function GridWorkspace({ project, timetable, violations, maps, quota, day
 
   return (
     <>
+      <div className="no-print px-4 pt-3 sm:px-6">
+        <ScenarioBar />
+      </div>
       <div className="no-print flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white px-4 py-2 sm:px-6">
         <div className="flex gap-1">
           {(["day", "week"] as const).map((g) => (
@@ -116,6 +121,7 @@ export function GridWorkspace({ project, timetable, violations, maps, quota, day
           ) : null}
         </div>
         <aside className="no-print flex flex-col gap-4">
+          {gridView === "day" && <SwapFinder project={project} timetable={timetable} />}
           <ViolationsPanel violations={violations} project={project} onJump={(d) => setSelectedDay(d)} />
           <TeacherLoadPanel project={project} maps={maps} day={selectedDay} />
           <QuotaPanel project={project} quota={quota} />

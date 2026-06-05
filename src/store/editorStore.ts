@@ -11,6 +11,7 @@ import {
   togglePin,
   type PlacementRef,
 } from "../domain/edit";
+import { applySwap } from "../domain/scenario";
 import { useProjectStore } from "./projectStore";
 
 interface Snapshot {
@@ -49,6 +50,10 @@ interface EditorState {
   pin: (ref: PlacementRef) => void;
   remove: (ref: PlacementRef) => void;
   add: (activity: Activity, day: Day, period: number, pinned?: boolean) => void;
+  /** Exchange the slots of two placements (swap finder). Undoable. */
+  swap: (a: PlacementRef, b: PlacementRef) => void;
+  /** Replace the active timetable's placements wholesale (promote / regenerate). Undoable. */
+  replaceActivePlacements: (placements: Placement[]) => void;
 
   undo: () => void;
   redo: () => void;
@@ -98,6 +103,12 @@ export const useEditorStore = create<EditorState>((set, get) => {
 
     add: (activity, day, period, pinned = false) =>
       apply((s) => addPlacement(s.activities, s.placements, activity, day, period, pinned)),
+
+    swap: (a, b) =>
+      apply((s) => ({ activities: s.activities, placements: applySwap(s.placements, a, b) })),
+
+    replaceActivePlacements: (placements) =>
+      apply((s) => ({ activities: s.activities, placements })),
 
     undo: () => {
       const { past } = get();
