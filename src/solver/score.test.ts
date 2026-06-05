@@ -29,7 +29,7 @@ describe("scoreTimetable", () => {
   it("changing soft weights flips candidate ranking deterministically (M4 AC)", () => {
     // Minimal 1-class, 1-teacher project. Teacher T qualified for X and Y.
     const project: Project = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       school: { name: "w" },
       teachers: [
         { id: "T", name: "T", subjects: ["X", "Y"], maxPeriodsPerDay: 6, maxPeriodsPerWeek: 36, unavailable: [] },
@@ -44,6 +44,7 @@ describe("scoreTimetable", () => {
       ],
       activities: [lesson("x1", "c1", "X", ["T"]), lesson("x2", "c1", "X", ["T"]), lesson("y1", "c1", "Y", ["T"])],
       requirements: { curriculum: [], blocks: [] },
+      rules: [],
       timetables: [
         // A: X@P1, Y@P3 → teacher gap at P2 (S1=1), no clustering (S2=0)
         { id: "A", name: "A", profileId: "pf", placements: [place("x1", "Mon", 1), place("y1", "Mon", 3)] },

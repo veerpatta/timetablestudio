@@ -142,7 +142,7 @@ export function buildProject(input: BuildInput): Project {
   }
 
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     school: { name: input.schoolName },
     teachers,
     classes,
@@ -150,6 +150,7 @@ export function buildProject(input: BuildInput): Project {
     profiles: [profile],
     activities,
     requirements: { curriculum, blocks },
+    rules: [],
     timetables: [{ id: "main", name: "Timetable", profileId: "profile", placements }],
     activeTimetableId: "main",
   };

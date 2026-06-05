@@ -39,14 +39,14 @@ export interface TeacherOccupancy {
 export type SlotKey = string;
 export const slotKey = (day: Day, period: number): SlotKey => `${day}#${period}`;
 
-/** The periods a placement occupies: [period] for a lesson, the run for a block. */
+/** The periods a placement occupies: the run for a block, [p] for a single
+ * lesson, [p, p+1] for a duration-2 (double-period) lesson. Duration-2 lessons
+ * are placed/moved/removed as one unit and clash-checked like a mini-block. */
 export function occupiedPeriods(activity: Activity, startPeriod: number): number[] {
-  if (activity.kind === "block") {
-    const out: number[] = [];
-    for (let p = startPeriod; p < startPeriod + activity.length; p++) out.push(p);
-    return out;
-  }
-  return [startPeriod];
+  const span = activity.kind === "block" ? activity.length : activity.duration ?? 1;
+  const out: number[] = [];
+  for (let p = startPeriod; p < startPeriod + span; p++) out.push(p);
+  return out;
 }
 
 export function buildActivityIndex(project: Project): Map<Id, Activity> {

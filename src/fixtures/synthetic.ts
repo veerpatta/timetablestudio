@@ -39,7 +39,7 @@ export function elgaFixture(): Project {
     length: 3,
   };
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     school: { name: "Synthetic" },
     teachers: [
       ...PRIMARY_TEACHERS.map((name) => ({
@@ -77,6 +77,7 @@ export function elgaFixture(): Project {
     profiles: [sixPeriodProfile],
     activities: [elga],
     requirements: { curriculum: [], blocks: [] },
+    rules: [],
     timetables: [
       { id: "tt", name: "Draft", profileId: "heatwave", placements: [] },
     ],

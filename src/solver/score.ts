@@ -4,6 +4,7 @@
 
 import { buildActivityIndex, occupiedPeriods } from "../domain/derive";
 import { validate } from "../domain/validate";
+import { preferRuleScore } from "../domain/rules";
 import type { Day, Id, Project, Timetable, Violation } from "../domain/types";
 
 export const HARD_PENALTY = 10_000;
@@ -158,11 +159,15 @@ export function scoreTimetable(
 ): ScoreBreakdown {
   const hardViolations = validate(project, timetable);
   const subjectName = new Map(project.subjects.map((s) => [s.id, s.name] as const));
-  const soft = softViolations(project, timetable, subjectName);
-  const softScore = soft.reduce(
+  const builtinSoft = softViolations(project, timetable, subjectName);
+  const builtinScore = builtinSoft.reduce(
     (sum, v) => sum + (weights[v.constraintId as keyof SoftWeights] ?? 0),
     0,
   );
-  const score = hardViolations.length * HARD_PENALTY + softScore;
+  // `prefer` rules (R1–R15) contribute their own weight × violations; their
+  // constraintIds aren't in SoftWeights, so they are scored separately here.
+  const rulePrefer = preferRuleScore(project, timetable);
+  const soft = [...builtinSoft, ...rulePrefer.violations];
+  const score = hardViolations.length * HARD_PENALTY + builtinScore + rulePrefer.score;
   return { score, hard: hardViolations.length, soft, violations: [...hardViolations, ...soft] };
 }

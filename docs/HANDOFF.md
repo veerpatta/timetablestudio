@@ -6,17 +6,23 @@ This file is the bridge between work sessions. The agent MUST update it after ev
 
 ## Current state
 
-- **Last completed milestone**: M14 — Guided experience + pre-flight. **v3 roadmap (M11–M14) COMPLETE.** 126 tests green; `npm run build` (92 KB gzip) and `npm run lint` clean. Verified live (clean server restart, 0 console errors): tour auto-opens on first run (and not again), header "Next step" hint, Create-timetables pre-flight checklist (✓/⚠/✗), glossary `?` popovers.
-  - **AC met**: (1) under-quota project → correct hint naming class + count, pre-flight names it as a warning that still allows generate (`solver/guidance.test.ts`); (2) tour renders on a fresh project, closes for good, replayable from Settings (`ui/app/tour.test.tsx`); (3) non-technical end-to-end is human/owner-side (honest claim) — verifiable parts covered by tests + live walkthrough.
-  - Built: `solver/guidance.ts` (`nextStep` + `preflight`, reading one shared `demand()`/`classLoads()` source); header hint strip + `PreflightChecklist`; `Tour` + `uiStore.tourOpen` + `persistence/uiPrefs`; `Glossary` (quota/block/draft/pin).
-- **In-progress milestone**: none — **v1 (M0–M6), v2 (M7–M10), v3 (M11–M14) all complete.**
-- **Tests**: green — 126 tests across 35 files
-- **Build**: green — typechecks + builds (92 KB gzip, well under the 300 KB budget)
+- **Last completed milestone**: M15 — Domain: rules, anchors, doubles, block days. **v4 started.** 149 tests green (36 files); `npm run build` (94 KB gzip) and `npm run lint` clean.
+  - **AC met**: (1) each rule template R1–R15 has a satisfied + violated unit test with a plain-language message naming entities/slots (`domain/rules.test.ts`, 23 tests); (2) a duration-2 lesson occupies two periods and moves as ONE unit (`movePlacement` + `occupiedPeriods`); a double past the day-end trips H4; (3) a v1 project file loads and migrates to v2 with `rules: []` (asserted on a synthetic v1 file; the committed v1 JSON fixtures also load via `deserializeProject`→`migrate`).
+  - Built (doc-first — DATA_MODEL.md + types.ts same change): `Rule` discriminated union R1–R15 + `RuleSeverity`/`HalfOfDay`; `Lesson.duration`; `BlockActivity.allowedDays`/`fixedStartPeriod`; `SchoolClass.classTeacherId`/`isBoardClass`; `ScheduleProfile.break`; `Project.rules` + `schemaVersion: 2`. Engine: `domain/rules.ts` (thin: must→validate hard, prefer→score soft with rule.weight) + `domain/ruleChecks.ts` (15 predicates) + `domain/occupancy.ts` (shared stats) + `domain/ruleText.ts` (`ruleSentence` + `RULE_TEMPLATES`) + `domain/names.ts`. `validate()` H4 generalized to any multi-period unit, H8 counts periods; `score.ts` adds prefer-rule weight; `migrations.ts` v1→v2.
+- **In-progress milestone**: none — M15 complete, M16 next.
+- **Tests**: green — 149 tests across 36 files
+- **Build**: green — typechecks + builds (94 KB gzip, well under the 300 KB budget); lint clean
 
-## Next action (v4 — start M15 after merging v3)
+## Next action (v4 — M16: Rules UI, plain-language rule builder)
 
-1. Merge/push branch `v3-m11-m14` to `main` (v3 is complete and AC-verified).
-2. Then start **v4**: the owner supplied the real timetable PDFs (docs/sources/Class_Wise.pdf = ground truth) and the true use case — iterate on the existing timetable, not generate from scratch. Deep analysis → docs/TIMETABLE_ANALYSIS.md; configurable Rule system (R1–R15) → docs/CONSTRAINTS.md § v4; milestones M15–M18 → docs/ROADMAP.md § v4. Use **Prompt E** in docs/PROMPTS.md. Key new domain facts: P1 class-teacher anchors, ELGA runs Mon–Thu only @P3, intentional double periods (duration-2), board-class priority flags (10, 12A/C/S), break after P4 (10:10–10:25), subjects missing from rawData (CCS, Revision, Sanskrit, practices, electives).
+Start **M16** (docs/ROADMAP.md § v4). Build on the M15 domain:
+1. "Rules" sidebar section: rule list as readable sentences (`ruleSentence`) with on/off toggles + must/prefer chips; "Add rule" = template picker (`RULE_TEMPLATES`) → fill-in-the-blanks sentence (pickers for subject/class/teacher/periods/days), zero jargon.
+2. Violations panel groups by rule, explains in the rule's own words with click-to-jump (rule violations already carry `constraintId: "R4"` etc. + entity-named messages + slots).
+3. **Import auto-detection**: importing the real timetable proposes detected rules (P1 anchors, doubles, ELGA Mon–Thu, board flags) as pre-filled sentences for one-click accept.
+4. Presets bundle: "Indian K-12 defaults" applied optionally at setup.
+- **AC**: the seven implicit VPPS constraint families all expressible via UI without code; auto-detect on the real import proposes ≥ P1 anchors, ELGA days, and the 12-Commerce Accountancy double; every violation message names entities + slots.
+
+Key new domain facts already in the model: P1 class-teacher anchors (R4 + `classTeacherId`), ELGA Mon–Thu @P3 (R7 + block `allowedDays`/`fixedStartPeriod`), double periods (`Lesson.duration: 2`, R6), board flags (R9 + `isBoardClass`), break after P4 (`ScheduleProfile.break`). Subjects missing from rawData (CCS, Revision, Sanskrit, practices, electives) are M18's reconciliation.
 
 Honest carried claims (unchanged discipline): AC#3 "non-technical tester unaided" is owner-side; Lighthouse a11y/PWA numeric scores confirm on deploy; the live legacy-viewer paste check is owner-side (the byte-exact M1 + semantic M12 round-trip tests back it in-repo).
 

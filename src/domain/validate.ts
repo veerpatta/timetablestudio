@@ -11,6 +11,7 @@ import {
   occupiedPeriods,
   type DerivedMaps,
 } from "./derive";
+import { mustRuleViolations } from "./rules";
 import type {
   CurriculumRequirement,
   Day,
@@ -96,34 +97,47 @@ function checkClassClash(maps: DerivedMaps, look: NameLookups): Violation[] {
   return out;
 }
 
-// --- H3 (structural block integrity) + H4 (block bounds) ---
-function checkBlocks(
+// --- H3 (structural block integrity) + H4 (bounds: any multi-period unit fits
+// inside the day — blocks AND duration-2 "double" lessons; single lessons
+// always fit, so they never trip H4). ---
+function checkBounds(
   project: Project,
   timetable: Timetable,
   maps: DerivedMaps,
+  look: NameLookups,
 ): Violation[] {
   const out: Violation[] = [];
   const ppd = periodsPerDay(project, timetable);
   for (const placement of timetable.placements) {
     const activity = maps.activityIndex.get(placement.activityId);
-    if (!activity || activity.kind !== "block") continue;
-    // H3: a block must be whole — non-degenerate definition.
-    if (activity.length < 1 || activity.classIds.length === 0 || activity.teacherIds.length === 0) {
-      out.push({
-        constraintId: "H3",
-        severity: "hard",
-        message: `Block "${activity.name}" is not atomic: needs length ≥ 1 and at least one class and teacher.`,
-        slots: [{ day: placement.day, period: placement.period }],
-      });
+    if (!activity) continue;
+    const span = activity.kind === "block" ? activity.length : activity.duration ?? 1;
+    if (activity.kind === "block") {
+      // H3: a block must be whole — non-degenerate definition.
+      if (activity.length < 1 || activity.classIds.length === 0 || activity.teacherIds.length === 0) {
+        out.push({
+          constraintId: "H3",
+          severity: "hard",
+          message: `Block "${activity.name}" is not atomic: needs length ≥ 1 and at least one class and teacher.`,
+          slots: [{ day: placement.day, period: placement.period }],
+        });
+      }
     }
-    // H4: block fits inside the day.
-    const last = placement.period + activity.length - 1;
+    if (span <= 1) continue; // single lessons can't overflow
+    // H4: the unit fits inside the day.
+    const last = placement.period + span - 1;
     if (placement.period < 1 || last > ppd) {
+      const what =
+        activity.kind === "block"
+          ? `Block "${activity.name}"`
+          : `${sName(look, activity.subjectId)} (${cName(look, activity.classId)}) double period`;
+      const classId = activity.kind === "lesson" ? activity.classId : undefined;
       out.push({
         constraintId: "H4",
         severity: "hard",
-        message: `Block "${activity.name}" at ${slotLabel(placement.day, placement.period)} runs to P${last}, outside the ${ppd}-period day.`,
+        message: `${what} at ${slotLabel(placement.day, placement.period)} runs to P${last}, outside the ${ppd}-period day.`,
         slots: occupiedPeriods(activity, placement.period).map((period) => ({
+          ...(classId ? { classId } : {}),
           day: placement.day,
           period,
         })),
@@ -193,16 +207,18 @@ function checkDailyMax(
   for (const r of project.requirements.curriculum) {
     reqBySubjectClass.set(`${r.classId}#${r.subjectId}`, r);
   }
-  // count lessons per (classId#subjectId#day)
+  // count subject-PERIODS per (classId#subjectId#day) — a duration-2 lesson is
+  // two periods of that subject on the day, so count occupied periods, not placements.
   const counts = new Map<string, { day: Day; classId: Id; subjectId: Id; n: number }>();
   for (const placement of timetable.placements) {
     const activity = maps.activityIndex.get(placement.activityId);
     if (!activity || activity.kind !== "lesson") continue;
     const lesson: Lesson = activity;
+    const periods = occupiedPeriods(lesson, placement.period).length;
     const key = `${lesson.classId}#${lesson.subjectId}#${placement.day}`;
     const cur = counts.get(key);
-    if (cur) cur.n++;
-    else counts.set(key, { day: placement.day, classId: lesson.classId, subjectId: lesson.subjectId, n: 1 });
+    if (cur) cur.n += periods;
+    else counts.set(key, { day: placement.day, classId: lesson.classId, subjectId: lesson.subjectId, n: periods });
   }
   for (const { day, classId, subjectId, n } of counts.values()) {
     const req = reqBySubjectClass.get(`${classId}#${subjectId}`);
@@ -249,18 +265,20 @@ function checkTeacherLoad(maps: DerivedMaps, look: NameLookups): Violation[] {
   return out;
 }
 
-/** Run all implemented hard constraints. Pure; sorted by constraintId for stability. */
+/** Run all implemented hard constraints plus enabled "must" rules.
+ * Pure; sorted by constraintId for stability. */
 export function validate(project: Project, timetable: Timetable): Violation[] {
   const look = buildLookups(project);
   const maps = deriveMaps(project, timetable);
   const violations: Violation[] = [
     ...checkTeacherClash(maps, look),
     ...checkClassClash(maps, look),
-    ...checkBlocks(project, timetable, maps),
+    ...checkBounds(project, timetable, maps, look),
     ...checkAvailability(maps, look),
     ...checkQualified(timetable, maps, look),
     ...checkDailyMax(project, timetable, maps, look),
     ...checkTeacherLoad(maps, look),
+    ...mustRuleViolations(project, timetable),
   ];
   violations.sort((a, b) => a.constraintId.localeCompare(b.constraintId));
   return violations;

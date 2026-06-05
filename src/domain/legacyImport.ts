@@ -255,7 +255,7 @@ export function importLegacyRawData(rawData: string, name = "Imported"): Project
   };
 
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     school: { name },
     teachers,
     classes,
@@ -263,6 +263,7 @@ export function importLegacyRawData(rawData: string, name = "Imported"): Project
     profiles: [profile],
     activities,
     requirements: { curriculum: [], blocks: [] },
+    rules: [],
     timetables: [
       { id: "imported", name, profileId: "imported", placements },
     ],
