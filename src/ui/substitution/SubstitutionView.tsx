@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import { useProjectStore } from "../../store/projectStore";
 import { proposeSubstitutions, type CoverItem } from "../../domain/substitution";
 import type { Day } from "../../domain/types";
-import { Modal } from "../common/Modal";
 
 const statusStyle: Record<CoverItem["status"], string> = {
   "owner-decision": "border-hard bg-red-50",
@@ -10,7 +9,9 @@ const statusStyle: Record<CoverItem["status"], string> = {
   partial: "border-slate-300 bg-slate-50",
 };
 
-export function SubstitutionView({ onClose }: { onClose: () => void }) {
+/** Substitution assistant — a page (M13). The toolbar is `.no-print` so the
+ * top-bar Print (or the button here) prints just the day sheet. */
+export function SubstitutionView() {
   const project = useProjectStore((s) => s.project);
   const [day, setDay] = useState<Day>("Mon");
   const [absent, setAbsent] = useState<Set<string>>(new Set());
@@ -37,30 +38,17 @@ export function SubstitutionView({ onClose }: { onClose: () => void }) {
     });
 
   return (
-    <Modal onClose={onClose} maxWidth="max-w-3xl" label="Substitution assistant">
+    <div>
         <header className="no-print flex items-center justify-between border-b border-slate-200 px-4 py-3">
           <h2 className="font-semibold">Substitution assistant</h2>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                document.body.classList.add("print-subs");
-                const cleanup = () => {
-                  document.body.classList.remove("print-subs");
-                  window.removeEventListener("afterprint", cleanup);
-                };
-                window.addEventListener("afterprint", cleanup);
-                window.print();
-              }}
-              disabled={!plan}
-              className="rounded bg-slate-800 px-3 py-1 text-sm text-white disabled:opacity-40"
-            >
-              🖨 Print day sheet
-            </button>
-            <button type="button" onClick={onClose} aria-label="Close" className="text-slate-400 hover:text-slate-600">
-              ✕
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => window.print()}
+            disabled={!plan}
+            className="rounded bg-slate-800 px-3 py-1 text-sm text-white disabled:opacity-40"
+          >
+            🖨 Print day sheet
+          </button>
         </header>
 
         <div className="no-print flex flex-wrap items-center gap-3 border-b border-slate-200 px-4 py-3 text-sm">
@@ -153,6 +141,6 @@ export function SubstitutionView({ onClose }: { onClose: () => void }) {
             </ul>
           )}
         </div>
-    </Modal>
+    </div>
   );
 }

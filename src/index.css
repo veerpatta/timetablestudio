@@ -2,29 +2,15 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Print targets:
-   - default print  → the timetable grid (chrome is marked .no-print, modals hidden)
-   - body.print-subs → only the substitution day sheet (app shell hidden) */
+/* Print: chrome (header, sidebar, toolbars, modals) is marked .no-print, so
+   whatever view is active prints its content — the timetable grid, a per-class
+   or per-teacher week, or the substitution day sheet (M13: views are pages, so
+   the active page IS the print target; no body-class juggling needed). */
 @media print {
   .no-print {
     display: none !important;
   }
   .modal-overlay {
     display: none !important;
-  }
-  body.print-subs .app-shell {
-    display: none !important;
-  }
-  body.print-subs .modal-overlay {
-    display: block !important;
-    position: static !important;
-    overflow: visible !important;
-    background: none !important;
-    padding: 0 !important;
-  }
-  body.print-subs .modal-card {
-    box-shadow: none !important;
-    max-width: none !important;
-    width: 100% !important;
   }
 }

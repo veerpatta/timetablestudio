@@ -2,7 +2,16 @@
 // Project. PURE: no DOM/store. Deletes cascade to keep the project consistent
 // (removing a class drops its requirements, lessons and placements).
 
-import type { CurriculumRequirement, Day, Id, Lesson, Project, SchoolClass } from "./types";
+import type {
+  BlockActivity,
+  BlockRequirement,
+  CurriculumRequirement,
+  Day,
+  Id,
+  Lesson,
+  Project,
+  SchoolClass,
+} from "./types";
 
 export function setSchoolName(project: Project, name: string): Project {
   return { ...project, school: { ...project.school, name } };
@@ -174,6 +183,127 @@ export function removeQuota(project: Project, requirementId: Id): Project {
     timetables: project.timetables.map((t) => ({
       ...t,
       placements: t.placements.filter((p) => p.activityId !== lid),
+    })),
+  };
+}
+
+/** Set ONE class×subject matrix cell: replaces any existing requirement for
+ * that (class, subject) — even if the teacher changed — and drops it entirely
+ * when periods ≤ 0 or no teacher. The make-or-break op behind the quota matrix. */
+export function setClassSubjectQuota(
+  project: Project,
+  classId: Id,
+  subjectId: Id,
+  opts: { teacher: Id; periodsPerWeek: number; maxPerDay?: number },
+): Project {
+  let p = project;
+  for (const r of project.requirements.curriculum.filter(
+    (r) => r.classId === classId && r.subjectId === subjectId,
+  )) {
+    p = removeQuota(p, r.id);
+  }
+  if (opts.periodsPerWeek > 0 && opts.teacher) {
+    p = addQuota(p, {
+      classId,
+      subjectId,
+      teacher: opts.teacher,
+      periodsPerWeek: opts.periodsPerWeek,
+      maxPerDay: opts.maxPerDay,
+    });
+  }
+  return p;
+}
+
+/** Copy every subject quota of one class onto other classes (bulk tool). */
+export function copyClassQuotas(project: Project, fromClassId: Id, toClassIds: Id[]): Project {
+  const source = project.requirements.curriculum.filter((r) => r.classId === fromClassId);
+  let p = project;
+  for (const target of toClassIds) {
+    if (target === fromClassId) continue;
+    for (const r of source) {
+      p = setClassSubjectQuota(p, target, r.subjectId, {
+        teacher: r.teacherIds[0] ?? "",
+        periodsPerWeek: r.periodsPerWeek,
+        maxPerDay: r.maxPerDay,
+      });
+    }
+  }
+  return p;
+}
+
+/** Set the same subject quota (teacher + periods) for many classes at once. */
+export function fillSubjectColumn(
+  project: Project,
+  subjectId: Id,
+  teacher: Id,
+  periodsPerWeek: number,
+  classIds: Id[],
+): Project {
+  let p = project;
+  for (const classId of classIds) {
+    p = setClassSubjectQuota(p, classId, subjectId, { teacher, periodsPerWeek });
+  }
+  return p;
+}
+
+export interface BlockInput {
+  name: string;
+  classIds: Id[];
+  teacherIds: Id[];
+  length: number;
+  days: Day[];
+  startPeriod: number;
+}
+
+/** Add a multi-class block (e.g. ELGA): activity + requirement + pinned
+ * placements on each chosen day, and register its name as a subject. */
+export function addBlock(project: Project, input: BlockInput): Project {
+  const baseId = `block-${input.name.toLowerCase().replace(/\s+/g, "-")}`;
+  let id = baseId;
+  let n = 1;
+  while (project.activities.some((a) => a.id === id)) id = `${baseId}-${++n}`;
+  const block: BlockActivity = {
+    kind: "block",
+    id,
+    name: input.name,
+    classIds: input.classIds,
+    teacherIds: input.teacherIds,
+    length: input.length,
+  };
+  const req: BlockRequirement = {
+    id: `block-req-${id}`,
+    blockActivityId: id,
+    occurrences: input.days.map((day) => ({ day, startPeriod: input.startPeriod })),
+  };
+  const subjects = project.subjects.some((s) => s.id === input.name)
+    ? project.subjects
+    : [...project.subjects, { id: input.name, name: input.name }];
+  return {
+    ...project,
+    subjects,
+    activities: [block, ...project.activities],
+    requirements: { ...project.requirements, blocks: [...project.requirements.blocks, req] },
+    timetables: project.timetables.map((t) => ({
+      ...t,
+      placements: [
+        ...t.placements,
+        ...input.days.map((day) => ({ activityId: id, day, period: input.startPeriod, pinned: true })),
+      ],
+    })),
+  };
+}
+
+export function removeBlock(project: Project, blockId: Id): Project {
+  return {
+    ...project,
+    activities: project.activities.filter((a) => a.id !== blockId),
+    requirements: {
+      ...project.requirements,
+      blocks: project.requirements.blocks.filter((b) => b.blockActivityId !== blockId),
+    },
+    timetables: project.timetables.map((t) => ({
+      ...t,
+      placements: t.placements.filter((p) => p.activityId !== blockId),
     })),
   };
 }

@@ -3,6 +3,8 @@ import { useProjectStore } from "../../store/projectStore";
 import { useEditorStore } from "../../store/editorStore";
 import { useUiStore } from "../../store/uiStore";
 import { useDerived } from "./hooks";
+import { useHashRoute } from "./useHashRoute";
+import { Sidebar } from "./Sidebar";
 import { GridWorkspace } from "./GridWorkspace";
 import { DraftSwitcher } from "./DraftSwitcher";
 import { CompleteButton } from "../solverui/CompleteButton";
@@ -12,7 +14,8 @@ import { ExportImport } from "../io/ExportImport";
 import { EmptyState } from "./EmptyState";
 import { RecoveryScreen } from "./RecoveryScreen";
 import { SetupWizard } from "../manage/SetupWizard";
-import { DataManager } from "../manage/DataManager";
+import { QuotaMatrix } from "../manage/QuotaMatrix";
+import { ClassesPage, TeachersPage, SettingsPage, BlocksPage } from "../manage/ManagePages";
 
 export function App() {
   const init = useProjectStore((s) => s.init);
@@ -22,11 +25,10 @@ export function App() {
   const saveFailed = useProjectStore((s) => s.saveFailed);
   const project = useProjectStore((s) => s.project);
   const derived = useDerived();
+  const [view, navigate] = useHashRoute();
   const [showGenerate, setShowGenerate] = useState(false);
-  const [showSubs, setShowSubs] = useState(false);
   const [showIO, setShowIO] = useState(false);
   const [showWizard, setShowWizard] = useState(false);
-  const [showData, setShowData] = useState(false);
   const { past, future } = useEditorStore();
   const { undo, redo } = useEditorStore.getState();
   const advanced = useUiStore((s) => s.advanced);
@@ -116,20 +118,6 @@ export function App() {
           </button>
           <button
             type="button"
-            onClick={() => setShowData(true)}
-            className="rounded border border-slate-300 px-3 py-1 hover:bg-slate-50"
-          >
-            🏫 Data
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowSubs(true)}
-            className="rounded border border-slate-300 px-3 py-1 hover:bg-slate-50"
-          >
-            🧑‍🏫 Substitutions
-          </button>
-          <button
-            type="button"
             onClick={() => setShowIO(true)}
             className="rounded border border-slate-300 px-3 py-1 hover:bg-slate-50"
           >
@@ -171,20 +159,31 @@ export function App() {
         </div>
       </header>
 
-      <GridWorkspace
-        project={project}
-        timetable={timetable}
-        violations={violations}
-        maps={maps}
-        quota={quota}
-        days={days}
-      />
+      <div className="sm:flex">
+        <Sidebar view={view} onNavigate={navigate} />
+        <main className="min-w-0 flex-1">
+          {view === "timetable" && (
+            <GridWorkspace
+              project={project}
+              timetable={timetable}
+              violations={violations}
+              maps={maps}
+              quota={quota}
+              days={days}
+            />
+          )}
+          {view === "teachers" && <TeachersPage />}
+          {view === "classes" && <ClassesPage />}
+          {view === "quotas" && <QuotaMatrix />}
+          {view === "blocks" && <BlocksPage />}
+          {view === "substitutions" && <SubstitutionView />}
+          {view === "settings" && <SettingsPage />}
+        </main>
+      </div>
       </div>
 
       {showGenerate && <CandidateCompare onClose={() => setShowGenerate(false)} />}
-      {showSubs && <SubstitutionView onClose={() => setShowSubs(false)} />}
       {showIO && <ExportImport onClose={() => setShowIO(false)} />}
-      {showData && <DataManager onClose={() => setShowData(false)} />}
       {showWizard && <SetupWizard onClose={() => setShowWizard(false)} />}
     </div>
   );

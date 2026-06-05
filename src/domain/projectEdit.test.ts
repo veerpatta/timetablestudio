@@ -8,8 +8,14 @@ import {
   removeQuota,
   setSchoolName,
   setActiveProfile,
+  setClassSubjectQuota,
+  copyClassQuotas,
+  fillSubjectColumn,
+  addBlock,
+  removeBlock,
 } from "./projectEdit";
 import { makeDemoProject } from "../store/projectStore";
+import { validate } from "./validate";
 
 describe("projectEdit (cascading CRUD)", () => {
   it("addClass / removeClass cascades to requirements, lessons and placements", () => {
@@ -49,6 +55,60 @@ describe("projectEdit (cascading CRUD)", () => {
     p = removeQuota(p, req.id);
     expect(p.requirements.curriculum.some((r) => r.id === req.id)).toBe(false);
     expect(p.activities.some((a) => a.kind === "lesson" && a.subjectId === "Art")).toBe(false);
+  });
+
+  it("setClassSubjectQuota replaces a cell even when the teacher changes", () => {
+    let p = addTeacher(makeDemoProject(), "Zoya", ["Art"]);
+    p = addTeacher(p, "Yara", ["Art"]);
+    p = setClassSubjectQuota(p, "Class 7", "Art", { teacher: "Zoya", periodsPerWeek: 3 });
+    let cells = p.requirements.curriculum.filter((r) => r.classId === "Class 7" && r.subjectId === "Art");
+    expect(cells).toHaveLength(1);
+    expect(cells[0]!.teacherIds).toEqual(["Zoya"]);
+    // Change the teacher for the SAME cell — must replace, not duplicate.
+    p = setClassSubjectQuota(p, "Class 7", "Art", { teacher: "Yara", periodsPerWeek: 4 });
+    cells = p.requirements.curriculum.filter((r) => r.classId === "Class 7" && r.subjectId === "Art");
+    expect(cells).toHaveLength(1);
+    expect(cells[0]!.teacherIds).toEqual(["Yara"]);
+    expect(cells[0]!.periodsPerWeek).toBe(4);
+    // periods 0 clears the cell.
+    p = setClassSubjectQuota(p, "Class 7", "Art", { teacher: "Yara", periodsPerWeek: 0 });
+    expect(p.requirements.curriculum.some((r) => r.classId === "Class 7" && r.subjectId === "Art")).toBe(false);
+  });
+
+  it("copyClassQuotas and fillSubjectColumn are bulk shortcuts", () => {
+    let p = addTeacher(makeDemoProject(), "Zoya", ["Art"]);
+    p = setClassSubjectQuota(p, "Class 6", "Art", { teacher: "Zoya", periodsPerWeek: 2 });
+    p = copyClassQuotas(p, "Class 6", ["Class 7", "Class 8"]);
+    expect(p.requirements.curriculum.some((r) => r.classId === "Class 7" && r.subjectId === "Art")).toBe(true);
+    expect(p.requirements.curriculum.some((r) => r.classId === "Class 8" && r.subjectId === "Art")).toBe(true);
+
+    p = fillSubjectColumn(p, "Art", "Zoya", 1, ["Class 9", "Class 10"]);
+    const nine = p.requirements.curriculum.find((r) => r.classId === "Class 9" && r.subjectId === "Art")!;
+    expect(nine.periodsPerWeek).toBe(1);
+  });
+
+  it("addBlock pins a multi-class block; removeBlock reverses it; stays feasible", () => {
+    let p = makeDemoProject();
+    const ttId = p.activeTimetableId!;
+    const before = validate(p, p.timetables.find((t) => t.id === ttId)!).filter((v) => v.severity === "hard").length;
+    p = addBlock(p, {
+      name: "Assembly",
+      classIds: ["Class 9", "Class 10"],
+      teacherIds: ["Nidhika"],
+      length: 1,
+      days: ["Sat"],
+      startPeriod: 6,
+    });
+    expect(p.activities.some((a) => a.kind === "block" && a.name === "Assembly")).toBe(true);
+    expect(p.subjects.some((s) => s.id === "Assembly")).toBe(true);
+    const block = p.activities.find((a) => a.kind === "block" && a.name === "Assembly")!;
+    expect(p.timetables.find((t) => t.id === ttId)!.placements.some((pl) => pl.activityId === block.id)).toBe(true);
+
+    p = removeBlock(p, block.id);
+    expect(p.activities.some((a) => a.id === block.id)).toBe(false);
+    expect(p.requirements.blocks.some((b) => b.blockActivityId === block.id)).toBe(false);
+    const after = validate(p, p.timetables.find((t) => t.id === ttId)!).filter((v) => v.severity === "hard").length;
+    expect(after).toBe(before);
   });
 
   it("setSchoolName and setActiveProfile update meta", () => {

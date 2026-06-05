@@ -42,10 +42,11 @@ describe("M8 acceptance — plain-language app shell", () => {
 
   it("Escape closes a modal (AC)", () => {
     render(<App />);
-    fireEvent.click(screen.getByText(/Data/));
-    expect(screen.getByText("Manage school data")).toBeInTheDocument();
+    // M13: data management moved to sidebar pages; File (export/import) stays a modal.
+    fireEvent.click(screen.getByText(/File/));
+    expect(screen.getByText("Export / Import")).toBeInTheDocument();
     fireEvent.keyDown(window, { key: "Escape" });
-    expect(screen.queryByText("Manage school data")).not.toBeInTheDocument();
+    expect(screen.queryByText("Export / Import")).not.toBeInTheDocument();
   });
 
   it("ELGA shows once as a band in the day grid (AC)", () => {
