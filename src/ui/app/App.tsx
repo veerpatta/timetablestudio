@@ -8,11 +8,14 @@ import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } f
 import { useMemo, useState } from "react";
 import { validate } from "../../domain/validate";
 import type { Day } from "../../domain/types";
+import { runFill } from "../../solver/fillClient";
+import type { FillResult } from "../../solver/fill";
 import { useProjectStore } from "../../store/projectStore";
 import { CellPicker } from "../editor/CellPicker";
 import { TeacherGrid } from "../grid/TeacherGrid";
 import { WeekGrid } from "../grid/WeekGrid";
 import { InsightsView } from "../insights/InsightsView";
+import { FillReview } from "../panels/FillReview";
 import { ClassHealth, TeacherLoad } from "../panels/Insights";
 import { IssuesPanel } from "../panels/Issues";
 
@@ -27,6 +30,21 @@ export function App(): React.ReactElement {
   const [teacherId, setTeacherId] = useState(project.teachers.find((t) => t.schedulable)!.id);
   const [cell, setCell] = useState<{ day: Day; slot: number } | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
+  const [fillResult, setFillResult] = useState<FillResult | null>(null);
+  const [fillSeed, setFillSeed] = useState(1);
+  const [filling, setFilling] = useState(false);
+
+  const onFillGaps = async () => {
+    setFilling(true);
+    setFlash(null);
+    const result = await runFill(project, timetableId, fillSeed);
+    setFilling(false);
+    if (result.added.length === 0) {
+      setFlash("No gaps to fill — the timetable is already complete.");
+      return;
+    }
+    setFillResult(result);
+  };
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
   const openCell = (day: Day, slot: number) => { setFlash(null); setCell({ day, slot }); };
@@ -69,6 +87,13 @@ export function App(): React.ReactElement {
               {clashCount === 0 ? "No clashes" : `${clashCount} clashes`}
             </span>
             <button
+              onClick={onFillGaps}
+              disabled={filling || fillResult !== null}
+              className="rounded border border-sky-300 bg-sky-50 px-3 py-1 text-sm text-sky-700 hover:bg-sky-100 disabled:opacity-40"
+            >
+              {filling ? "Filling…" : "Fill the gaps"}
+            </button>
+            <button
               onClick={undo}
               disabled={past.length === 0}
               className="rounded border border-slate-300 px-3 py-1 text-sm disabled:opacity-40"
@@ -102,6 +127,25 @@ export function App(): React.ReactElement {
             </label>
           )}
         </div>
+
+        {fillResult && (
+          <FillReview
+            project={project}
+            result={fillResult}
+            onAccept={() => {
+              const n = fillResult.added.length;
+              applyFix(fillResult.project);
+              setFillResult(null);
+              setFillSeed((s) => s + 1);
+              setFlash(`Filled ${n} ${n === 1 ? "gap" : "gaps"} — you can Undo it.`);
+            }}
+            onReject={() => {
+              setFillResult(null);
+              setFillSeed((s) => s + 1); // a fresh seed → "Fill the gaps" can try a different arrangement
+              setFlash("Discarded the suggested fill.");
+            }}
+          />
+        )}
 
         <IssuesPanel
           project={project}
