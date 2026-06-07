@@ -1,6 +1,10 @@
 # Constraint Catalog
 
-> **v4 note**: §"v4 Rule system" below supersedes the fixed S1–S6 list as the product direction — constraints become user-configurable Rules. H1–H10 remain the structural core. See docs/TIMETABLE_ANALYSIS.md for the real-school evidence behind each rule type.
+> **⚠ v6 REBUILD (2026-06-07)**: Constraints are being re-implemented on the event model (docs/REBUILD.md). The hard core is restated below as event-model rules; the configurable R-rules (R1–R24) carry over and are evaluated against events. The old per-cell H1–H10 framing is legacy reference.
+>
+> **Event-model hard constraints (RB0):** (HE1) teacher clash — a teacher in two *different* events in one slot; (HE2) class clash — a class in two *different* events in one slot; (HE3) qualification — every (teacher, subject, class) used must exist in the Qualification table; (HE4) availability — no teacher placed in an `unavailable` slot, non-`schedulable` teachers never placed; (HE5) fixed slots — Assembly/Recess never carry teaching events; (HE6) event integrity — a joint_class/team_block places ALL its classes+teachers together or not at all; (HE7) duration fit — a duration-d event fits within the day's teaching slots; (HE8) pinned immovable. Same-event overlap is NEVER a clash (kills the senior-combined / ELGA false-clash bug).
+
+> **v4 note**: §"v4 Rule system" below supersedes the fixed S1–S6 list as the product direction — constraints become user-configurable Rules. See docs/TIMETABLE_ANALYSIS.md and docs/sources/VPPS_Timetable_*Analysis* for the real-school evidence behind each rule type.
 
 Every constraint has a stable ID used in code (`Violation.constraintId`), tests, and UI. Hard constraints (H*) must never be violated in a generated timetable; the editor shows them as red. Soft constraints (S*) carry weights; the editor shows them as amber.
 

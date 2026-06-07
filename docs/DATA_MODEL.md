@@ -2,6 +2,8 @@
 
 These types are canonical. Implement them verbatim in `src/domain/types.ts`. Any change requires editing this doc in the same commit.
 
+> **⚠ v6 REBUILD NOTICE (2026-06-07):** The project is being rebuilt on an **event model** per `docs/REBUILD.md`. The cell model below (Lesson / BlockActivity / per-cell Placement) is **legacy reference**. The authoritative model for new work is the "v6 event model" section at the bottom of this file. When the two conflict, v6 wins. Build per `docs/PROMPTS.md` Prompt G.
+
 ## Core entities
 
 ```ts
@@ -231,3 +233,113 @@ interface Violation {
 }
 // validate(project, timetable): Violation[]  — pure function in domain/validate.ts
 ```
+
+---
+
+## v6 event model (REBUILD — AUTHORITATIVE for new work)
+
+Replaces the cell model above. See `docs/REBUILD.md` for rationale. Implement verbatim in `src/domain/types.ts` during RB0; refine in the same commit if reality demands.
+
+```ts
+type Id = string;
+type Day = "Mon" | "Tue" | "Wed" | "Thu" | "Fri" | "Sat";
+
+// Slots: a profile is Assembly + N teaching periods + a positioned Recess.
+interface SlotDef {
+  index: number;                 // 0=Assembly, 1..8 teaching, etc.
+  label: string;                 // "Assembly", "P1", "Recess"
+  start: string; end: string;    // "08:00"
+  teaching: boolean;             // false for Assembly/Recess (engine never fills these)
+}
+interface Profile {
+  id: Id; name: string;          // "Regular 2026-27" (default) | "Heatwave"
+  days: Day[];                   // Mon–Sat
+  slots: SlotDef[];              // regular = Assembly,P1..P8,Recess
+  isDefault?: boolean;
+}
+
+interface Teacher {
+  id: Id; name: string;
+  maxPerDay: number; maxPerWeek: number;
+  schedulable: boolean;          // Director = false
+  // availability: which (day, teaching-slot) this teacher CAN work.
+  // Absent entry = available. Use for Mahesh (narrow) / Anjana (P5–P8 only).
+  unavailable: { day: Day; slot: number }[];
+}
+interface SchoolClass {
+  id: Id; name: string;
+  band: "primary" | "middle" | "secondary" | "senior";
+  stream?: "Science" | "Commerce" | "Arts";
+  classTeacherId?: Id;
+  isBoardClass?: boolean;
+}
+interface Subject {
+  id: Id; name: string;
+  bands: SchoolClass["band"][];  // scoping; "Science" is 3 subjects in middle, 1 in secondary
+  kind: "academic" | "activity" | "study" | "fixed"; // activity=Sports/Robotics/CCS, study=Free/SelfStudy, fixed=Assembly/Recess
+  color?: string;
+}
+interface Room { id: Id; name: string; }   // lab, ground, robotics — optional on events
+
+// THE central concept: one event, possibly many classes AND many teachers.
+type EventType =
+  | "normal"          // 1 class, 1+ teachers
+  | "joint_class"     // many classes, 1 teacher (senior combined English/Hindi/Economics)
+  | "team_block"      // many classes, many teachers (ELGA)
+  | "self_study" | "free" | "sports" | "robotics" | "ccs" | "notebook_check"
+  | "assembly" | "recess";
+type EventSource = "imported" | "manual" | "generated" | "locked";
+
+interface TimetableEvent {
+  id: Id;
+  type: EventType;
+  subjectId: Id;
+  classIds: Id[];     // 1..n
+  teacherIds: Id[];   // 0..n (study/free may have 0; team_block has n)
+  roomId?: Id;
+  duration: number;   // teaching slots occupied as one unit (1 default, 2 = double)
+  source: EventSource;
+  notes?: string;
+}
+
+interface Placement {
+  eventId: Id;
+  day: Day;
+  slot: number;       // start slot; a duration-2 event also occupies slot+1
+  pinned: boolean;    // locked: solver never moves/removes
+}
+
+// What a teacher CAN teach. The engine may use ONLY these triples.
+interface Qualification { teacherId: Id; subjectId: Id; classId: Id; }
+
+// Weekly demand per (class, subject); drives fill + quota checks.
+interface Requirement {
+  id: Id; classId: Id; subjectId: Id; teacherIds: Id[];
+  periodsPerWeek: number; preferDouble?: boolean; maxPerDay?: number;
+}
+
+interface Timetable { id: Id; name: string; profileId: Id; placements: Placement[]; }
+
+interface Project {
+  schemaVersion: 6;
+  bundledDataVersion: number;     // bump when the built-in 2026-27 timetable changes
+  school: { name: string };
+  profiles: Profile[];
+  teachers: Teacher[];
+  classes: SchoolClass[];
+  subjects: Subject[];
+  rooms: Room[];
+  qualifications: Qualification[];
+  requirements: Requirement[];
+  events: TimetableEvent[];
+  rules: Rule[];                  // carried from v2 catalog, evaluated on the event model
+  timetables: Timetable[];
+  activeTimetableId: Id | null;
+}
+```
+
+**Clash rule (event model).** Build occupancy from placements by expanding each event over its `classIds × teacherIds × [slot..slot+duration)`. A `(teacher|class, day, slot)` collision is a **real clash only if the two occupancies come from different `eventId`s**. Same-event overlap (joint_class, team_block) is legal by construction. This single rule kills the false-clash problem that broke the cell model.
+
+**Legal-move rule (powers the RB2 editor).** A candidate placement of event E at (day, slot) is legal iff: every teacher is qualified for every (subject, class) in E (Qualification table), every teacher is available (not in `unavailable`, `schedulable`), no class/teacher in E already occupied in any covered slot by a different event, the event fits the day (duration), and no enabled `must` rule is violated. The picker offers ONLY legal candidates.
+
+**Migration.** v2/v5 cell-model projects are not auto-upgraded to v6 (different shape). The bundled real 2026-27 project ships natively as v6; the old viewer's legacy rawData export is still produced by a v6→text writer for back-compat (RB7).

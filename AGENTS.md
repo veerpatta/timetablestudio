@@ -2,6 +2,8 @@
 
 This file is the contract. If a user instruction conflicts with this file, ask; otherwise follow this file.
 
+> **⚠ ACTIVE DIRECTION (2026-06-07): v6 REBUILD.** The product is being rebuilt on an **event model**. Read `docs/REBUILD.md` first — it is the master plan and supersedes the M0–M22 roadmap. Build with `docs/PROMPTS.md` Prompt G (milestones RB0–RB8). The authoritative data model is `docs/DATA_MODEL.md` § "v6 event model". The §1 guardrails below still hold (the "≤504 cells" figure is now ≈768; a hand-rolled deterministic TS solver in a Web Worker is still the rule).
+
 ## 1. Non-negotiable guardrails
 
 - **No backend. No servers. No paid services.** If a feature seems to need one, redesign it client-side or stop and ask.

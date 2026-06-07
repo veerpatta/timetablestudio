@@ -17,7 +17,17 @@ This file is the bridge between work sessions. The agent MUST update it after ev
 - **Tests**: green — 192 tests across 43 files
 - **Build**: green — typechecks + builds (103 KB gzip, well under the 300 KB budget); lint clean
 
-## Next action (v5 — M20)
+## Next action (v6 REBUILD — start RB0)
+
+**DIRECTION CHANGED (2026-06-07).** Owner reviewed the live app against two fresh analyses of the REAL 2026-27 timetable (docs/sources/VPPS_Timetable_Analysis_2026-27.md + ..._Complexity_Analysis_2026-27.md) and chose a **full rewrite on an event model**. Master plan = **docs/REBUILD.md**; it SUPERSEDES M0–M22 (kept in ROADMAP.md as history — do NOT continue them, including the in-flight M20 below).
+
+Owner decisions: (1) default = the real **8-period 2026-27** timetable, pre-loaded so they only tweak; (2) **full rewrite** of UI + engine, reusing proven validation/solver concepts on the event model; (3) **legal-only editing** — the picker only ever offers conflict-free, qualified options.
+
+Why: the cell model cannot represent the school. Real events span many classes/teachers — senior 11/12 share English/Hindi/Economics (joint_class), ELGA is a 5-class×5-teacher team_block; the cell model false-flags these (the "feels off" root cause). Bundled data is also the wrong skeleton (6-period heatwave vs the real 8-period day + Assembly + Recess).
+
+New model: docs/DATA_MODEL.md § "v6 event model (AUTHORITATIVE)". Hard constraints HE1–HE8: docs/CONSTRAINTS.md. Milestones RB0→RB8: docs/REBUILD.md. **Use Prompt G. Start RB0** (event-model foundation), then RB1 (transcribe the real 8-period timetable as the bundled default, replacing M19's 6-period bundle).
+
+## Superseded: v5 — M20 (do not continue)
 
 **M20 — Health panel: 275 lines → 5 actions.** The bundled project's "Things to fix" panel is now a confirmed flood (~140 raw soft items live — 16 R4 + 26 R6 prefer rules feed the existing per-unit S1–S6 + prefer-rule violations). M20 must: health score 0–100 in the header (plain words, replaces raw counts); suggestion pipeline dedupe → group by person/class → rank by impact → top 5 with "Show me" on every item; "Fix it" (precomputed conflict-free swap/move, mini-diff, one click, undoable) on ≥60% of top-5; "Tidy up" scoped soft-optimization presented as an accept/reject ledger; NO constraint codes outside Advanced (regression test on rendered strings). AC: ≤20 grouped suggestions + a top-5; ≥60% of top-5 carry a working Fix-it; one undo reverts any fix; Tidy-up improves the health score and applies only after accept. Spec: docs/ROADMAP.md § v5 M20. Then M21 (insights), M22 (R16–R24 + presets + suggest-rules). Prompt F rules 17–19 apply throughout.
 

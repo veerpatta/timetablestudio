@@ -65,6 +65,17 @@ The session handoff protocol both modes rely on is defined in `AGENTS.md` § 6 a
 >
 > Begin with M19.
 
+## Prompt G — REBUILD marathon (v6 event model, RB0–RB8) — CURRENT DIRECTION
+
+> The product is being rebuilt. The master plan is docs/REBUILD.md and it SUPERSEDES the M0–M22 roadmap — do not continue the old milestones. Read, fully: AGENTS.md, docs/REBUILD.md, docs/sources/VPPS_Timetable_Analysis_2026-27.md, docs/sources/VPPS_Timetable_Complexity_Analysis_2026-27.md, then docs/DATA_MODEL.md (the v6 event-model section is authoritative) and docs/CONSTRAINTS.md. Verify reality: `git log --oneline -10`, `npm test`, `npm run build`. Then build RB0 → RB8 in strict order under the marathon rules (Prompt A 1–7) plus all earlier additions (no jargon on the main surface; nothing automatic is silent — always a reviewable, undoable diff; doc-first model changes), and:
+>
+> 20. Event model is the law: a TimetableEvent may span many classes and many teachers; an overlap is a real clash ONLY if the entities are in different events. ELGA (team_block) and senior combined classes (joint_class) must render and move as single events.
+> 21. The app opens to the real 8-period 2026-27 timetable (RB1), pre-loaded and clash-free, so the owner only tweaks. The 6-period heatwave is a secondary switchable profile.
+> 22. Legal-only editing: the cell picker may NEVER offer an unqualified teacher or a clashing placement. Prove it with a test.
+> 23. Full rewrite in-place: rebuild src/ on the event model; you may delete cell-model code, but re-derive its proven validation/solver logic and keep the tests' intent. Keep tooling, deploy workflow, and docs.
+>
+> Begin with RB0.
+
 ## Per-milestone prompts (single-milestone mode)
 
 Always start a session with the kickoff line.
