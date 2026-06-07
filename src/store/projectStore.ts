@@ -11,10 +11,17 @@ import type { Day, Id, Placement, Project, Rule } from "../domain/types";
 
 export type DropResult = "swapped" | "moved" | "illegal";
 
+export interface NamedVersion {
+  id: Id;
+  name: string;
+  project: Project;
+}
+
 interface ProjectState {
   project: Project;
   past: Project[];
   timetableId: Id;
+  versions: NamedVersion[];
   place: (classId: Id, day: Day, slot: number, subjectId: Id, teacherIds: Id[]) => void;
   clear: (classId: Id, day: Day, slot: number) => void;
   move: (placement: Placement, day: Day, slot: number) => void;
@@ -26,6 +33,10 @@ interface ProjectState {
   addRule: (rule: Rule) => void;
   toggleRule: (id: Id) => void;
   removeRule: (id: Id) => void;
+  /** Named versions (RB8): snapshot the current project; restore is undoable. */
+  saveVersion: (name: string) => void;
+  restoreVersion: (id: Id) => void;
+  deleteVersion: (id: Id) => void;
   undo: () => void;
   reset: () => void;
 }
@@ -36,6 +47,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   project: initial,
   past: [],
   timetableId: initial.activeTimetableId!,
+  versions: [],
   place: (classId, day, slot, subjectId, teacherIds) =>
     set((s) => ({
       past: [...s.past, s.project],
@@ -75,6 +87,14 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     })),
   removeRule: (id) =>
     set((s) => ({ past: [...s.past, s.project], project: { ...s.project, rules: s.project.rules.filter((r) => r.id !== id) } })),
+  saveVersion: (name) =>
+    set((s) => ({ versions: [...s.versions, { id: `ver:${s.versions.length + 1}`, name, project: s.project }] })),
+  restoreVersion: (id) =>
+    set((s) => {
+      const v = s.versions.find((x) => x.id === id);
+      return v ? { past: [...s.past, s.project], project: v.project } : s;
+    }),
+  deleteVersion: (id) => set((s) => ({ versions: s.versions.filter((v) => v.id !== id) })),
   undo: () =>
     set((s) => (s.past.length === 0 ? s : { project: s.past[s.past.length - 1]!, past: s.past.slice(0, -1) })),
   reset: () =>

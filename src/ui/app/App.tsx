@@ -20,8 +20,9 @@ import { ClassHealth, TeacherLoad } from "../panels/Insights";
 import { IssuesPanel } from "../panels/Issues";
 import { RulesPanel } from "../panels/RulesPanel";
 import { ReportsView } from "../reports/ReportsView";
+import { ToolsView } from "../tools/ToolsView";
 
-type View = "class" | "teacher" | "insights" | "rules" | "reports";
+type View = "class" | "teacher" | "insights" | "rules" | "reports" | "tools";
 
 export function App(): React.ReactElement {
   const { project, timetableId, place, clear, tryDrop, applyFix, addRule, toggleRule, removeRule, undo, past } = useProjectStore();
@@ -112,8 +113,9 @@ export function App(): React.ReactElement {
             <button className={tabBtn("insights")} onClick={() => { setView("insights"); setCell(null); }}>Insights</button>
             <button className={tabBtn("rules")} onClick={() => { setView("rules"); setCell(null); }}>Rules</button>
             <button className={tabBtn("reports")} onClick={() => { setView("reports"); setCell(null); }}>Reports</button>
+            <button className={tabBtn("tools")} onClick={() => { setView("tools"); setCell(null); }}>Tools</button>
           </div>
-          {view === "insights" || view === "rules" || view === "reports" ? null : view === "class" ? (
+          {["insights", "rules", "reports", "tools"].includes(view) ? null : view === "class" ? (
             <label className="flex items-center gap-2 text-sm">
               <span className="text-slate-500">Class</span>
               <select className="rounded border border-slate-300 px-2 py-1" value={classId} onChange={(e) => { setClassId(e.target.value); setCell(null); }}>
@@ -180,6 +182,8 @@ export function App(): React.ReactElement {
               <InsightsView project={project} timetable={timetable} />
             ) : view === "reports" ? (
               <ReportsView project={project} timetable={timetable} timetableId={timetableId} />
+            ) : view === "tools" ? (
+              <ToolsView project={project} timetable={timetable} />
             ) : (
               <RulesPanel
                 project={project}
