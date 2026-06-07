@@ -11,6 +11,7 @@ import type { Day, Profile, SlotDef } from "./types";
 export const ALL_DAYS: Day[] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 export const REGULAR_PROFILE_ID = "profile-regular";
+export const HEATWAVE_PROFILE_ID = "profile-heatwave";
 
 // The authoritative 2026-27 clock (analysis §1): 40-min periods, Recess 11:10–11:30.
 const REGULAR_SLOTS: SlotDef[] = [
@@ -34,6 +35,30 @@ export function buildRegularProfile(): Profile {
     days: [...ALL_DAYS],
     slots: REGULAR_SLOTS.map((s) => ({ ...s })),
     isDefault: true,
+  };
+}
+
+// The 6-period heatwave clock (docs/sources/Day_Wise.pdf): "P1 7:30-8:10,
+// P2 8:10-8:50, P3 8:50-9:30, P4 9:30-10:10, Break 10:10-10:25, P5 10:25-11:05,
+// P6 11:05-11:45". No ground assembly (class-wise prayer/attendance in P1).
+const HEATWAVE_SLOTS: SlotDef[] = [
+  { index: 0, label: "P1", start: "07:30", end: "08:10", teaching: true },
+  { index: 1, label: "P2", start: "08:10", end: "08:50", teaching: true },
+  { index: 2, label: "P3", start: "08:50", end: "09:30", teaching: true },
+  { index: 3, label: "P4", start: "09:30", end: "10:10", teaching: true },
+  { index: 4, label: "Break", start: "10:10", end: "10:25", teaching: false },
+  { index: 5, label: "P5", start: "10:25", end: "11:05", teaching: true },
+  { index: 6, label: "P6", start: "11:05", end: "11:45", teaching: true },
+];
+
+/** The secondary, switchable 6-period heatwave grid (docs/REBUILD.md decision 1).
+ * No Assembly slot; a positioned Break after P4. */
+export function buildHeatwaveProfile(): Profile {
+  return {
+    id: HEATWAVE_PROFILE_ID,
+    name: "Heatwave",
+    days: [...ALL_DAYS],
+    slots: HEATWAVE_SLOTS.map((s) => ({ ...s })),
   };
 }
 
