@@ -6,10 +6,11 @@ import { useState } from "react";
 import { referencesOf } from "../../domain/references";
 import type { Project, Timetable } from "../../domain/types";
 import { useProjectStore } from "../../store/projectStore";
+import { AssignmentsView } from "./AssignmentsView";
 import { EntityManager } from "./EntityManager";
 import { PeriodManager } from "./PeriodManager";
 
-type Section = "teachers" | "subjects" | "classes" | "periods";
+type Section = "teachers" | "subjects" | "classes" | "assignments" | "periods";
 
 export function ManageView({ project, timetable }: { project: Project; timetable: Timetable }): React.ReactElement {
   const store = useProjectStore();
@@ -32,6 +33,7 @@ export function ManageView({ project, timetable }: { project: Project; timetable
         {tab("teachers", "Teachers")}
         {tab("subjects", "Subjects")}
         {tab("classes", "Classes")}
+        {tab("assignments", "Who teaches what")}
         {tab("periods", "School day")}
       </div>
 
@@ -71,6 +73,7 @@ export function ManageView({ project, timetable }: { project: Project; timetable
           onRemove={(id) => store.removeClass(id)}
         />
       )}
+      {section === "assignments" && <AssignmentsView project={project} />}
       {section === "periods" && (
         <PeriodManager
           profile={profile}

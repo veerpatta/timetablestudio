@@ -19,6 +19,7 @@ import {
   renameSubject,
   renameTeacher,
 } from "../domain/entityEdit";
+import { addQualification, removeQualification, setClassTeacher } from "../domain/assign";
 import { canMove, canSwap, type Cell } from "../domain/swaps";
 import { buildBundledProject } from "../fixtures/bundled";
 import { loadProject, saveProject } from "../persistence/db";
@@ -61,6 +62,10 @@ interface ProjectState {
   editPeriod: (slotIndex: number, patch: { label?: string; start?: string; end?: string }) => void;
   addPeriod: (label?: string) => void;
   removePeriod: (slotIndex: number) => void;
+  /** Assignments (C2) — qualification matrix + class teacher. Undoable + persisted. */
+  addQualification: (teacherId: Id, subjectId: Id, classId: Id) => void;
+  removeQualification: (teacherId: Id, subjectId: Id, classId: Id) => void;
+  setClassTeacher: (classId: Id, teacherId: Id | undefined) => void;
   /** Named versions (RB8): snapshot the current project; restore is undoable. */
   saveVersion: (name: string) => void;
   restoreVersion: (id: Id) => void;
@@ -157,6 +162,12 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     set((s) => ({ past: [...s.past, s.project], project: addPeriod(s.project, profileIdOf(s.project), label) })),
   removePeriod: (slotIndex) =>
     set((s) => ({ past: [...s.past, s.project], project: removePeriod(s.project, profileIdOf(s.project), slotIndex) })),
+  addQualification: (teacherId, subjectId, classId) =>
+    set((s) => ({ past: [...s.past, s.project], project: addQualification(s.project, teacherId, subjectId, classId) })),
+  removeQualification: (teacherId, subjectId, classId) =>
+    set((s) => ({ past: [...s.past, s.project], project: removeQualification(s.project, teacherId, subjectId, classId) })),
+  setClassTeacher: (classId, teacherId) =>
+    set((s) => ({ past: [...s.past, s.project], project: setClassTeacher(s.project, classId, teacherId) })),
   saveVersion: (name) =>
     set((s) => ({ versions: [...s.versions, { id: `ver:${s.versions.length + 1}`, name, project: s.project }] })),
   restoreVersion: (id) =>
