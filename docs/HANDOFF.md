@@ -23,6 +23,16 @@ This file is the bridge between work sessions. The agent MUST update it after ev
   - Built: `fixtures/realGrid.ts` (authoritative 8-period transcription, coordinate-extracted from the owner's PDF), `domain/buildProject.ts` (pure grid→events folder: normal/joint/team detection), `domain/gridReconstruct.ts` (project→grid for the round-trip), `fixtures/bundled.ts` (`buildBundledProject`, `BUNDLED_DATA_VERSION=1`, VPPS metadata), read-only `ui/app/App.tsx` + `ui/grid/WeekGrid.tsx` (+ `App.test.tsx`), heatwave profile (`buildHeatwaveProfile`).
 - **Prior (REBUILD)**: **RB0 — event-model foundation.** `domain/types.ts` (v6), `profile.ts`, `derive.ts` (eventId-keyed occupancy), `validate.ts` (HE1–HE7), clash tests both directions. Deleted all cell-model `src/`.
 
+## Next action (v6.1 CUSTOMIZE — start C1)
+
+**NEW PHASE (2026-06-07).** v6 rebuild is live & verified (8-period real timetable, 0 clashes, cache issue resolved). Owner: app is still mostly view-only and the rules are decorative. Next phase = full editing + a REAL applied constraint system + the Arts elective fix. Master plan: **docs/CUSTOMIZE.md** (milestones C1–C7). Model additions: docs/DATA_MODEL.md § v6.1 (Constraint, ElectiveGroup, StudentGroup; events gain studentGroupIds). Catalog: docs/CONSTRAINTS.md § v6.1. **Use Prompt H. Start C1** (editable entities CRUD), then C2 assignments/class-teacher, C3 applied constraint engine, C4 constraint-library breadth, C5 electives/student-groups (Arts 3-of-4 free choice; no forced sitting; parallel where possible else supervised study; Prakash≠Eco&Geo same slot), C6 generator honours all, C7 reports + per-student view.
+
+Owner decisions this session: electives only in Arts 11&12 (3 of 4, free choice); fix = parallel option blocks where possible + supervised study fallback; build as one combined plan, cleanest order (encoded as C1→C7).
+
+Also queued (small, from prior session): RB-cache — service-worker skipWaiting/clients.claim + "new version, refresh" prompt so updates roll out without users clearing cache (this session's 6-period-stale bug).
+
+## Superseded earlier next-action
+
 ## Next action (REBUILD COMPLETE & DEPLOYED)
 
 **All RB0–RB8 merged to `main` (`b13666e`) and deployed; heatwave dropped (8-period only).** There is no next milestone. Remaining items are the owner's, none blocking:

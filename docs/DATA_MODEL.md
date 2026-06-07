@@ -367,3 +367,46 @@ interface Violation {
 ```
 
 `validate()` implements HE1–HE7 (HE8 pinned-immovable is a solver-time invariant, enforced in solver/, RB5). HE3 (qualification) applies the legal-move rule to every event with teachers, including a team_block: each teacher must be qualified for every (subject, class) the event spans (so ELGA needs the 5×5 teacher×class qualification triples). Events with zero teachers (free/self_study) are exempt from HE3.
+
+---
+
+## v6.1 additions — constraints, electives, student groups (AUTHORITATIVE; see docs/CUSTOMIZE.md)
+
+```ts
+// Applied constraint (replaces static rules). Compiled to a predicate over
+// (project, timetable) reusing Violation. must -> validate(); prefer -> score()/generate().
+type ConstraintScope = "teacher" | "class" | "subject" | "global";
+type ConstraintSeverity = "must" | "prefer";
+
+interface Constraint {
+  id: Id;
+  scope: ConstraintScope;
+  targetId?: Id;                 // teacher/class/subject id; omitted for global
+  template: string;             // e.g. "subject_half_of_day", "teacher_max_per_week"
+  params: Record<string, unknown>; // typed per template via a discriminated map (no `any` leaks)
+  severity: ConstraintSeverity;
+  weight: number;               // used when severity === "prefer"
+  enabled: boolean;
+}
+
+// Electives: a class offers a set of subjects; each student picks `chooseCount`.
+interface ElectiveGroup {
+  id: Id;
+  classId: Id;                  // "Class 11 Arts"
+  name: string;                 // "Arts electives"
+  subjectIds: Id[];             // [PolSci, Geography, Economics, EngLit]
+  chooseCount: number;          // 3
+}
+
+// A cohort within a class defined by its elective combination (the clash unit for electives).
+interface StudentGroup {
+  id: Id;
+  classId: Id;
+  name: string;                 // "11 Arts · PolSci/Geo/Eco"
+  electiveSubjectIds: Id[];     // the chosen subset
+}
+```
+
+`TimetableEvent` gains `studentGroupIds?: Id[]` — when present, the event is attended only by those student groups (an elective), not the whole class. **Clash rule extension:** a student group may not appear in two different events in the same slot; an opted-out group gets a `self_study`/`free` event during a dropped-elective line. Same-event overlap remains legal (joint/team). `Project` gains `constraints: Constraint[]`, `electiveGroups: ElectiveGroup[]`, `studentGroups: StudentGroup[]`; `rules: Rule[]` is retired in favor of `constraints` (migrate existing rules → constraints).
+
+**Elective scheduling note (free 3-of-4):** because Prakash teaches both Economics and Geography (never parallel) and every elective pair is co-taken under free choice, the engine schedules the four Arts electives in distinct period-lines and assigns each student group a supervised Study during the single elective it dropped; it auto-parallelizes only when the actual chosen combinations make a pair clash-free. No student group is ever placed into a non-chosen subject.

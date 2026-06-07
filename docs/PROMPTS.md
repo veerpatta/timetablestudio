@@ -76,6 +76,16 @@ The session handoff protocol both modes rely on is defined in `AGENTS.md` § 6 a
 >
 > Begin with RB0.
 
+## Prompt H — CUSTOMIZE marathon (v6.1: editing, applied constraints, electives) — CURRENT DIRECTION
+
+> The v6 rebuild is live but mostly view-only. Next phase makes it fully editable, gives it a REAL applied constraint system, and fixes the Arts elective problem. Master plan: docs/CUSTOMIZE.md (it sequences milestones C1–C7 and supersedes the old static-rules idea). Read, fully: AGENTS.md, docs/CUSTOMIZE.md, docs/DATA_MODEL.md (v6 + v6.1 sections are authoritative), docs/CONSTRAINTS.md (v6.1 catalog). Verify reality: `git log --oneline -10`, `npm test`, `npm run build`. Then build C1 → C7 in strict order under the marathon rules (Prompt A 1–7) plus the standing additions (no jargon on the main surface; nothing automatic is silent — reviewable, undoable diffs; doc-first model changes; legal-only editing), and:
+>
+> 24. Constraints must actually apply: every Constraint drives validate() (must) and generate()/score() (prefer), with live cell highlighting and plain-sentence messages. A constraint the user can create but that changes nothing is a bug. The two owner examples — "subject in the first half" and "teacher max 30/week" — must work end-to-end.
+> 25. Editing is real CRUD with safe impact: add/remove/rename teacher, subject, class, period; removing anything walks the user through reassigning or confirming affected events — never leave a dangling reference or a silent clash.
+> 26. Electives = student groups + option lines: an elective event is attended only by the student groups that chose it; no student group is ever placed in a non-chosen subject (C5 AC). Honor that Prakash can't teach Economics and Geography at once; parallelize electives only when the chosen combinations are clash-free, else give opted-out groups a supervised study period.
+>
+> Begin with C1.
+
 ## Per-milestone prompts (single-milestone mode)
 
 Always start a session with the kickoff line.

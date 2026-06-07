@@ -86,3 +86,26 @@ Placing the ELGA block on Monday start P3:
 - Bindu, Anita, Rashmita, Kusum, Ravina are all occupied Mon P3–P5 (H1, H3) — so a Class 7 Hindi lesson with Kusum at Mon P4 is an H1 violation.
 - Moving "just Class 3's ELGA" to P2 is impossible — placement is per block (H3).
 - An ELGA placement starting P5 with length 3 violates H4.
+
+---
+
+## v6.1 applied constraint catalog (CUSTOMIZE.md — the real, user-created constraints)
+
+Each is a `Constraint` (scope + targetId + template + params + severity + weight + enabled), shown as a fill-in-the-blank sentence, evaluated in validate() (must) and score()/generate() (prefer), and highlighted live on the grid. Template ids are stable strings.
+
+**Teacher** — `teacher_max_per_week` ("{T} at most {n} periods/week"), `teacher_max_per_day`, `teacher_min_free_per_week`, `teacher_unavailable` ({slots}), `teacher_max_consecutive` ({n}), `teacher_max_days_per_week`, `teacher_prefers_free_day` ({day?}), `teacher_not_first_period`, `teacher_not_last_period`, `teacher_compact_day` (minimize gaps), `teacher_max_subject_per_day`.
+
+**Subject** — `subject_half_of_day` ({first|second}), `subject_only_periods` ({set}), `subject_never_periods` ({set}), `subject_not_last`, `subject_spread_min_days` ({n}), `subject_max_per_day` ({class?}, {n}), `subject_double` (required/preferred, {count}), `subject_min_gap_days` ({n}), `subject_not_adjacent_to` ({otherSubject}), `subject_order` (before/after {otherSubject}, same day), `subject_needs_room` ({room}).
+
+**Class** — `class_no_free` (juniors) / `class_free_allowed` (seniors), `class_max_teachers_per_day` ({n}), `class_teacher_p1` (class teacher takes period 1 daily), `class_board_protect` ({coreSubjects}), `class_daily_variety` (no same subject twice/day unless double), `class_max_consecutive_same` ({n}), `class_start_with` / `class_end_with` ({subjectKind}).
+
+**Global** — `balance_teacher_loads` (minimize variance), `core_subjects_early`, `spread_activities`, `fair_first_last_duties`, `specials_avoid_block` (keep specials clear of ELGA).
+
+Each template requires: satisfied + violated unit tests with a plain-language message; live cell highlighting; and an entry in "Suggest constraints" (detect the pattern in the current timetable, offer it pre-filled). The two owner examples map to `subject_half_of_day` and `teacher_max_per_week`.
+
+## v6.1 elective constraints (student groups)
+
+- `elective_no_forced_sitting` (must): a student group is never placed in a subject outside its `electiveSubjectIds`.
+- `student_group_no_clash` (must): a student group has at most one event per slot across its chosen subjects.
+- `elective_parallelize` (prefer): run elective subjects concurrently when the active student-group combinations make it clash-free; otherwise assign supervised study to opted-out groups.
+- `elective_min_study` (prefer): minimize a student group's supervised-study/non-teaching periods (Untis "no NTPs" goal).
