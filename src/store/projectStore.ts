@@ -20,6 +20,8 @@ interface ProjectState {
   move: (placement: Placement, day: Day, slot: number) => void;
   /** Drag a lesson from one cell onto another: legal swap (occupied) or move (empty). */
   tryDrop: (source: Cell, target: Cell) => DropResult;
+  /** Apply a precomputed fix (from suggestFixes) — undoable like any edit. */
+  applyFix: (next: Project) => void;
   undo: () => void;
   reset: () => void;
 }
@@ -59,7 +61,12 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     }
     return "illegal";
   },
+  applyFix: (next) => set((s) => ({ past: [...s.past, s.project], project: next })),
   undo: () =>
     set((s) => (s.past.length === 0 ? s : { project: s.past[s.past.length - 1]!, past: s.past.slice(0, -1) })),
-  reset: () => set(() => ({ project: buildBundledProject(), past: [] })),
+  reset: () =>
+    set(() => {
+      const project = buildBundledProject();
+      return { project, past: [], timetableId: project.activeTimetableId! };
+    }),
 }));

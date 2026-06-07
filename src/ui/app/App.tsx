@@ -13,11 +13,12 @@ import { CellPicker } from "../editor/CellPicker";
 import { TeacherGrid } from "../grid/TeacherGrid";
 import { WeekGrid } from "../grid/WeekGrid";
 import { ClassHealth, TeacherLoad } from "../panels/Insights";
+import { IssuesPanel } from "../panels/Issues";
 
 type View = "class" | "teacher";
 
 export function App(): React.ReactElement {
-  const { project, timetableId, place, clear, tryDrop, undo, past } = useProjectStore();
+  const { project, timetableId, place, clear, tryDrop, applyFix, undo, past } = useProjectStore();
   const timetable = project.timetables.find((t) => t.id === timetableId)!;
 
   const [view, setView] = useState<View>("class");
@@ -99,6 +100,13 @@ export function App(): React.ReactElement {
             </label>
           )}
         </div>
+
+        <IssuesPanel
+          project={project}
+          timetable={timetable}
+          onJump={(c, day, slot) => { setView("class"); setClassId(c); setFlash(null); setCell({ day, slot }); }}
+          onFix={(next) => { applyFix(next); setCell(null); setFlash("Fixed — and you can Undo it."); }}
+        />
 
         {flash && (
           <p className="mb-2 rounded bg-slate-100 px-3 py-1.5 text-sm text-slate-600" role="status">{flash}</p>
