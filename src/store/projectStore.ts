@@ -7,7 +7,7 @@ import { create } from "zustand";
 import { clearCell, movePlacement, placeNormalLesson } from "../domain/edit";
 import { canMove, canSwap, type Cell } from "../domain/swaps";
 import { buildBundledProject } from "../fixtures/bundled";
-import type { Day, Id, Placement, Project } from "../domain/types";
+import type { Day, Id, Placement, Project, Rule } from "../domain/types";
 
 export type DropResult = "swapped" | "moved" | "illegal";
 
@@ -22,6 +22,10 @@ interface ProjectState {
   tryDrop: (source: Cell, target: Cell) => DropResult;
   /** Apply a precomputed fix (from suggestFixes) — undoable like any edit. */
   applyFix: (next: Project) => void;
+  /** Rules (RB6): add (from a suggestion or builder), toggle on/off, remove. Undoable. */
+  addRule: (rule: Rule) => void;
+  toggleRule: (id: Id) => void;
+  removeRule: (id: Id) => void;
   undo: () => void;
   reset: () => void;
 }
@@ -62,6 +66,15 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     return "illegal";
   },
   applyFix: (next) => set((s) => ({ past: [...s.past, s.project], project: next })),
+  addRule: (rule) =>
+    set((s) => ({ past: [...s.past, s.project], project: { ...s.project, rules: [...s.project.rules, rule] } })),
+  toggleRule: (id) =>
+    set((s) => ({
+      past: [...s.past, s.project],
+      project: { ...s.project, rules: s.project.rules.map((r) => (r.id === id ? { ...r, enabled: !r.enabled } : r)) },
+    })),
+  removeRule: (id) =>
+    set((s) => ({ past: [...s.past, s.project], project: { ...s.project, rules: s.project.rules.filter((r) => r.id !== id) } })),
   undo: () =>
     set((s) => (s.past.length === 0 ? s : { project: s.past[s.past.length - 1]!, past: s.past.slice(0, -1) })),
   reset: () =>

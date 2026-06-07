@@ -34,7 +34,7 @@ describe("RB3 Issues panel (clash from outside the editor)", () => {
 
     // Clash resolved: the panel is gone and the header reads clean.
     expect(screen.queryByText(/Things to fix/)).not.toBeInTheDocument();
-    expect(screen.getByText("No clashes")).toBeInTheDocument();
+    expect(screen.getByText("All clear")).toBeInTheDocument();
 
     // Undo brings the problem back (the fix was reviewable + reversible).
     fireEvent.click(screen.getByRole("button", { name: "Undo" }));

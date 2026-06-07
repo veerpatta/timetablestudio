@@ -6,6 +6,7 @@
 
 import { suggestFixes } from "../../domain/fixes";
 import { buildIssues } from "../../domain/issues";
+import { validate } from "../../domain/validate";
 import type { Day, Id, Project, Timetable } from "../../domain/types";
 
 interface Props {
@@ -17,9 +18,12 @@ interface Props {
 
 export function IssuesPanel({ project, timetable, onJump, onFix }: Props): React.ReactElement | null {
   const issues = buildIssues(project, timetable);
-  if (issues.length === 0) return null;
+  const soft = validate(project, timetable).filter((v) => v.severity === "soft");
+  if (issues.length === 0 && soft.length === 0) return null;
 
   return (
+    <>
+      {issues.length > 0 && (
     <section className="mb-3 rounded-lg border border-rose-200 bg-rose-50 p-3">
       <h2 className="mb-2 text-sm font-semibold text-rose-800">
         Things to fix · {issues.length}
@@ -55,5 +59,18 @@ export function IssuesPanel({ project, timetable, onJump, onFix }: Props): React
         })}
       </ul>
     </section>
+      )}
+
+      {soft.length > 0 && (
+        <section className="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
+          <h2 className="mb-2 text-sm font-semibold text-amber-800">Could be better · {soft.length}</h2>
+          <ul className="max-h-48 space-y-1 overflow-auto text-sm text-slate-700">
+            {soft.map((v, i) => (
+              <li key={`${v.constraintId}#${i}`} className="rounded bg-white px-2 py-1">{v.message}</li>
+            ))}
+          </ul>
+        </section>
+      )}
+    </>
   );
 }

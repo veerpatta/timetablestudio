@@ -18,11 +18,12 @@ import { InsightsView } from "../insights/InsightsView";
 import { FillReview } from "../panels/FillReview";
 import { ClassHealth, TeacherLoad } from "../panels/Insights";
 import { IssuesPanel } from "../panels/Issues";
+import { RulesPanel } from "../panels/RulesPanel";
 
-type View = "class" | "teacher" | "insights";
+type View = "class" | "teacher" | "insights" | "rules";
 
 export function App(): React.ReactElement {
-  const { project, timetableId, place, clear, tryDrop, applyFix, undo, past } = useProjectStore();
+  const { project, timetableId, place, clear, tryDrop, applyFix, addRule, toggleRule, removeRule, undo, past } = useProjectStore();
   const timetable = project.timetables.find((t) => t.id === timetableId)!;
 
   const [view, setView] = useState<View>("class");
@@ -84,7 +85,7 @@ export function App(): React.ReactElement {
                 clashCount === 0 ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"
               }`}
             >
-              {clashCount === 0 ? "No clashes" : `${clashCount} clashes`}
+              {clashCount === 0 ? "All clear" : `${clashCount} to fix`}
             </span>
             <button
               onClick={onFillGaps}
@@ -108,8 +109,9 @@ export function App(): React.ReactElement {
             <button className={tabBtn("class")} onClick={() => { setView("class"); setCell(null); }}>By class</button>
             <button className={tabBtn("teacher")} onClick={() => { setView("teacher"); setCell(null); }}>By teacher</button>
             <button className={tabBtn("insights")} onClick={() => { setView("insights"); setCell(null); }}>Insights</button>
+            <button className={tabBtn("rules")} onClick={() => { setView("rules"); setCell(null); }}>Rules</button>
           </div>
-          {view === "insights" ? null : view === "class" ? (
+          {view === "insights" || view === "rules" ? null : view === "class" ? (
             <label className="flex items-center gap-2 text-sm">
               <span className="text-slate-500">Class</span>
               <select className="rounded border border-slate-300 px-2 py-1" value={classId} onChange={(e) => { setClassId(e.target.value); setCell(null); }}>
@@ -172,8 +174,16 @@ export function App(): React.ReactElement {
               </DndContext>
             ) : view === "teacher" ? (
               <TeacherGrid project={project} timetable={timetable} teacherId={teacherId} />
-            ) : (
+            ) : view === "insights" ? (
               <InsightsView project={project} timetable={timetable} />
+            ) : (
+              <RulesPanel
+                project={project}
+                timetable={timetable}
+                onAdd={(r) => { addRule(r); setFlash("Rule added — you can Undo it."); }}
+                onToggle={toggleRule}
+                onRemove={removeRule}
+              />
             )}
           </div>
           {view === "class" && cell && (

@@ -28,7 +28,7 @@ describe("RB5 Fill the gaps (review → accept)", () => {
     // Applied: review gone, header confirms, still clash-free, Undo available.
     expect(screen.queryByRole("button", { name: "Accept" })).not.toBeInTheDocument();
     expect(screen.getByText(/Filled \d+ gap/)).toBeInTheDocument();
-    expect(screen.getByText("No clashes")).toBeInTheDocument();
+    expect(screen.getByText("All clear")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Undo" })).toBeEnabled();
   });
 
