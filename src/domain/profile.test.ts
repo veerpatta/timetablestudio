@@ -1,12 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  buildHeatwaveProfile,
-  buildRegularProfile,
-  isTeachingSlot,
-  occupiedSlots,
-  slotLabel,
-  teachingSlots,
-} from "./profile";
+import { buildRegularProfile, isTeachingSlot, occupiedSlots, slotLabel, teachingSlots } from "./profile";
 
 describe("regular 2026-27 profile", () => {
   const p = buildRegularProfile();
@@ -24,23 +17,6 @@ describe("regular 2026-27 profile", () => {
     expect(teachingSlots(p)).toEqual([1, 2, 3, 4, 6, 7, 8, 9]);
     expect(isTeachingSlot(p, 5)).toBe(false);
     expect(isTeachingSlot(p, 6)).toBe(true);
-  });
-});
-
-describe("heatwave (secondary) profile", () => {
-  const h = buildHeatwaveProfile();
-
-  it("is 6 teaching periods with a Break after P4 and no Assembly", () => {
-    expect(h.slots).toHaveLength(7);
-    expect(h.slots.filter((s) => s.teaching)).toHaveLength(6);
-    expect(h.slots.some((s) => s.label === "Assembly")).toBe(false);
-    expect(slotLabel(h, 4)).toBe("Break");
-    expect(teachingSlots(h)).toEqual([0, 1, 2, 3, 5, 6]);
-    expect(h.isDefault).toBeUndefined();
-  });
-
-  it("a 2-period block over the break spans P4,P5 (skipping the Break slot)", () => {
-    expect(occupiedSlots(h, 3, 2)).toEqual([3, 5]);
   });
 });
 

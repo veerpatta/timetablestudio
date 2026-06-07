@@ -21,7 +21,7 @@ export interface SlotDef {
 
 export interface Profile {
   id: Id;
-  name: string; // "Regular 2026-27" (default) | "Heatwave"
+  name: string; // "Regular 2026-27" (the 8-period default)
   days: Day[]; // Mon–Sat
   slots: SlotDef[]; // regular = Assembly, P1..P8, Recess
   isDefault?: boolean;

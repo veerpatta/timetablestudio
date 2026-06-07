@@ -3,9 +3,8 @@
 // 6 days (Mon..Sat) x 8 periods (P1..P8). Each cell is "Subject|Teacher"
 // ("Subject|T1,T2" for multi-teacher), "ELGA" for the team block, "Free" for a free
 // period, "" never (every teaching slot is filled). Extracted by coordinate-bucketing
-// the PDF words (see docs/DECISIONS.md RB1); the 6-period heatwave set lives in
-// classWisePdf.ts. This file is DATA ONLY (no imports) and is the cell-for-cell
-// fixture the built project is checked against (realGrid.test.ts).
+// the PDF words (see docs/DECISIONS.md RB1). This file is DATA ONLY (no imports) and is
+// the cell-for-cell fixture the built project is checked against (realGrid.test.ts).
 
 export const REAL_GRID_CLASS_ORDER: string[] = [
   "Class 1",

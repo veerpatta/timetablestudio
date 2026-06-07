@@ -7,7 +7,7 @@
 // The reverse (project → grid) lives in gridFromProject() so the round-trip is
 // checkable cell-for-cell (realGrid.test.ts).
 
-import { buildHeatwaveProfile, buildRegularProfile, teachingSlots } from "./profile";
+import { buildRegularProfile, teachingSlots } from "./profile";
 import type {
   Band,
   EventType,
@@ -91,7 +91,7 @@ interface EventBuilder {
 /** Build the full v6 project from a cell grid. */
 export function buildProject(input: BuildInput): Project {
   const regular = buildRegularProfile();
-  const profiles: Profile[] = [regular, buildHeatwaveProfile()];
+  const profiles: Profile[] = [regular];
   const periodToSlot = teachingSlots(regular); // [1,2,3,4,6,7,8,9]
 
   const events = new Map<string, EventBuilder>();

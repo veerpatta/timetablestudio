@@ -5,8 +5,8 @@
 // ZERO issues by construction (asserted in issues.test.ts).
 //
 // The Issues panel is the safety net for clashes that arrive from OUTSIDE the legal-only
-// editor — teacher absence/reassignment, availability edits, a profile switch that drops
-// periods (8p→6p heatwave), or project import. The editor itself can't create one.
+// editor — teacher absence/reassignment, availability edits, or project import. The
+// editor itself can't create one.
 
 import { findProfile, placementSlots } from "./derive";
 import { validate } from "./validate";

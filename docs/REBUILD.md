@@ -47,7 +47,7 @@ This replaces the cell/Lesson/BlockActivity model. Full TypeScript spec goes in 
 
 - **TimetableEvent**: `{ id, type, subjectId, classIds[], teacherIds[], roomId?, duration, source }` where `type ∈ normal | joint_class | team_block | self_study | free | sports | robotics | ccs | notebook_check | assembly | recess`. One event can occupy many classes and many teachers in the same slot — this is the whole point.
 - **Placement**: `{ eventId, day, period, pinned }` — events are placed onto the fixed grid.
-- **Grid/Profile**: Assembly + 8 teaching periods + Recess as typed slots (teaching vs fixed-non-teaching); profiles switchable (regular 8p / heatwave 6p) but **regular 8p is default**.
+- **Grid/Profile**: Assembly + 8 teaching periods + Recess as typed slots (teaching vs fixed-non-teaching). **The regular 8-period profile is the only profile.** (SUPERSEDED 2026-06-07: the "heatwave 6p switchable profile" idea was dropped by the owner — the product is 8-period only; see DECISIONS.md post-RB8.)
 - **Qualification**: `{ teacherId, subjectId, classId }` triples — the only (teacher, subject, class) combos the engine may ever use.
 - **Availability**: per-teacher mask over (day × period) for hard windows (Mahesh narrow; Anjana P5–P8 only; Director not schedulable).
 - **Requirement**: per (class, subject) weekly period count + optional double-period preference, driving fill & quota checks.
