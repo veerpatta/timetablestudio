@@ -7,7 +7,7 @@ import { qualifiedTeachers } from "../../domain/assign";
 import type { Project } from "../../domain/types";
 import { useProjectStore } from "../../store/projectStore";
 
-const P1_RULE_ID = (classId: string) => `R4:${classId}`;
+const P1_CONSTRAINT_ID = (classId: string) => `ctp1:${classId}`;
 
 export function AssignmentsView({ project }: { project: Project }): React.ReactElement {
   const store = useProjectStore();
@@ -16,11 +16,20 @@ export function AssignmentsView({ project }: { project: Project }): React.ReactE
   const teachersById = new Map(project.teachers.map((t) => [t.id, t.name]));
   const schedulable = project.teachers.filter((t) => t.schedulable).sort((a, b) => a.name.localeCompare(b.name));
   const subjects = [...project.subjects].sort((a, b) => a.name.localeCompare(b.name));
-  const p1On = project.rules.some((r) => r.id === P1_RULE_ID(classId) && r.enabled);
+  const p1On = project.constraints.some((c) => c.id === P1_CONSTRAINT_ID(classId) && c.enabled);
 
   const toggleP1 = () => {
-    if (p1On) store.removeRule(P1_RULE_ID(classId));
-    else store.addRule({ id: P1_RULE_ID(classId), template: "R4", classId, enabled: true, severity: "prefer", weight: 3 });
+    if (p1On) store.removeConstraint(P1_CONSTRAINT_ID(classId));
+    else
+      store.addConstraint({
+        id: P1_CONSTRAINT_ID(classId),
+        scope: "class",
+        severity: "prefer",
+        weight: 3,
+        enabled: true,
+        template: "class_teacher_p1",
+        params: { classId },
+      });
   };
 
   return (

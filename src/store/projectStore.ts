@@ -23,7 +23,7 @@ import { addQualification, removeQualification, setClassTeacher } from "../domai
 import { canMove, canSwap, type Cell } from "../domain/swaps";
 import { buildBundledProject } from "../fixtures/bundled";
 import { loadProject, saveProject } from "../persistence/db";
-import type { Band, Day, Id, Placement, Project, Rule, SchoolClass } from "../domain/types";
+import type { Band, Constraint, Day, Id, Placement, Project, Rule, SchoolClass } from "../domain/types";
 
 export type DropResult = "swapped" | "moved" | "illegal";
 
@@ -66,6 +66,11 @@ interface ProjectState {
   addQualification: (teacherId: Id, subjectId: Id, classId: Id) => void;
   removeQualification: (teacherId: Id, subjectId: Id, classId: Id) => void;
   setClassTeacher: (classId: Id, teacherId: Id | undefined) => void;
+  /** Applied constraints (C3) — create/replace, toggle, remove. Undoable + persisted. */
+  addConstraint: (constraint: Constraint) => void;
+  updateConstraint: (constraint: Constraint) => void;
+  toggleConstraint: (id: Id) => void;
+  removeConstraint: (id: Id) => void;
   /** Named versions (RB8): snapshot the current project; restore is undoable. */
   saveVersion: (name: string) => void;
   restoreVersion: (id: Id) => void;
@@ -168,6 +173,20 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     set((s) => ({ past: [...s.past, s.project], project: removeQualification(s.project, teacherId, subjectId, classId) })),
   setClassTeacher: (classId, teacherId) =>
     set((s) => ({ past: [...s.past, s.project], project: setClassTeacher(s.project, classId, teacherId) })),
+  addConstraint: (constraint) =>
+    set((s) => ({ past: [...s.past, s.project], project: { ...s.project, constraints: [...s.project.constraints, constraint] } })),
+  updateConstraint: (constraint) =>
+    set((s) => ({
+      past: [...s.past, s.project],
+      project: { ...s.project, constraints: s.project.constraints.map((c) => (c.id === constraint.id ? constraint : c)) },
+    })),
+  toggleConstraint: (id) =>
+    set((s) => ({
+      past: [...s.past, s.project],
+      project: { ...s.project, constraints: s.project.constraints.map((c) => (c.id === id ? { ...c, enabled: !c.enabled } : c)) },
+    })),
+  removeConstraint: (id) =>
+    set((s) => ({ past: [...s.past, s.project], project: { ...s.project, constraints: s.project.constraints.filter((c) => c.id !== id) } })),
   saveVersion: (name) =>
     set((s) => ({ versions: [...s.versions, { id: `ver:${s.versions.length + 1}`, name, project: s.project }] })),
   restoreVersion: (id) =>

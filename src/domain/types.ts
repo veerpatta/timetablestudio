@@ -138,7 +138,8 @@ export interface Project {
   qualifications: Qualification[];
   requirements: Requirement[];
   events: TimetableEvent[];
-  rules: Rule[]; // carried from v2 catalog, evaluated on the event model (RB6)
+  rules: Rule[]; // DEPRECATED (RB6 R1–R15) — evaluated in parallel until C4 ports the catalog
+  constraints: Constraint[]; // v6.1 (C3) — the authoritative applied constraint system
   timetables: Timetable[];
   activeTimetableId: Id | null;
 }
@@ -262,6 +263,48 @@ export type Rule =
   | R15Rule;
 
 export type RuleTemplate = Rule["template"];
+
+// --- Applied constraints (v6.1, C3) — the user-created, APPLIED constraint system ---
+// Replaces the static R-rules (which are deprecated and evaluated in parallel until the
+// C4 catalog + suggester move over). Each constraint compiles to a predicate over
+// (project, timetable) producing Violations: `must` → hard (validate), `prefer` → soft
+// (score/issues). A discriminated union on `template` keeps params type-safe (no `any`).
+// `scope`/`targetId` are UI-grouping hints; the typed `params` are the source of truth.
+
+export type ConstraintScope = "teacher" | "class" | "subject" | "global";
+export type ConstraintSeverity = "must" | "prefer";
+
+export interface ConstraintBase {
+  id: Id;
+  scope: ConstraintScope;
+  targetId?: Id; // optional UI hint; params carry the authoritative entity refs
+  severity: ConstraintSeverity;
+  weight: number; // soft weight when severity === "prefer"
+  enabled: boolean;
+}
+
+// "{subjects} must be in the first/second half of the day for {classes}"  (placement-local)
+export interface SubjectHalfOfDayConstraint extends ConstraintBase {
+  template: "subject_half_of_day";
+  params: { subjectIds: Id[]; classIds: Id[]; half: HalfOfDay };
+}
+// "{teacher} teaches at most {max} periods a week"  (aggregate)
+export interface TeacherMaxPerWeekConstraint extends ConstraintBase {
+  template: "teacher_max_per_week";
+  params: { teacherId: Id; max: number };
+}
+// "{class}'s class teacher takes period 1 every day"  (aggregate; reads classTeacherId)
+export interface ClassTeacherP1Constraint extends ConstraintBase {
+  template: "class_teacher_p1";
+  params: { classId: Id; subjectId?: Id };
+}
+
+export type Constraint =
+  | SubjectHalfOfDayConstraint
+  | TeacherMaxPerWeekConstraint
+  | ClassTeacherP1Constraint;
+
+export type ConstraintTemplate = Constraint["template"];
 
 // --- Validation result shape (shared by editor & solver) ---
 

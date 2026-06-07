@@ -21,11 +21,11 @@ describe("Who-teaches-what view (C2 AC, through the UI)", () => {
     fireEvent.change(classTeacherSelect, { target: { value: "Bindu" } });
     expect(proj().classes.find((c) => c.id === "Class 1")?.classTeacherId).toBe("Bindu");
 
-    // The "takes period 1" checkbox is now enabled — turning it on adds the R4 rule.
+    // The "takes period 1" checkbox is now enabled — turning it on adds the constraint.
     const p1 = screen.getByRole("checkbox", { name: /takes period 1/i }) as HTMLInputElement;
     expect(p1.disabled).toBe(false);
     fireEvent.click(p1);
-    expect(proj().rules.some((r) => r.id === "R4:Class 1" && r.enabled)).toBe(true);
+    expect(proj().constraints.some((c) => c.id === "ctp1:Class 1" && c.enabled && c.template === "class_teacher_p1")).toBe(true);
 
     // Add a teacher to a subject row that they aren't yet qualified for (changes the matrix).
     const before = proj().qualifications.length;

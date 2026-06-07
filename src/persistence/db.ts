@@ -59,7 +59,32 @@ export function normalizeProject(project: Project): Project {
   ensureArray("constraints");
   ensureArray("electiveGroups");
   ensureArray("studentGroups");
-  return Object.keys(patch).length === 0 ? project : { ...project, ...patch };
+
+  // One-time migration (C3): a project saved during C2 carries deprecated R4 rules
+  // (class-teacher-P1). Convert each to a `class_teacher_p1` constraint and drop the R4
+  // so the new engine owns it — without this both would fire and double-count.
+  const rules = (Array.isArray(p.rules) ? p.rules : (patch.rules as unknown[]) ?? []) as Array<Record<string, unknown>>;
+  const r4s = rules.filter((r) => r.template === "R4");
+  if (r4s.length > 0) {
+    const constraints = (Array.isArray(p.constraints) ? [...p.constraints] : []) as unknown as Array<Record<string, unknown>>;
+    for (const r of r4s) {
+      const classId = r.classId as string;
+      if (constraints.some((c) => c.template === "class_teacher_p1" && (c.params as { classId?: string })?.classId === classId)) continue;
+      constraints.push({
+        id: `ctp1:${classId}`,
+        scope: "class",
+        severity: "prefer",
+        weight: 3,
+        enabled: true,
+        template: "class_teacher_p1",
+        params: { classId, ...(r.subjectId ? { subjectId: r.subjectId } : {}) },
+      });
+    }
+    patch.rules = rules.filter((r) => r.template !== "R4");
+    patch.constraints = constraints;
+  }
+
+  return Object.keys(patch).length === 0 ? project : ({ ...project, ...patch } as Project);
 }
 
 /** Persist the whole project under the single "current" key. No-op without IndexedDB. */

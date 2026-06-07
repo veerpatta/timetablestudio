@@ -11,7 +11,7 @@
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { deriveMaps, findProfile, slotKey } from "../../domain/derive";
 import { ghostSuggestion } from "../../domain/ghost";
-import type { Day, Id, Project, SlotDef, Timetable } from "../../domain/types";
+import type { Day, Id, Project, SlotDef, Timetable, Violation } from "../../domain/types";
 
 const DAYS: Day[] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -21,6 +21,8 @@ interface Props {
   classId: Id;
   onSelectCell?: (day: Day, slot: number) => void;
   selected?: { day: Day; slot: number } | null;
+  /** Violations to highlight live on the grid (C3). Class-scoped slots land here. */
+  violations?: Violation[];
 }
 
 function DraggableLesson({ id, children }: { id: string; children: React.ReactNode }): React.ReactElement {
@@ -41,10 +43,11 @@ interface CellProps {
   day: Day;
   s: SlotDef;
   isSel: boolean;
+  flags: string[]; // plain-language messages for violations on this cell (C3 highlight)
   onSelectCell?: (day: Day, slot: number) => void;
 }
 
-function GridCell({ project, timetable, classId, day, s, isSel, onSelectCell }: CellProps): React.ReactElement {
+function GridCell({ project, timetable, classId, day, s, isSel, flags, onSelectCell }: CellProps): React.ReactElement {
   const id = `${day}#${s.index}`;
   const { setNodeRef, isOver } = useDroppable({ id });
   const subjects = new Map(project.subjects.map((x) => [x.id, x.name]));
@@ -54,6 +57,8 @@ function GridCell({ project, timetable, classId, day, s, isSel, onSelectCell }: 
 
   const ring = isSel ? "ring-2 ring-inset ring-sky-500" : "";
   const over = isOver ? "ring-2 ring-inset ring-emerald-400" : "";
+  const flagCls = flags.length ? "bg-rose-100 outline outline-2 -outline-offset-2 outline-rose-400" : "";
+  const flagTitle = flags.length ? flags.join(" · ") : undefined;
   const clickable = onSelectCell ? "cursor-pointer hover:bg-sky-50" : "";
   const handle = onSelectCell ? () => onSelectCell(day, s.index) : undefined;
   const a11y = onSelectCell
@@ -73,7 +78,7 @@ function GridCell({ project, timetable, classId, day, s, isSel, onSelectCell }: 
   if (!event) {
     const ghost = ghostSuggestion(project, timetable.id, classId, day, s.index);
     return (
-      <td ref={setNodeRef} onClick={handle} {...a11y} className={`border p-2 text-center ${clickable} ${ring} ${over}`}>
+      <td ref={setNodeRef} onClick={handle} {...a11y} title={flagTitle} className={`border p-2 text-center ${clickable} ${ring} ${over} ${flagCls}`}>
         {ghost ? (
           <span className="text-[11px] italic text-slate-300" title="Suggested — click to choose">
             {subjects.get(ghost.subjectId) ?? ghost.subjectId}?
@@ -103,15 +108,24 @@ function GridCell({ project, timetable, classId, day, s, isSel, onSelectCell }: 
   );
 
   return (
-    <td ref={setNodeRef} onClick={handle} {...a11y} className={`border p-2 align-top ${tint} ${clickable} ${ring} ${over}`}>
+    <td ref={setNodeRef} onClick={handle} {...a11y} title={flagTitle} className={`border p-2 align-top ${tint} ${clickable} ${ring} ${over} ${flagCls}`}>
       {draggable ? <DraggableLesson id={id}>{body}</DraggableLesson> : body}
     </td>
   );
 }
 
-export function WeekGrid({ project, timetable, classId, onSelectCell, selected }: Props): React.ReactElement {
+export function WeekGrid({ project, timetable, classId, onSelectCell, selected, violations }: Props): React.ReactElement {
   const profile = findProfile(project, timetable);
   if (!profile) return <p>Unknown profile.</p>;
+
+  // Precompute slotKey -> messages for THIS class (advisor: one pass, not per-cell).
+  const flagsByCell = new Map<string, string[]>();
+  for (const v of violations ?? [])
+    for (const s of v.slots)
+      if (s.classId === classId && s.slot != null) {
+        const key = slotKey(s.day, s.slot);
+        (flagsByCell.get(key) ?? flagsByCell.set(key, []).get(key)!).push(v.message);
+      }
 
   return (
     <table className="w-full border-collapse text-sm">
@@ -149,6 +163,7 @@ export function WeekGrid({ project, timetable, classId, onSelectCell, selected }
                   day={day}
                   s={s}
                   isSel={selected?.day === day && selected?.slot === s.index}
+                  flags={flagsByCell.get(slotKey(day, s.index)) ?? []}
                   onSelectCell={onSelectCell}
                 />
               );

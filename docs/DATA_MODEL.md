@@ -375,19 +375,33 @@ interface Violation {
 ```ts
 // Applied constraint (replaces static rules). Compiled to a predicate over
 // (project, timetable) reusing Violation. must -> validate(); prefer -> score()/generate().
+// As implemented in C3 it is a TYPED DISCRIMINATED UNION on `template` (no `any`/Record
+// leak) — `scope`/`targetId` are UI-grouping hints, the typed `params` are authoritative
+// (so a two-entity constraint like "Maths first half FOR Class 7" carries subjectIds[] +
+// classIds[]). New templates extend the union. Implemented in src/domain/types.ts.
 type ConstraintScope = "teacher" | "class" | "subject" | "global";
 type ConstraintSeverity = "must" | "prefer";
 
-interface Constraint {
+interface ConstraintBase {
   id: Id;
   scope: ConstraintScope;
-  targetId?: Id;                 // teacher/class/subject id; omitted for global
-  template: string;             // e.g. "subject_half_of_day", "teacher_max_per_week"
-  params: Record<string, unknown>; // typed per template via a discriminated map (no `any` leaks)
-  severity: ConstraintSeverity;
-  weight: number;               // used when severity === "prefer"
+  targetId?: Id;                 // optional UI hint; params carry the real entity refs
+  severity: ConstraintSeverity;  // must -> hard (validate); prefer -> soft (score/issues)
+  weight: number;                // used when severity === "prefer"
   enabled: boolean;
 }
+// C3 templates (catalog breadth lands in C4):
+interface SubjectHalfOfDayConstraint  extends ConstraintBase { template: "subject_half_of_day"; params: { subjectIds: Id[]; classIds: Id[]; half: "first" | "second" }; }
+interface TeacherMaxPerWeekConstraint extends ConstraintBase { template: "teacher_max_per_week"; params: { teacherId: Id; max: number }; }
+interface ClassTeacherP1Constraint    extends ConstraintBase { template: "class_teacher_p1"; params: { classId: Id; subjectId?: Id }; }
+type Constraint = SubjectHalfOfDayConstraint | TeacherMaxPerWeekConstraint | ClassTeacherP1Constraint;
+
+// ENGINE (advisor): a placement-LOCAL template defines ONE predicate
+// localViolates(constraint, profile, placement); evaluate() filters all placements
+// through it AND fill's per-candidate check uses the SAME predicate, so the picker/
+// generator and validate() can't disagree. AGGREGATE templates (weekly caps, class-
+// teacher-P1) define a whole-timetable evaluate only — fill does NOT pre-respect them
+// (they surface as issues; the generator resolves them in C6). See src/domain/constraints.ts.
 
 // Electives: a class offers a set of subjects; each student picks `chooseCount`.
 interface ElectiveGroup {
@@ -407,6 +421,6 @@ interface StudentGroup {
 }
 ```
 
-`TimetableEvent` gains `studentGroupIds?: Id[]` — when present, the event is attended only by those student groups (an elective), not the whole class. **Clash rule extension:** a student group may not appear in two different events in the same slot; an opted-out group gets a `self_study`/`free` event during a dropped-elective line. Same-event overlap remains legal (joint/team). `Project` gains `constraints: Constraint[]`, `electiveGroups: ElectiveGroup[]`, `studentGroups: StudentGroup[]`; `rules: Rule[]` is retired in favor of `constraints` (migrate existing rules → constraints).
+`TimetableEvent` gains `studentGroupIds?: Id[]` — when present, the event is attended only by those student groups (an elective), not the whole class. **Clash rule extension:** a student group may not appear in two different events in the same slot; an opted-out group gets a `self_study`/`free` event during a dropped-elective line. Same-event overlap remains legal (joint/team). `Project` gains `constraints: Constraint[]` (added in C3), and will gain `electiveGroups: ElectiveGroup[]`, `studentGroups: StudentGroup[]` (C5). **`rules: Rule[]` is DEPRECATED, not yet removed:** from C3 `constraints` is the authoritative, user-facing system, but `validate()` still evaluates the legacy R1–R15 in parallel so any carried rule keeps working. The full R1–R15 → constraint-template port, the constraint *suggester*, and the removal of the `Rule` type + `evaluateRules` land in C4 — at which point `rules` is dropped. A one-time load-time migration already converts the only C3-overlapping rule (R4 class-teacher-P1 → `class_teacher_p1` constraint, dropping the R4) so the two never double-count.
 
 **Elective scheduling note (free 3-of-4):** because Prakash teaches both Economics and Geography (never parallel) and every elective pair is co-taken under free choice, the engine schedules the four Arts electives in distinct period-lines and assigns each student group a supervised Study during the single elective it dropped; it auto-parallelizes only when the actual chosen combinations make a pair clash-free. No student group is ever placed into a non-chosen subject.

@@ -19,14 +19,14 @@ import { ManageView } from "../manage/ManageView";
 import { FillReview } from "../panels/FillReview";
 import { ClassHealth, TeacherLoad } from "../panels/Insights";
 import { IssuesPanel } from "../panels/Issues";
-import { RulesPanel } from "../panels/RulesPanel";
+import { ConstraintsPanel } from "../panels/ConstraintsPanel";
 import { ReportsView } from "../reports/ReportsView";
 import { ToolsView } from "../tools/ToolsView";
 
-type View = "class" | "teacher" | "setup" | "insights" | "rules" | "reports" | "tools";
+type View = "class" | "teacher" | "setup" | "insights" | "constraints" | "reports" | "tools";
 
 export function App(): React.ReactElement {
-  const { project, timetableId, place, clear, tryDrop, applyFix, addRule, toggleRule, removeRule, undo, past } = useProjectStore();
+  const { project, timetableId, place, clear, tryDrop, applyFix, addConstraint, toggleConstraint, removeConstraint, undo, past } = useProjectStore();
   const timetable = project.timetables.find((t) => t.id === timetableId)!;
 
   const [view, setView] = useState<View>("class");
@@ -72,10 +72,8 @@ export function App(): React.ReactElement {
     );
   };
 
-  const clashCount = useMemo(
-    () => validate(project, timetable).filter((v) => v.severity === "hard").length,
-    [project, timetable],
-  );
+  const violations = useMemo(() => validate(project, timetable), [project, timetable]);
+  const clashCount = violations.filter((v) => v.severity === "hard").length;
 
   const tabBtn = (v: View) =>
     `rounded px-3 py-1 text-sm ${view === v ? "bg-slate-800 text-white" : "bg-slate-100 text-slate-700"}`;
@@ -119,11 +117,11 @@ export function App(): React.ReactElement {
             <button className={tabBtn("teacher")} onClick={() => { setView("teacher"); setCell(null); }}>By teacher</button>
             <button className={tabBtn("setup")} onClick={() => { setView("setup"); setCell(null); }}>Setup</button>
             <button className={tabBtn("insights")} onClick={() => { setView("insights"); setCell(null); }}>Insights</button>
-            <button className={tabBtn("rules")} onClick={() => { setView("rules"); setCell(null); }}>Rules</button>
+            <button className={tabBtn("constraints")} onClick={() => { setView("constraints"); setCell(null); }}>Constraints</button>
             <button className={tabBtn("reports")} onClick={() => { setView("reports"); setCell(null); }}>Reports</button>
             <button className={tabBtn("tools")} onClick={() => { setView("tools"); setCell(null); }}>Tools</button>
           </div>
-          {["setup", "insights", "rules", "reports", "tools"].includes(view) ? null : view === "class" ? (
+          {["setup", "insights", "constraints", "reports", "tools"].includes(view) ? null : view === "class" ? (
             <label className="flex items-center gap-2 text-sm">
               <span className="text-slate-500">Class</span>
               <select className="rounded border border-slate-300 px-2 py-1" value={classId} onChange={(e) => { setClassId(e.target.value); setCell(null); }}>
@@ -182,6 +180,7 @@ export function App(): React.ReactElement {
                   classId={classId}
                   selected={cell}
                   onSelectCell={openCell}
+                  violations={violations}
                 />
               </DndContext>
             ) : view === "teacher" ? (
@@ -195,12 +194,11 @@ export function App(): React.ReactElement {
             ) : view === "tools" ? (
               <ToolsView project={project} timetable={timetable} />
             ) : (
-              <RulesPanel
+              <ConstraintsPanel
                 project={project}
-                timetable={timetable}
-                onAdd={(r) => { addRule(r); setFlash("Rule added — you can Undo it."); }}
-                onToggle={toggleRule}
-                onRemove={removeRule}
+                onAdd={(c) => { addConstraint(c); setFlash("Constraint added — you can Undo it."); }}
+                onToggle={toggleConstraint}
+                onRemove={removeConstraint}
               />
             )}
           </div>

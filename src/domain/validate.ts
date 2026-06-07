@@ -11,6 +11,7 @@
 // occupancies come from DIFFERENT eventIds. Same-event overlap (joint_class's many
 // classes, team_block's many teachers) is legal by construction.
 
+import { evaluateConstraints } from "./constraints";
 import { distinctEventIds, deriveMaps, findProfile, type DerivedMaps } from "./derive";
 import { isTeachingSlot, occupiedSlots, slotLabel } from "./profile";
 import { evaluateRules } from "./rules";
@@ -223,7 +224,8 @@ export function validate(project: Project, timetable: Timetable): Violation[] {
     ...checkAvailability(maps, look, profile),
     ...checkPlacementBounds(timetable, maps, look, profile),
     ...checkEventIntegrity(project, look),
-    ...evaluateRules(project, timetable), // R1–R15 (RB6): must→hard, prefer→soft
+    ...evaluateRules(project, timetable), // DEPRECATED R1–R15 (RB6) — parallel until C4
+    ...evaluateConstraints(project, timetable), // v6.1 applied constraints (C3): must→hard, prefer→soft
   ];
   violations.sort((a, b) => a.constraintId.localeCompare(b.constraintId));
   return violations;
