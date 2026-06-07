@@ -55,6 +55,27 @@ export function clashReport(project: Project, timetable: Timetable): Violation[]
   return validate(project, timetable).filter((v) => v.severity === "hard" && (v.constraintId === "HE1" || v.constraintId === "HE2"));
 }
 
+export interface RoomUseRow {
+  roomId: Id;
+  name: string;
+  periods: number; // distinct events placed in this room across the week
+}
+
+/** Room utilisation = distinct placed events that name each room. Empty when no lesson is
+ *  assigned to a room (the current data: `roomId` is an optional event field nothing sets
+ *  yet — same gap as the deferred `subject_needs_room` constraint in C4). The UI shows an
+ *  honest "rooms aren't assigned" note in that case rather than a misleading empty table. */
+export function roomUseReport(project: Project, timetable: Timetable): RoomUseRow[] {
+  const used = new Map<Id, Set<Id>>(); // roomId -> distinct eventIds
+  const eventIndex = new Map(project.events.map((e) => [e.id, e]));
+  for (const p of timetable.placements) {
+    const ev = eventIndex.get(p.eventId);
+    if (!ev?.roomId) continue;
+    (used.get(ev.roomId) ?? used.set(ev.roomId, new Set()).get(ev.roomId)!).add(ev.id);
+  }
+  return project.rooms.map((r) => ({ roomId: r.id, name: r.name, periods: used.get(r.id)?.size ?? 0 }));
+}
+
 /** Total empty teaching cells across all classes (the school-wide free-period count). */
 export function freeCellCount(project: Project, timetable: Timetable): number {
   const profile = findProfile(project, timetable);
