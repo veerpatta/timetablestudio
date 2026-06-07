@@ -1,8 +1,14 @@
-// Hand-rolled service worker — cache-first app shell + runtime asset caching.
-// No build-time asset manifest needed: hashed assets are cached on first fetch,
-// so the app works fully offline after the first load. Dependency-free (AGENTS §1).
+// Hand-rolled service worker. Dependency-free (AGENTS §1).
+//
+// Caching strategy (the important part): NETWORK-FIRST for navigations / HTML, CACHE-FIRST
+// for everything else. The previous version was cache-first for index.html too, which meant a
+// returning visitor was served the first-cached HTML forever — and that HTML points at the
+// OLD content-hashed JS bundle, so new deploys never appeared. HTML must come from the network
+// so each deploy is picked up; the cached copy is only the OFFLINE fallback. Hashed assets
+// (index-<hash>.js etc.) are immutable — their URL changes when content changes — so caching
+// them first is both safe and fast. Bump CACHE on any strategy change to purge stale clients.
 
-const CACHE = "timetable-studio-v1";
+const CACHE = "timetable-studio-v2";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {
@@ -26,6 +32,26 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const req = event.request;
   if (req.method !== "GET") return;
+
+  const isNavigation =
+    req.mode === "navigate" || (req.headers.get("accept") || "").includes("text/html");
+
+  if (isNavigation) {
+    // Network-first: always try the live HTML so a new deploy loads; refresh the offline
+    // fallback on success; fall back to the cached shell only when the network is unavailable.
+    event.respondWith(
+      fetch(req)
+        .then((res) => {
+          const copy = res.clone();
+          caches.open(CACHE).then((c) => c.put("./index.html", copy));
+          return res;
+        })
+        .catch(() => caches.match(req).then((c) => c || caches.match("./index.html"))),
+    );
+    return;
+  }
+
+  // Everything else (content-hashed assets, manifest): cache-first + runtime caching.
   event.respondWith(
     caches.match(req).then(
       (cached) =>
@@ -38,7 +64,7 @@ self.addEventListener("fetch", (event) => {
             }
             return res;
           })
-          .catch(() => (req.mode === "navigate" ? caches.match("./index.html") : undefined)),
+          .catch(() => undefined),
     ),
   );
 });
