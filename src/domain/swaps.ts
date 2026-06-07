@@ -9,7 +9,7 @@
 // would silently move every member class; the picker handles those explicitly).
 
 import { deriveMaps, findProfile, slotKey } from "./derive";
-import { placementsCovering, swapPlacements } from "./edit";
+import { movePlacement, placementsCovering, swapPlacements } from "./edit";
 import { isTeachingSlot, teachingSlots } from "./profile";
 import { validate } from "./validate";
 import type { Day, Id, Placement, Project, TimetableEvent } from "./types";
@@ -79,6 +79,31 @@ export function canSwap(project: Project, timetableId: Id, a: Cell, b: Cell): Sw
 
   const partnerEvent = project.events.find((e) => e.id === pb.eventId)!;
   return { target: b, project: after, label: eventLabel(project, partnerEvent) };
+}
+
+/**
+ * Move the normal lesson at `source` into the EMPTY slot `target` (same class), if that
+ * keeps the timetable legal. Returns the moved project or null. The drag path uses this
+ * for a drop on a free slot; canSwap handles a drop on an occupied slot. A shared
+ * (joint/team) cell is never moved here (normalPlacementAt rejects it).
+ */
+export function canMove(project: Project, timetableId: Id, source: Cell, target: Cell): Project | null {
+  if (source.classId !== target.classId) return null;
+  if (source.day === target.day && source.slot === target.slot) return null;
+  const tt = getTimetable(project, timetableId);
+  const profile = tt && findProfile(project, tt);
+  if (!tt || !profile) return null;
+  if (!isTeachingSlot(profile, source.slot) || !isTeachingSlot(profile, target.slot)) return null;
+
+  const ps = normalPlacementAt(project, timetableId, source);
+  if (!ps) return null;
+  // Target must be empty for this class (a drop on an occupied slot is a swap, not a move).
+  if (deriveMaps(project, tt).classCells.get(target.classId)?.has(slotKey(target.day, target.slot))) return null;
+
+  const before = hardCount(project, timetableId);
+  const after = movePlacement(project, timetableId, ps, target.day, target.slot);
+  if (hardCount(after, timetableId) > before) return null;
+  return after;
 }
 
 /**

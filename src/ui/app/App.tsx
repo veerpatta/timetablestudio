@@ -4,6 +4,7 @@
 // shows in the other. Global undo. RB2 niceties (ghost autocomplete, drag-swap,
 // richer health) layer on next.
 
+import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { useMemo, useState } from "react";
 import { validate } from "../../domain/validate";
 import type { Day } from "../../domain/types";
@@ -16,13 +17,30 @@ import { ClassHealth, TeacherLoad } from "../panels/Insights";
 type View = "class" | "teacher";
 
 export function App(): React.ReactElement {
-  const { project, timetableId, place, clear, undo, past } = useProjectStore();
+  const { project, timetableId, place, clear, tryDrop, undo, past } = useProjectStore();
   const timetable = project.timetables.find((t) => t.id === timetableId)!;
 
   const [view, setView] = useState<View>("class");
   const [classId, setClassId] = useState(project.classes[0]!.id);
   const [teacherId, setTeacherId] = useState(project.teachers.find((t) => t.schedulable)!.id);
   const [cell, setCell] = useState<{ day: Day; slot: number } | null>(null);
+  const [flash, setFlash] = useState<string | null>(null);
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+  const openCell = (day: Day, slot: number) => { setFlash(null); setCell({ day, slot }); };
+
+  const parseCell = (id: string | number) => {
+    const [day, slot] = String(id).split("#");
+    return { day: day as Day, slot: Number(slot) };
+  };
+  const handleDragEnd = (e: DragEndEvent) => {
+    if (!e.over) return;
+    const r = tryDrop({ classId, ...parseCell(e.active.id) }, { classId, ...parseCell(e.over.id) });
+    setCell(null);
+    setFlash(
+      r === "swapped" ? "Swapped — both lessons stay valid." : r === "moved" ? "Moved." : "Can’t drop there — it would clash.",
+    );
+  };
 
   const clashCount = useMemo(
     () => validate(project, timetable).filter((v) => v.severity === "hard").length,
@@ -82,16 +100,22 @@ export function App(): React.ReactElement {
           )}
         </div>
 
+        {flash && (
+          <p className="mb-2 rounded bg-slate-100 px-3 py-1.5 text-sm text-slate-600" role="status">{flash}</p>
+        )}
+
         <div className="flex flex-col gap-4 lg:flex-row">
           <div className="min-w-0 flex-1 overflow-auto">
             {view === "class" ? (
-              <WeekGrid
-                project={project}
-                timetable={timetable}
-                classId={classId}
-                selected={cell}
-                onSelectCell={(day, slot) => setCell({ day, slot })}
-              />
+              <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+                <WeekGrid
+                  project={project}
+                  timetable={timetable}
+                  classId={classId}
+                  selected={cell}
+                  onSelectCell={openCell}
+                />
+              </DndContext>
             ) : (
               <TeacherGrid project={project} timetable={timetable} teacherId={teacherId} />
             )}
@@ -106,6 +130,11 @@ export function App(): React.ReactElement {
                 slot={cell.slot}
                 onPlace={(subjectId, teacherIds) => { place(classId, cell.day, cell.slot, subjectId, teacherIds); setCell(null); }}
                 onClear={() => { clear(classId, cell.day, cell.slot); setCell(null); }}
+                onSwap={(target) => {
+                  const r = tryDrop({ classId, day: cell.day, slot: cell.slot }, { classId, ...target });
+                  setCell(null);
+                  setFlash(r === "swapped" ? "Swapped — both lessons stay valid." : r === "moved" ? "Moved." : "Couldn’t swap.");
+                }}
                 onClose={() => setCell(null)}
               />
             </div>
@@ -113,7 +142,7 @@ export function App(): React.ReactElement {
         </div>
 
         <p className="mt-3 text-xs text-slate-400">
-          Amber = ELGA team block · violet = combined senior class. Click a class cell to edit — only legal options are offered.
+          Amber = ELGA team block · violet = combined senior class. Click a class cell to edit (only legal options shown), or drag a lesson onto another slot to swap.
         </p>
       </div>
     </div>

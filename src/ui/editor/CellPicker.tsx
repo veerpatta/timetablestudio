@@ -4,8 +4,10 @@
 // half-replaced: it offers an explicit "remove for all N classes" instead.
 
 import { deriveMaps, slotKey } from "../../domain/derive";
+import { ghostSuggestion } from "../../domain/ghost";
 import { legalOptions } from "../../domain/legalMoves";
 import { slotLabel } from "../../domain/profile";
+import { legalSwaps } from "../../domain/swaps";
 import { findProfile } from "../../domain/derive";
 import type { Day, Id, Project, TimetableEvent } from "../../domain/types";
 
@@ -17,6 +19,7 @@ interface Props {
   slot: number;
   onPlace: (subjectId: Id, teacherIds: Id[]) => void;
   onClear: () => void;
+  onSwap: (target: { day: Day; slot: number }) => void;
   onClose: () => void;
 }
 
@@ -38,13 +41,15 @@ function explain(project: Project, event: TimetableEvent | undefined): string {
   }
 }
 
-export function CellPicker({ project, timetableId, classId, day, slot, onPlace, onClear, onClose }: Props): React.ReactElement {
+export function CellPicker({ project, timetableId, classId, day, slot, onPlace, onClear, onSwap, onClose }: Props): React.ReactElement {
   const tt = project.timetables.find((t) => t.id === timetableId);
   const profile = tt && findProfile(project, tt);
   const maps = tt && deriveMaps(project, tt);
   const event = maps?.classCells.get(classId)?.get(slotKey(day, slot))?.[0]?.event;
   const shared = !!event && event.classIds.length > 1;
   const options = shared ? [] : legalOptions(project, timetableId, classId, day, slot);
+  const ghost = !event && !shared ? ghostSuggestion(project, timetableId, classId, day, slot) : null;
+  const swaps = event && !shared ? legalSwaps(project, timetableId, classId, day, slot) : [];
 
   return (
     <aside className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
@@ -65,6 +70,15 @@ export function CellPicker({ project, timetableId, classId, day, slot, onPlace, 
         </button>
       ) : (
         <>
+          {ghost && (
+            <button
+              onClick={() => onPlace(ghost.subjectId, ghost.teacherIds)}
+              className="mb-3 w-full rounded border border-sky-200 bg-sky-50 px-3 py-2 text-left text-sm hover:bg-sky-100"
+            >
+              <span className="text-xs font-medium uppercase tracking-wide text-sky-600">Suggested</span>
+              <span className="block font-medium text-slate-800">{ghost.label}</span>
+            </button>
+          )}
           <p className="mb-1 text-xs font-medium uppercase tracking-wide text-slate-400">
             {event ? "Replace with" : "Place a lesson"} · only legal options shown
           </p>
@@ -81,6 +95,25 @@ export function CellPicker({ project, timetableId, classId, day, slot, onPlace, 
               </li>
             ))}
           </ul>
+          {event && swaps.length > 0 && (
+            <div className="mt-3">
+              <p className="mb-1 text-xs font-medium uppercase tracking-wide text-slate-400">
+                Swap with · both stay valid
+              </p>
+              <ul className="max-h-48 space-y-1 overflow-auto">
+                {swaps.map((s) => (
+                  <li key={`${s.target.day}#${s.target.slot}`}>
+                    <button
+                      onClick={() => onSwap(s.target)}
+                      className="w-full rounded px-3 py-1.5 text-left text-sm hover:bg-emerald-50"
+                    >
+                      ⇄ {s.label}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           {event && (
             <button onClick={onClear} className="mt-2 w-full rounded px-3 py-1.5 text-left text-sm text-rose-600 hover:bg-rose-50">
               Clear this cell

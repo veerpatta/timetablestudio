@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildBundledProject } from "../fixtures/bundled";
 import { makeMiniSchool } from "../fixtures/synthetic";
-import { canSwap, legalSwaps } from "./swaps";
+import { canMove, canSwap, legalSwaps } from "./swaps";
 import { validate } from "./validate";
 import type { Day, Placement, Project } from "./types";
 
@@ -81,6 +81,27 @@ describe("canSwap only accepts clash-free exchanges (synthetic, discriminating)"
     // ELGA team block at Mon P3 (slots 3,4,6) covers Class 1; a normal Maths at Mon P1.
     const p = setPlacements(makeMiniSchool(), [place("evt-elga", "Mon", 3), place("evt-maths-c1", "Mon", 1)]);
     expect(canSwap(p, "tt", { classId: "c1", day: "Mon", slot: 1 }, { classId: "c1", day: "Mon", slot: 3 })).toBeNull();
+  });
+});
+
+describe("canMove only accepts a legal drop onto a free slot (synthetic, discriminating)", () => {
+  it("moves a normal lesson into a free slot where the teacher is available (stays clash-free)", () => {
+    const p = setPlacements(miniWithEvs(), [place("evt-maths-c1", "Mon", 1)]);
+    const moved = canMove(p, "tt", { classId: "c1", day: "Mon", slot: 1 }, { classId: "c1", day: "Tue", slot: 1 });
+    expect(moved).not.toBeNull();
+    expect(hardCount(moved!, "tt")).toBe(0);
+  });
+
+  it("REFUSES a move into a slot the teacher is unavailable for (HE4)", () => {
+    const base = miniWithEvs();
+    base.teachers.find((t) => t.id === "mMaths")!.unavailable = [{ day: "Tue", slot: 1 }];
+    const p = setPlacements(base, [place("evt-maths-c1", "Mon", 1)]);
+    expect(canMove(p, "tt", { classId: "c1", day: "Mon", slot: 1 }, { classId: "c1", day: "Tue", slot: 1 })).toBeNull();
+  });
+
+  it("returns null when the target slot is occupied (that case is a swap, not a move)", () => {
+    const p = setPlacements(miniWithEvs(), [place("evt-maths-c1", "Mon", 1), place("evt-evs-c1", "Mon", 2)]);
+    expect(canMove(p, "tt", { classId: "c1", day: "Mon", slot: 1 }, { classId: "c1", day: "Mon", slot: 2 })).toBeNull();
   });
 });
 
