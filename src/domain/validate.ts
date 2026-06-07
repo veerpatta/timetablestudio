@@ -11,6 +11,7 @@
 // occupancies come from DIFFERENT eventIds. Same-event overlap (joint_class's many
 // classes, team_block's many teachers) is legal by construction.
 
+import { attendeesIntersect, attendeesOf, buildGroupsByClass } from "./attendees";
 import { evaluateConstraints } from "./constraints";
 import { distinctEventIds, deriveMaps, findProfile, type DerivedMaps } from "./derive";
 import { isTeachingSlot, occupiedSlots, slotLabel } from "./profile";
@@ -53,7 +54,11 @@ const sName = (l: Lookups, id: Id) => l.subject.get(id)?.name ?? id;
 const at = (p: Profile, day: Day, slot: number) => `${day} ${slotLabel(p, slot)}`;
 
 // --- HE1 / HE2: clash = >1 distinct eventId in one slot ---
+// HE1 (teacher): any two distinct events sharing a teacher slot. HE2 (class): two distinct
+// events whose ATTENDEE SETS within that class intersect (C5) — so an elective and the
+// dropping group's Study, or two electives for disjoint groups, legally share a slot.
 function checkClashes(
+  project: Project,
   maps: DerivedMaps,
   look: Lookups,
   profile: Profile,
@@ -73,15 +78,23 @@ function checkClashes(
       }
     }
   }
+  const groupsByClass = buildGroupsByClass(project);
   for (const [classId, slots] of maps.classCells) {
     for (const occ of slots.values()) {
-      const ids = distinctEventIds(occ);
-      if (ids.length > 1) {
+      // distinct events in this class slot, with their attendee sets for this class
+      const byEvent = new Map(occ.map((o) => [o.eventId, o.event]));
+      const events = [...byEvent.values()];
+      if (events.length < 2) continue;
+      let clash = false;
+      for (let i = 0; i < events.length && !clash; i++)
+        for (let j = i + 1; j < events.length && !clash; j++)
+          if (attendeesIntersect(attendeesOf(events[i]!, classId, groupsByClass), attendeesOf(events[j]!, classId, groupsByClass))) clash = true;
+      if (clash) {
         const { day, slot } = occ[0]!;
         out.push({
           constraintId: "HE2",
           severity: "hard",
-          message: `${cName(look, classId)} has ${ids.length} different lessons at ${at(profile, day, slot)}.`,
+          message: `${cName(look, classId)} has overlapping lessons at ${at(profile, day, slot)}.`,
           slots: [{ classId, day, slot }],
         });
       }
@@ -218,7 +231,7 @@ export function validate(project: Project, timetable: Timetable): Violation[] {
   const look = buildLookups(project);
   const maps = deriveMaps(project, timetable);
   const violations: Violation[] = [
-    ...checkClashes(maps, look, profile),
+    ...checkClashes(project, maps, look, profile),
     ...checkQualified(timetable, maps, look, profile),
     ...checkAvailability(maps, look, profile),
     ...checkPlacementBounds(timetable, maps, look, profile),

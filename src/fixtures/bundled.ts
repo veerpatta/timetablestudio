@@ -6,6 +6,7 @@
 // Bump BUNDLED_DATA_VERSION whenever this data changes (Prompt F rule 19 / REBUILD).
 
 import { buildProject, type BuildInput } from "../domain/buildProject";
+import { seedArtsElectives } from "../domain/electives";
 import type { Project, Subject } from "../domain/types";
 import { REAL_GRID, REAL_GRID_CLASS_ORDER } from "./realGrid";
 
@@ -66,7 +67,17 @@ function buildInput(): BuildInput {
   };
 }
 
+/**
+ * The RAW transcription (no elective modelling) — matches the source grid cell-for-cell.
+ * Used by the round-trip test; the live app uses buildBundledProject (with electives).
+ */
+export function buildBundledProjectRaw(): Project {
+  return buildProject(buildInput());
+}
+
 /** Build the bundled real VPPS project (fresh each call). */
 export function buildBundledProject(): Project {
-  return buildProject(buildInput());
+  // Arts 11 & 12 electives are modelled as student groups (free 3-of-4) so opted-out
+  // students get a supervised Study rather than being forced to sit in (C5).
+  return seedArtsElectives(buildBundledProjectRaw());
 }

@@ -279,6 +279,8 @@ export function buildProject(input: BuildInput): Project {
     requirements,
     events: timetableEvents,
     constraints: [],
+    electiveGroups: [],
+    studentGroups: [],
     timetables: [{ id: "tt-real", name: "2026-27", profileId: regular.id, placements }],
     activeTimetableId: "tt-real",
   };

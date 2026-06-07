@@ -8,6 +8,7 @@
 // is a silent no-op — the app simply runs from the bundled seed.
 
 import { openDB, type IDBPDatabase } from "idb";
+import { seedArtsElectives } from "../domain/electives";
 import type { Project } from "../domain/types";
 
 // NOTE: a DIFFERENT name than the legacy M19 cell-model DB ("timetable-studio",
@@ -76,12 +77,16 @@ export function normalizeProject(project: Project): Project {
     patch.constraints = constraints;
   }
 
-  // Drop any legacy `rules` field — it's no longer part of the Project shape.
+  // Nothing missing and no legacy field → already current; return as-is (no needless copy).
+  // Such a project already carries electiveGroups, so no elective migration is needed.
   const hadRules = "rules" in p;
   if (Object.keys(patch).length === 0 && !hadRules) return project;
+
   const result = { ...project, ...patch } as Project & Record<string, unknown>;
-  delete result.rules;
-  return result as Project;
+  delete result.rules; // legacy field is no longer part of the Project shape
+  // Migrate a pre-C5 VPPS project to the elective model on load (idempotent — a no-op if
+  // electives already exist or there are no Arts classes). Returning users get the Arts fix.
+  return seedArtsElectives(result as Project);
 }
 
 /** Persist the whole project under the single "current" key. No-op without IndexedDB. */

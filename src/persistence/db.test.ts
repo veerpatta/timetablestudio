@@ -1,7 +1,7 @@
 import "fake-indexeddb/auto";
 import { beforeEach, describe, expect, it } from "vitest";
 import { addTeacher } from "../domain/entityEdit";
-import { buildBundledProject } from "../fixtures/bundled";
+import { buildBundledProject, buildBundledProjectRaw } from "../fixtures/bundled";
 import type { Project } from "../domain/types";
 import { clearProject, loadProject, normalizeProject, saveProject } from "./db";
 
@@ -54,5 +54,15 @@ describe("normalizeProject — survives schema growth", () => {
     const n = normalizeProject(blob) as Project & Record<string, unknown>;
     expect(n.rules).toBeUndefined(); // legacy field not carried forward
     expect(n.constraints.some((c) => c.template === "class_teacher_p1" && (c.params as { classId: string }).classId === "Class 7")).toBe(true);
+  });
+
+  it("seeds Arts electives on load for a pre-C5 VPPS project (no electiveGroups)", () => {
+    // a pre-C5 blob = the raw transcription with the elective fields absent (as C4 saved it)
+    const blob: Record<string, unknown> = { ...buildBundledProjectRaw() };
+    delete blob.electiveGroups;
+    delete blob.studentGroups;
+    const n = normalizeProject(blob as unknown as Project);
+    expect(n.studentGroups.filter((g) => g.classId === "Class 11 Arts").length).toBe(4);
+    expect(n.events.some((e) => e.type === "self_study" && e.classIds.includes("Class 11 Arts"))).toBe(true);
   });
 });

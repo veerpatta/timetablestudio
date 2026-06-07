@@ -32,9 +32,16 @@ export function subjectCountReport(project: Project, timetable: Timetable): Subj
   const subj = new Map(project.subjects.map((s) => [s.id, s.name]));
   return project.classes.map((c) => {
     const tally = new Map<Id, number>();
+    // Count every DISTINCT event in each slot — an elective option line legitimately holds
+    // more than one (the electives + the dropping group's Study), so per-subject counts can
+    // sum to more than the slot count (reconciles with the occupancy recompute).
     for (const occ of maps.classCells.get(c.id)?.values() ?? []) {
-      const s = occ[0]?.event.subjectId;
-      if (s) tally.set(s, (tally.get(s) ?? 0) + 1);
+      const seen = new Set<Id>();
+      for (const o of occ) {
+        if (seen.has(o.eventId)) continue;
+        seen.add(o.eventId);
+        tally.set(o.event.subjectId, (tally.get(o.event.subjectId) ?? 0) + 1);
+      }
     }
     const counts = [...tally.entries()]
       .map(([subjectId, periods]) => ({ subjectId, subject: subj.get(subjectId) ?? subjectId, periods }))

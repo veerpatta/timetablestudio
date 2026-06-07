@@ -53,7 +53,8 @@ function GridCell({ project, timetable, classId, day, s, isSel, flags, onSelectC
   const subjects = new Map(project.subjects.map((x) => [x.id, x.name]));
   const teachers = new Map(project.teachers.map((t) => [t.id, t.name]));
   const occ = deriveMaps(project, timetable).classCells.get(classId)?.get(slotKey(day, s.index));
-  const event = occ?.[0]?.event;
+  const distinctEvents = [...new Map((occ ?? []).map((o) => [o.eventId, o.event])).values()];
+  const event = distinctEvents[0];
 
   const ring = isSel ? "ring-2 ring-inset ring-sky-500" : "";
   const over = isOver ? "ring-2 ring-inset ring-emerald-400" : "";
@@ -74,6 +75,34 @@ function GridCell({ project, timetable, classId, day, s, isSel, flags, onSelectC
         },
       }
     : {};
+
+  // Option line (C5): an elective slot legitimately holds 2+ events (electives + the
+  // dropping group's Study). Render them stacked so the class view reads clearly.
+  if (distinctEvents.length > 1) {
+    const groups = new Map(project.studentGroups.map((g) => [g.id, g]));
+    const labelFor = (e: typeof distinctEvents[number]) => {
+      const sub = subjects.get(e.subjectId) ?? e.subjectId;
+      const tch = e.teacherIds.map((t) => teachers.get(t) ?? t).join(", ");
+      const who = (e.studentGroupIds ?? []).map((gid) => groups.get(gid)?.electiveSubjectIds.join("/") ?? gid);
+      return { sub, tch, note: who.length ? `chose ${who.join("; ")}` : "" };
+    };
+    return (
+      <td ref={setNodeRef} onClick={handle} {...a11y} title={flagTitle} className={`border p-2 align-top ${clickable} ${ring} ${over} ${flagCls}`}>
+        <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Option line</div>
+        <div className="flex flex-col gap-1">
+          {distinctEvents.map((e) => {
+            const { sub, tch, note } = labelFor(e);
+            return (
+              <div key={e.id} className={`rounded px-1 py-0.5 ${e.type === "self_study" ? "bg-slate-100" : "bg-violet-50"}`}>
+                <div className="text-xs font-medium text-slate-800">{sub}{tch ? ` — ${tch}` : ""}</div>
+                {note && <div className="text-[10px] text-slate-500">{note}</div>}
+              </div>
+            );
+          })}
+        </div>
+      </td>
+    );
+  }
 
   if (!event) {
     const ghost = ghostSuggestion(project, timetable.id, classId, day, s.index);

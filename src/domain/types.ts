@@ -92,6 +92,27 @@ export interface TimetableEvent {
   duration: number; // teaching slots occupied as one unit (1 default, 2 = double)
   source: EventSource;
   notes?: string;
+  // v6.1 (C5): when present, within a class that HAS student groups the event is attended
+  // only by these groups (an elective), not the whole class. A class with no groups (or an
+  // event listing no group of this class) attends as the whole class. Same-event and
+  // disjoint-audience overlaps in one (class, slot) are legal; intersecting audiences clash.
+  studentGroupIds?: Id[];
+}
+
+// v6.1 electives (C5). A class offers a set of subjects; each student picks `chooseCount`.
+export interface ElectiveGroup {
+  id: Id;
+  classId: Id;
+  name: string;
+  subjectIds: Id[];
+  chooseCount: number;
+}
+// A cohort within a class defined by its elective combination (the clash unit for electives).
+export interface StudentGroup {
+  id: Id;
+  classId: Id;
+  name: string;
+  electiveSubjectIds: Id[]; // the chosen subset
 }
 
 export interface Placement {
@@ -139,6 +160,8 @@ export interface Project {
   requirements: Requirement[];
   events: TimetableEvent[];
   constraints: Constraint[]; // v6.1 (C3/C4) — the applied constraint system (replaced rules)
+  electiveGroups: ElectiveGroup[]; // v6.1 (C5)
+  studentGroups: StudentGroup[]; // v6.1 (C5) — the elective clash unit
   timetables: Timetable[];
   activeTimetableId: Id | null;
 }

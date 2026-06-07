@@ -8,10 +8,13 @@ const ttId = (p: Project) => p.activeTimetableId!;
 const tableOf = (p: Project) => p.timetables.find((t) => t.id === ttId(p))!;
 const hard = (p: Project) => validate(p, tableOf(p)).filter((v) => v.severity === "hard").length;
 
-/** Clear ~30% of the non-pinned NORMAL placements (deterministically) to make holes. */
+/** Clear ~30% of the non-pinned NORMAL placements (deterministically) to make holes.
+ * Excludes group-scoped (elective) events: clearing one leaves the dropping group's Study
+ * shadow in the slot, which legitimately blocks a whole-class refill — attendee-aware
+ * elective refill is C6's job, so they'd skew this "fill the ordinary gaps" quality check. */
 function clear30pct(base: Project): { cleared: Project; clearedCount: number } {
   const tt = tableOf(base);
-  const normalIds = new Set(base.events.filter((e) => e.type === "normal").map((e) => e.id));
+  const normalIds = new Set(base.events.filter((e) => e.type === "normal" && !e.studentGroupIds).map((e) => e.id));
   const movable = tt.placements.filter((p) => !p.pinned && normalIds.has(p.eventId));
   const drop = new Set<Placement>(movable.filter((_, i) => i % 10 < 3)); // ~30%
   const cleared: Project = {
