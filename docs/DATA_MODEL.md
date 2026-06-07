@@ -340,6 +340,30 @@ interface Project {
 
 **Clash rule (event model).** Build occupancy from placements by expanding each event over its `classIds × teacherIds × [slot..slot+duration)`. A `(teacher|class, day, slot)` collision is a **real clash only if the two occupancies come from different `eventId`s**. Same-event overlap (joint_class, team_block) is legal by construction. This single rule kills the false-clash problem that broke the cell model.
 
-**Legal-move rule (powers the RB2 editor).** A candidate placement of event E at (day, slot) is legal iff: every teacher is qualified for every (subject, class) in E (Qualification table), every teacher is available (not in `unavailable`, `schedulable`), no class/teacher in E already occupied in any covered slot by a different event, the event fits the day (duration), and no enabled `must` rule is violated. The picker offers ONLY legal candidates.
+**Legal-move rule (powers the RB2 editor).** A candidate placement of event E at (day, slot) is legal iff: every teacher is qualified for every (subject, class) in E (Qualification table), every teacher is available (not in `unavailable`, `schedulable`), no class/teacher in E already occupied in any covered slot by a different event, and the event fits the day (duration). The picker offers ONLY candidates meeting these — so it can never offer an unqualified or clashing cell (the guaranteed, tested invariant).
+
+**Configurable `must`-rules (R1–R15) are NOT pre-excluded from the picker (RB6 decision).** They are evaluated by `validate()` as hard violations, so the move/swap/fix paths (`canMove`, `canSwap`, `suggestFixes`) — which all gate on the hard-violation count — respect them automatically, and any cell that breaks a `must`-rule surfaces as a fixable issue (RB3 path). `legalOptions` and the solver do not filter on configurable rules: aggregate rules (spread, weekly caps, gaps) can't be judged per-candidate, and pre-filtering the others would make the picker silently hide options for reasons the owner can't see. This is a deliberate scoping of "legal" to the structural invariants (qualification / availability / clash / duration); configurable preferences are surfaced, not hidden. See DECISIONS.md (RB6).
 
 **Migration.** v2/v5 cell-model projects are not auto-upgraded to v6 (different shape). The bundled real 2026-27 project ships natively as v6; the old viewer's legacy rawData export is still produced by a v6→text writer for back-compat (RB7).
+
+### Slot indexing (RB0)
+
+`Profile.slots` is an ordered array in **physical time order**, and each `SlotDef.index` is its array position. The regular profile is therefore `[Assembly(0), P1(1), P2(2), P3(3), P4(4), Recess(5), P5(6), P6(7), P7(8), P8(9)]` — so Recess sits at index 5 and **teaching slot indices are non-contiguous**: `[1,2,3,4,6,7,8,9]`. A `Placement.slot` is a slot index; a duration-d event occupies its start slot plus the next d−1 **teaching** slots, skipping fixed slots (so ELGA at P3 for 3 periods occupies P3,P4,P5 = indices `[3,4,6]`, straddling Recess). All slot-bearing fields below (`Placement.slot`, `Teacher.unavailable[].slot`, `SlotRef.slot`, rule slot params, `Violation.slots[].slot`) are slot indices, never 1-based period numbers.
+
+### Carried rule catalog (event-model field names, RB0)
+
+The v2 Rule discriminated union (R1–R15, defined in the § Rules block above) is carried into v6 verbatim **except** that its position fields are renamed to event-model terms (`slot`/`slots` instead of `period`/`periods`, `eventId` instead of `blockId`) so they index `Profile.slots` consistently. The carried shapes that differ from the v2 block above: `R1Rule.slots: number[]`, `R2Rule.slots: number[]`, `R5Rule.slot?: number`, `R7Rule.eventId: Id` (the team_block / joint_class event it pins), `SlotRef { day: Day; slot: number }` (used by `R8Rule.slots`). Semantics are unchanged; rules are not evaluated by `validate()` until RB6. `RuleSeverity`, `RuleBase`, and the rest are identical.
+
+### Validation result shape (event model, RB0)
+
+```ts
+interface Violation {
+  constraintId: string;        // event-model hard ids "HE1".."HE8", or rule template "R4"
+  severity: "hard" | "soft";
+  message: string;             // human-readable, names entities
+  slots: { classId?: Id; teacherId?: Id; eventId?: Id; day: Day; slot: number }[];
+}
+// validate(project, timetable): Violation[]  — pure function in domain/validate.ts
+```
+
+`validate()` implements HE1–HE7 (HE8 pinned-immovable is a solver-time invariant, enforced in solver/, RB5). HE3 (qualification) applies the legal-move rule to every event with teachers, including a team_block: each teacher must be qualified for every (subject, class) the event spans (so ELGA needs the 5×5 teacher×class qualification triples). Events with zero teachers (free/self_study) are exempt from HE3.

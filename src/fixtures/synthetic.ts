@@ -1,104 +1,128 @@
-// Synthetic test fixtures — NOT real VPPS data (AGENTS.md §2 allows clearly
-// marked synthetic fixtures). Ids are readable strings (ids are opaque).
-//
-// Mirrors the ELGA structure: 5 primary classes regroup under 5 primary
-// teachers as one atomic 3-period BlockActivity.
+// Small synthetic v6 project for unit tests (clearly NOT real school data).
+// Covers the three structural cases the event model must get right: an ELGA
+// team_block (5 classes × 5 teachers), a senior joint_class (3 classes × 1
+// teacher), and ordinary normal lessons used to provoke real clashes.
 
+import { buildRegularProfile, REGULAR_PROFILE_ID } from "../domain/profile";
 import type {
-  BlockActivity,
-  Day,
-  Lesson,
-  Placement,
   Project,
-  ScheduleProfile,
+  Qualification,
+  SchoolClass,
+  Subject,
+  Teacher,
+  TimetableEvent,
 } from "../domain/types";
 
-const PRIMARY_TEACHERS = ["Bindu", "Anita", "Rashmita", "Kusum", "Ravina"];
-const PRIMARY_CLASSES = ["Class 1", "Class 2", "Class 3", "Class 4", "Class 5"];
+const teacher = (id: string, name: string, over: Partial<Teacher> = {}): Teacher => ({
+  id,
+  name,
+  maxPerDay: 8,
+  maxPerWeek: 48,
+  schedulable: true,
+  unavailable: [],
+  ...over,
+});
 
-export const sixPeriodProfile: ScheduleProfile = {
-  id: "heatwave",
-  name: "heatwave",
-  days: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
-  periods: Array.from({ length: 6 }, (_, i) => ({
-    label: `P${i + 1}`,
-    start: "00:00",
-    end: "00:40",
-  })),
-};
+const subject = (id: string, name: string, kind: Subject["kind"] = "academic"): Subject => ({
+  id,
+  name,
+  bands: ["primary", "middle", "secondary", "senior"],
+  kind,
+});
 
-/** Base project: 5 primary classes + Class 7, ELGA block defined but UNPLACED. */
-export function elgaFixture(): Project {
-  const classIds = PRIMARY_CLASSES.map((_, i) => `c${i + 1}`);
-  const elga: BlockActivity = {
-    kind: "block",
-    id: "act-elga",
-    name: "ELGA",
-    classIds,
-    teacherIds: [...PRIMARY_TEACHERS],
-    length: 3,
-  };
-  return {
-    schemaVersion: 2,
-    school: { name: "Synthetic" },
-    teachers: [
-      ...PRIMARY_TEACHERS.map((name) => ({
-        id: name,
-        name,
-        subjects: ["Maths", "Hindi", "EVS", "English", "ELGA"],
-        maxPeriodsPerDay: 6,
-        maxPeriodsPerWeek: 36,
-        unavailable: [],
-      })),
-      {
-        id: "Nidhika",
-        name: "Nidhika",
-        subjects: ["Maths"],
-        maxPeriodsPerDay: 6,
-        maxPeriodsPerWeek: 36,
-        unavailable: [],
-      },
-    ],
-    classes: [
-      ...PRIMARY_CLASSES.map((name, i) => ({
-        id: `c${i + 1}`,
-        name,
-        group: "primary" as const,
-      })),
-      { id: "c7", name: "Class 7", group: "middle" as const },
-    ],
-    subjects: [
-      { id: "Maths", name: "Maths" },
-      { id: "Hindi", name: "Hindi" },
-      { id: "EVS", name: "EVS" },
-      { id: "English", name: "English" },
-      { id: "ELGA", name: "ELGA" },
-    ],
-    profiles: [sixPeriodProfile],
-    activities: [elga],
-    requirements: { curriculum: [], blocks: [] },
+const PRIMARY = ["c1", "c2", "c3", "c4", "c5"];
+const PRIMARY_TEAM = ["bindu", "anita", "rashmita", "kusum", "ravina"];
+const SENIOR11 = ["s11sci", "s11com", "s11arts"];
+
+const classes: SchoolClass[] = [
+  ...PRIMARY.map((id, i): SchoolClass => ({ id, name: `Class ${i + 1}`, band: "primary" })),
+  { id: "s11sci", name: "Class 11 Science", band: "senior", stream: "Science" },
+  { id: "s11com", name: "Class 11 Commerce", band: "senior", stream: "Commerce" },
+  { id: "s11arts", name: "Class 11 Arts", band: "senior", stream: "Arts" },
+];
+
+const teachers: Teacher[] = [
+  ...PRIMARY_TEAM.map((id) => teacher(id, id[0]!.toUpperCase() + id.slice(1))),
+  teacher("pEng", "Pradhyuman"),
+  teacher("mMaths", "Nidhika"),
+];
+
+const subjects: Subject[] = [
+  subject("ELGA", "ELGA"),
+  subject("Eng", "English"),
+  subject("Maths", "Maths"),
+];
+
+function buildQualifications(): Qualification[] {
+  const q: Qualification[] = [];
+  // ELGA: every primary teacher qualified for every primary class (team block).
+  for (const teacherId of PRIMARY_TEAM)
+    for (const classId of PRIMARY) q.push({ teacherId, subjectId: "ELGA", classId });
+  // English: Pradhyuman teaches all senior streams.
+  for (const classId of SENIOR11) q.push({ teacherId: "pEng", subjectId: "Eng", classId });
+  // Maths: Nidhika teaches Class 1 (used for the real-clash test).
+  q.push({ teacherId: "mMaths", subjectId: "Maths", classId: "c1" });
+  q.push({ teacherId: "mMaths", subjectId: "Maths", classId: "c2" });
+  return q;
+}
+
+const events: TimetableEvent[] = [
+  {
+    id: "evt-elga",
+    type: "team_block",
+    subjectId: "ELGA",
+    classIds: [...PRIMARY],
+    teacherIds: [...PRIMARY_TEAM],
+    duration: 3,
+    source: "imported",
+  },
+  {
+    id: "evt-eng11",
+    type: "joint_class",
+    subjectId: "Eng",
+    classIds: [...SENIOR11],
+    teacherIds: ["pEng"],
+    duration: 1,
+    source: "imported",
+  },
+  // Two separate normal Maths lessons by the same teacher — used to provoke HE1.
+  {
+    id: "evt-maths-c1",
+    type: "normal",
+    subjectId: "Maths",
+    classIds: ["c1"],
+    teacherIds: ["mMaths"],
+    duration: 1,
+    source: "imported",
+  },
+  {
+    id: "evt-maths-c2",
+    type: "normal",
+    subjectId: "Maths",
+    classIds: ["c2"],
+    teacherIds: ["mMaths"],
+    duration: 1,
+    source: "imported",
+  },
+];
+
+/** A minimal v6 project with the regular 8-period profile and one empty timetable.
+ * Returns a fresh deep copy each call so tests can mutate it in isolation. */
+export function makeMiniSchool(): Project {
+  return structuredClone({
+    schemaVersion: 6,
+    bundledDataVersion: 0,
+    school: { name: "Synthetic Test School" },
+    profiles: [buildRegularProfile()],
+    teachers,
+    classes,
+    subjects,
+    rooms: [],
+    qualifications: buildQualifications(),
+    requirements: [],
+    events,
     rules: [],
-    timetables: [
-      { id: "tt", name: "Draft", profileId: "heatwave", placements: [] },
-    ],
+    timetables: [{ id: "tt", name: "Draft", profileId: REGULAR_PROFILE_ID, placements: [] }],
     activeTimetableId: "tt",
-  };
-}
-
-export function lesson(
-  id: string,
-  classId: string,
-  subjectId: string,
-  teacherIds: string[],
-): Lesson {
-  return { kind: "lesson", id, classId, subjectId, teacherIds };
-}
-
-export function place(
-  activityId: string,
-  day: Day,
-  period: number,
-  pinned = false,
-): Placement {
-  return { activityId, day, period, pinned };
+  }) as Project;
 }

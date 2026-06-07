@@ -1,46 +1,72 @@
-// The bundled VPPS timetable — the app's zero-setup default project (M19).
+// The bundled, zero-setup default project: the REAL 8-period 2026-27 VPPS
+// timetable on the event model. The app opens to this, pre-loaded and clash-free,
+// so the owner only tweaks (docs/REBUILD.md decision 1). It is built deterministically
+// from the authoritative cell grid (realGrid.ts) by the pure buildProject() folder.
 //
-// `buildBundledProject()` is the single source of the built-in school: the
-// PDF-true real dataset (`makeRealVppsProject`) with the rules the timetable
-// already lives by (R4 anchors, R6 doubles, R7 ELGA config) pre-detected and
-// enabled, stamped with the current `BUNDLED_DATA_VERSION`. A fresh browser
-// opens straight into this — full grid, rules on, 0 conflicts, no user action.
-//
-// BUNDLED_DATA_VERSION is sacred (AGENTS Prompt F rule 19): bump it whenever the
-// built-in timetable changes so returning browsers are offered the update; never
-// overwrite a user's project without keeping the old one as a draft.
+// Bump BUNDLED_DATA_VERSION whenever this data changes (Prompt F rule 19 / REBUILD).
 
-import { detectRules, acceptProposal } from "../domain/ruleDetect";
-import type { Project } from "../domain/types";
-import { makeRealVppsProject, VPPS_SCHOOL_NAME } from "./vppsReal";
+import { buildProject, type BuildInput } from "../domain/buildProject";
+import type { Project, Subject } from "../domain/types";
+import { REAL_GRID, REAL_GRID_CLASS_ORDER } from "./realGrid";
 
-/** Revision of the built-in timetable. Bump on ANY change to the bundled data
- * or its pre-enabled rules so stale-data detection fires for returning users. */
 export const BUNDLED_DATA_VERSION = 1;
+export const VPPS_SCHOOL_NAME = "Shri Veer Patta Senior Secondary School";
 
-/** Build the bundled default project: real VPPS data + its lived-by rules,
- * stamped with the current bundled version. Deterministic and side-effect-free. */
-export function buildBundledProject(): Project {
-  let project = makeRealVppsProject();
-  const timetable = project.timetables.find((t) => t.id === project.activeTimetableId);
-  if (timetable) {
-    // Accept every rule the actual timetable already satisfies — anchors, doubles
-    // and the ELGA block config. All are detected FROM the placements, so they add
-    // zero hard conflicts (the R7 block "must" matches the real ELGA slots).
-    for (const proposal of detectRules(project, timetable)) {
-      project = acceptProposal(project, proposal);
-    }
+/** The five primary teachers who co-teach the ELGA team block (analysis §3.1). */
+const ELGA_TEAM = ["Bindu", "Anita", "Rashmita", "Kusum", "Ravina"];
+
+// Board-exam classes (CBSE: X and XII). Powers R9 (RB6); refine if the owner's
+// "Board classes highlighted" set differs (the PDF highlight colour was ambiguous).
+const BOARD = new Set(["Class 10", "Class 12 Science", "Class 12 Commerce", "Class 12 Arts"]);
+
+const STREAMS: Record<string, "Science" | "Commerce" | "Arts"> = {
+  "Class 11 Science": "Science",
+  "Class 11 Commerce": "Commerce",
+  "Class 11 Arts": "Arts",
+  "Class 12 Science": "Science",
+  "Class 12 Commerce": "Commerce",
+  "Class 12 Arts": "Arts",
+};
+
+const SUBJECT_KIND: Record<string, Subject["kind"]> = {
+  Sports: "activity",
+  Robotics: "activity",
+  CCS: "activity",
+  "NoteBook Checking": "activity",
+  "Self Study": "study",
+  Free: "study",
+};
+
+function buildInput(): BuildInput {
+  const classMeta: BuildInput["classMeta"] = {};
+  for (const name of REAL_GRID_CLASS_ORDER) {
+    const n = parseInt(name.replace(/\D/g, ""), 10);
+    classMeta[name] = {
+      band: n <= 5 ? "primary" : n <= 8 ? "middle" : n <= 10 ? "secondary" : "senior",
+      ...(STREAMS[name] ? { stream: STREAMS[name] } : {}),
+      ...(BOARD.has(name) ? { isBoardClass: true } : {}),
+    };
   }
-  return { ...project, bundledDataVersion: BUNDLED_DATA_VERSION };
+  return {
+    schoolName: VPPS_SCHOOL_NAME,
+    bundledDataVersion: BUNDLED_DATA_VERSION,
+    classOrder: REAL_GRID_CLASS_ORDER,
+    grid: REAL_GRID,
+    classMeta,
+    teacherMeta: {
+      // Hard availability windows (analysis §3.4). Mahesh teaches only the early
+      // periods; Anjana only after recess. Director is admin, never scheduled.
+      Mahesh: { unavailablePeriods: ["P4", "P5", "P6", "P7", "P8"] },
+      Anjana: { unavailablePeriods: ["P1", "P2", "P3", "P4"] },
+      Director: { schedulable: false },
+    },
+    extraTeachers: ["Director"],
+    subjectKind: SUBJECT_KIND,
+    elgaTeam: ELGA_TEAM,
+  };
 }
 
-/** True when a stored project is a VPPS-bundled project older than the current
- * bundled version (so the M19 update banner should offer the latest). Gated on
- * the school name so a user's own school never sees the banner — "Start a
- * different school" is the escape hatch (see docs/DECISIONS.md). */
-export function isStaleBundled(project: Project): boolean {
-  return (
-    project.school.name === VPPS_SCHOOL_NAME &&
-    (project.bundledDataVersion ?? 0) < BUNDLED_DATA_VERSION
-  );
+/** Build the bundled real VPPS project (fresh each call). */
+export function buildBundledProject(): Project {
+  return buildProject(buildInput());
 }

@@ -1,0 +1,159 @@
+// AUTHORITATIVE cell-for-cell transcription of the REAL 8-period 2026-27 timetable
+// (the owner's 'School Timetable 2026-27' Class-wise PDF). One entry per class:
+// 6 days (Mon..Sat) x 8 periods (P1..P8). Each cell is "Subject|Teacher"
+// ("Subject|T1,T2" for multi-teacher), "ELGA" for the team block, "Free" for a free
+// period, "" never (every teaching slot is filled). Extracted by coordinate-bucketing
+// the PDF words (see docs/DECISIONS.md RB1); the 6-period heatwave set lives in
+// classWisePdf.ts. This file is DATA ONLY (no imports) and is the cell-for-cell
+// fixture the built project is checked against (realGrid.test.ts).
+
+export const REAL_GRID_CLASS_ORDER: string[] = [
+  "Class 1",
+  "Class 2",
+  "Class 3",
+  "Class 4",
+  "Class 5",
+  "Class 6",
+  "Class 7",
+  "Class 8",
+  "Class 9",
+  "Class 10",
+  "Class 11 Science",
+  "Class 11 Commerce",
+  "Class 11 Arts",
+  "Class 12 Science",
+  "Class 12 Commerce",
+  "Class 12 Arts",
+];
+
+/** className -> [day 0..5 Mon..Sat][period 0..7 P1..P8] = cell token. */
+export const REAL_GRID: Record<string, string[][]> = {
+  "Class 1": [
+    ["Maths|Bindu", "Sports|Rakesh", "ELGA", "ELGA", "ELGA", "Hindi|Anjana", "EVS|Ravina", "EVS|Ravina"],
+    ["Maths|Bindu", "Maths|Bindu", "ELGA", "ELGA", "ELGA", "Hindi|Anjana", "Hindi|Anjana", "EVS|Ravina"],
+    ["Maths|Bindu", "EVS|Ravina", "ELGA", "ELGA", "ELGA", "Hindi|Anjana", "Hindi|Anjana", "NoteBook Checking|Antima"],
+    ["Maths|Bindu", "Maths|Bindu", "ELGA", "ELGA", "ELGA", "Hindi|Anjana", "EVS|Ravina", "EVS|Ravina"],
+    ["Maths|Bindu", "Maths|Bindu", "EVS|Ravina", "EVS|Ravina", "Sports|Rakesh", "CCS|Maya", "Hindi|Anjana", "Hindi|Anjana"],
+    ["Maths|Bindu", "Maths|Bindu", "EVS|Ravina", "EVS|Ravina", "CCS|Maya", "Hindi|Anjana", "Hindi|Anjana", "Robotics|Maya"],
+  ],
+  "Class 2": [
+    ["Maths|Ravina", "EVS|Bindu", "ELGA", "ELGA", "ELGA", "Hindi|Bindu", "Hindi|Bindu", "CCS|Maya"],
+    ["Maths|Ravina", "Maths|Ravina", "ELGA", "ELGA", "ELGA", "Hindi|Bindu", "EVS|Bindu", "EVS|Bindu"],
+    ["Maths|Ravina", "Sports|Rakesh", "ELGA", "ELGA", "ELGA", "EVS|Bindu", "EVS|Bindu", "Hindi|Bindu"],
+    ["Maths|Ravina", "Maths|Ravina", "ELGA", "ELGA", "ELGA", "EVS|Bindu", "Hindi|Bindu", "Hindi|Bindu"],
+    ["Maths|Ravina", "Maths|Ravina", "EVS|Bindu", "EVS|Bindu", "CCS|Maya", "Hindi|Bindu", "Hindi|Bindu", "Sports|Rakesh"],
+    ["Maths|Ravina", "Maths|Ravina", "NoteBook Checking|Antima", "Robotics|Maya", "Hindi|Bindu", "Hindi|Bindu", "EVS|Bindu", "EVS|Bindu"],
+  ],
+  "Class 3": [
+    ["EVS|Rashmita", "EVS|Rashmita", "ELGA", "ELGA", "ELGA", "Maths|Ravina", "Hindi|Kusum", "Hindi|Kusum"],
+    ["EVS|Rashmita", "Hindi|Kusum", "ELGA", "ELGA", "ELGA", "Maths|Ravina", "Maths|Ravina", "Sports|Rakesh"],
+    ["EVS|Rashmita", "EVS|Rashmita", "ELGA", "ELGA", "ELGA", "Hindi|Kusum", "Maths|Ravina", "Maths|Ravina"],
+    ["EVS|Rashmita", "CCS|Maya", "ELGA", "ELGA", "ELGA", "Maths|Ravina", "Hindi|Kusum", "Hindi|Kusum"],
+    ["EVS|Rashmita", "EVS|Rashmita", "NoteBook Checking|Antima", "CCS|Maya", "Maths|Ravina", "Maths|Ravina", "Hindi|Kusum", "Hindi|Kusum"],
+    ["EVS|Rashmita", "EVS|Rashmita", "Hindi|Kusum", "Hindi|Kusum", "Maths|Ravina", "Maths|Ravina", "Robotics|Maya", "Sports|Rakesh"],
+  ],
+  "Class 4": [
+    ["Hindi|Kusum", "Hindi|Kusum", "ELGA", "ELGA", "ELGA", "Maths|Anita", "EVS|Rashmita", "EVS|Rashmita"],
+    ["Hindi|Kusum", "Sports|Rakesh", "ELGA", "ELGA", "ELGA", "EVS|Rashmita", "Maths|Anita", "Maths|Anita"],
+    ["Hindi|Kusum", "Hindi|Kusum", "ELGA", "ELGA", "ELGA", "Maths|Anita", "Maths|Anita", "EVS|Rashmita"],
+    ["Hindi|Kusum", "Maths|Anita", "ELGA", "ELGA", "ELGA", "CCS|Maya", "EVS|Rashmita", "EVS|Rashmita"],
+    ["Hindi|Kusum", "Hindi|Kusum", "EVS|Rashmita", "EVS|Rashmita", "Maths|Anita", "Maths|Anita", "Robotics|Maya", "NoteBook Checking|Antima"],
+    ["Hindi|Kusum", "Hindi|Kusum", "EVS|Rashmita", "EVS|Rashmita", "Sports|Rakesh", "CCS|Maya", "Maths|Anita", "Maths|Anita"],
+  ],
+  "Class 5": [
+    ["Maths|Nidhika", "Maths|Nidhika", "ELGA", "ELGA", "ELGA", "Hindi|Kusum", "CCS|Maya", "EVS|Anita"],
+    ["Maths|Nidhika", "Maths|Nidhika", "ELGA", "ELGA", "ELGA", "EVS|Anita", "Hindi|Kusum", "Hindi|Kusum"],
+    ["Maths|Nidhika", "EVS|Anita", "ELGA", "ELGA", "ELGA", "Robotics|Maya", "CCS|Maya", "Hindi|Kusum"],
+    ["Maths|Nidhika", "Maths|Nidhika", "ELGA", "ELGA", "ELGA", "Hindi|Kusum", "EVS|Anita", "EVS|Anita"],
+    ["Maths|Nidhika", "EVS|Anita", "EVS|Anita", "NoteBook Checking|Antima", "Hindi|Kusum", "Hindi|Kusum", "Sports|Rakesh", "English compulsory|Ravina"],
+    ["Maths|Nidhika", "Maths|Nidhika", "Sports|Rakesh", "EVS|Anita", "EVS|Anita", "Hindi|Kusum", "Hindi|Kusum", "English compulsory|Ravina"],
+  ],
+  "Class 6": [
+    ["English compulsory|Hemlata", "CCS|Maya", "Hindi|Jainendra", "Sports|Rakesh", "NoteBook Checking|Antima", "SST|Rashmita", "Maths|Nidhika", "Maths|Nidhika"],
+    ["English compulsory|Hemlata", "Chemistry|Hemlata", "Physics|Hemlata", "Sanskrit|Jainendra", "Sports|Rakesh", "Maths|Nidhika", "Maths|Nidhika", "SST|Rashmita"],
+    ["Biology|Hemlata", "Sanskrit|Jainendra", "Chemistry|Hemlata", "Maths|Nidhika", "Maths|Nidhika", "English compulsory|Hemlata", "SST|Rashmita", "Hindi|Jainendra"],
+    ["English compulsory|Hemlata", "SST|Rashmita", "Maths|Nidhika", "CCS|Maya", "Hindi|Jainendra", "Chemistry|Hemlata", "Biology|Hemlata", "Robotics|Maya"],
+    ["Physics|Hemlata", "Sanskrit|Jainendra", "English compulsory|Hemlata", "Hindi|Jainendra", "SST|Rashmita", "SST|Rashmita", "Biology|Hemlata", "Maths|Nidhika"],
+    ["English compulsory|Hemlata", "English compulsory|Hemlata", "Maths|Nidhika", "Sanskrit|Jainendra", "SST|Rashmita", "SST|Rashmita", "Hindi|Jainendra", "Physics|Hemlata"],
+  ],
+  "Class 7": [
+    ["Maths|Anita", "Maths|Anita", "Sanskrit|Antima", "Hindi|Jainendra", "SST|Nidhika", "English compulsory|Harshita", "Sports|Rakesh", "NoteBook Checking|Antima"],
+    ["Maths|Anita", "Maths|Anita", "Sanskrit|Antima", "Physics|Toshit", "SST|Nidhika", "Biology|Hemlata", "CCS|Maya", "English compulsory|Harshita"],
+    ["Maths|Anita", "English compulsory|Harshita", "Sports|Rakesh", "Physics|Toshit", "Hindi|Jainendra", "Sanskrit|Antima", "SST|Nidhika", "Robotics|Maya"],
+    ["Maths|Anita", "Hindi|Jainendra", "Physics|Toshit", "SST|Nidhika", "Biology|Hemlata", "Sanskrit|Antima", "English compulsory|Harshita", "Chemistry|Hemlata"],
+    ["Maths|Anita", "CCS|Maya", "SST|Nidhika", "SST|Nidhika", "Chemistry|Hemlata", "English compulsory|Harshita", "Hindi|Jainendra", "Biology|Hemlata"],
+    ["Maths|Anita", "Maths|Anita", "Chemistry|Hemlata", "Sanskrit|Antima", "English compulsory|Harshita", "Hindi|Jainendra", "SST|Nidhika", "SST|Nidhika"],
+  ],
+  "Class 8": [
+    ["Sanskrit|Antima", "Hindi|Jainendra", "English compulsory|Pradhyuman", "SST|Harshita", "SST|Harshita", "CCS|Maya", "Maths|Prakash", "Maths|Prakash"],
+    ["Sanskrit|Antima", "Hindi|Jainendra", "Maths|Prakash", "Maths|Prakash", "English compulsory|Pradhyuman", "SST|Harshita", "Chemistry|Toshit", "Biology|Hemlata"],
+    ["Sanskrit|Antima", "Biology|Hemlata", "English compulsory|Pradhyuman", "Hindi|Jainendra", "Chemistry|Toshit", "Maths|Prakash", "SST|Harshita", "Physics|Toshit"],
+    ["NoteBook Checking|Antima", "Biology|Hemlata", "CCS|Maya", "English compulsory|Pradhyuman", "Sports|Rakesh", "SST|Harshita", "Maths|Prakash", "Maths|Prakash"],
+    ["Sanskrit|Antima", "Sports|Rakesh", "English compulsory|Pradhyuman", "Physics|Toshit", "SST|Harshita", "Hindi|Jainendra", "Maths|Prakash", "Robotics|Maya"],
+    ["Sanskrit|Antima", "Physics|Toshit", "SST|Harshita", "SST|Harshita", "Hindi|Jainendra", "English compulsory|Pradhyuman", "Maths|Prakash", "Chemistry|Toshit"],
+  ],
+  "Class 9": [
+    ["Hindi|Jainendra", "Sanskrit|Antima", "Science|Toshit", "Science|Toshit", "SST|Pradhyuman", "SST|Pradhyuman", "English compulsory|Harshita", "Maths|Nathulal"],
+    ["Hindi|Jainendra", "CCS|Maya", "Maths|Nathulal", "Sanskrit|Antima", "English compulsory|Harshita", "NoteBook Checking|Antima", "SST|Pradhyuman", "Science|Toshit"],
+    ["Hindi|Jainendra", "Sanskrit|Antima", "English compulsory|Harshita", "English compulsory|Harshita", "Maths|Nathulal", "Science|Toshit", "Sports|Rakesh", "SST|Pradhyuman"],
+    ["Hindi|Jainendra", "Sanskrit|Antima", "SST|Pradhyuman", "English compulsory|Harshita", "English compulsory|Harshita", "Science|Toshit", "Maths|Nathulal", "Maths|Nathulal"],
+    ["Hindi|Jainendra", "Science|Toshit", "Sports|Rakesh", "English compulsory|Harshita", "Sanskrit|Antima", "Maths|Nathulal", "SST|Pradhyuman", "SST|Pradhyuman"],
+    ["Hindi|Jainendra", "SST|Pradhyuman", "Science|Toshit", "Science|Toshit", "Maths|Nathulal", "Maths|Nathulal", "Sanskrit|Antima", "English compulsory|Harshita"],
+  ],
+  "Class 10": [
+    ["SST|Pradhyuman", "English compulsory|Harshita", "English compulsory|Harshita", "Sanskrit|Antima", "Maths|Nathulal", "Hindi|Antima", "Science|Toshit", "Science|Toshit"],
+    ["SST|Pradhyuman", "SST|Pradhyuman", "Science|Toshit", "English compulsory|Harshita", "Sanskrit|Antima", "Maths|Nathulal", "Maths|Nathulal", "Hindi|Antima"],
+    ["SST|Pradhyuman", "CCS|Maya", "Sanskrit|Antima", "Hindi|Antima", "English compulsory|Harshita", "English compulsory|Harshita", "Science|Toshit", "Maths|Nathulal"],
+    ["SST|Pradhyuman", "SST|Pradhyuman", "English compulsory|Harshita", "Hindi|Antima", "Sanskrit|Antima", "Maths|Nathulal", "Sports|Rakesh", "Science|Toshit"],
+    ["SST|Pradhyuman", "Sanskrit|Antima", "English compulsory|Harshita", "Maths|Nathulal", "Maths|Nathulal", "Hindi|Antima", "Science|Toshit", "Science|Toshit"],
+    ["SST|Pradhyuman", "CCS|Maya", "Maths|Nathulal", "Maths|Nathulal", "Science|Toshit", "Sanskrit|Antima", "English compulsory|Harshita", "Hindi|Antima"],
+  ],
+  "Class 11 Science": [
+    ["Physics|Mahesh", "Biology|Hemlata", "Biology|Hemlata", "English compulsory|Pradhyuman", "Hindi|Jainendra", "Chemistry|Toshit", "Free", "Free"],
+    ["Physics|Mahesh", "Physics|Mahesh", "Sports|Rakesh", "Biology|Hemlata", "Biology|Hemlata", "Chemistry|Toshit", "Hindi|Jainendra", "English compulsory|Pradhyuman"],
+    ["Physics|Mahesh", "Physics|Mahesh", "Chemistry|Toshit", "Sports|Rakesh", "English compulsory|Pradhyuman", "Hindi|Jainendra", "Biology|Hemlata", "Biology|Hemlata"],
+    ["Physics|Mahesh", "Physics|Mahesh", "Biology|Hemlata", "Chemistry|Toshit", "Chemistry|Toshit", "English compulsory|Pradhyuman", "Hindi|Jainendra", "Free"],
+    ["Physics|Mahesh", "English compulsory|Pradhyuman", "Hindi|Jainendra", "Biology|Hemlata", "Chemistry|Toshit", "Chemistry|Toshit", "Free", "Free"],
+    ["Physics|Mahesh", "Hindi|Jainendra", "English compulsory|Pradhyuman", "Biology|Hemlata", "NoteBook Checking|Antima", "Chemistry|Toshit", "Chemistry|Toshit", "Free"],
+  ],
+  "Class 11 Commerce": [
+    ["Self Study|Maya", "Economics|Prakash", "Economics|Prakash", "English compulsory|Pradhyuman", "Hindi|Jainendra", "Business Studies|Nidhika", "Accountancy|Nathulal", "Free"],
+    ["CCS|Maya", "NoteBook Checking|Antima", "Business Studies|Nidhika", "Accountancy|Nathulal", "Accountancy|Nathulal", "Economics|Prakash", "Hindi|Jainendra", "English compulsory|Pradhyuman"],
+    ["Self Study|Maya", "Business Studies|Nidhika", "Accountancy|Nathulal", "Accountancy|Nathulal", "English compulsory|Pradhyuman", "Hindi|Jainendra", "Economics|Prakash", "Free"],
+    ["CCS|Maya", "Sports|Rakesh", "Accountancy|Nathulal", "Accountancy|Nathulal", "Economics|Prakash", "English compulsory|Pradhyuman", "Hindi|Jainendra", "Business Studies|Nidhika"],
+    ["Self Study|Maya", "English compulsory|Pradhyuman", "Hindi|Jainendra", "Sports|Rakesh", "Business Studies|Nidhika", "Economics|Prakash", "Accountancy|Nathulal", "Accountancy|Nathulal"],
+    ["Self Study|Maya", "Hindi|Jainendra", "English compulsory|Pradhyuman", "Business Studies|Nidhika", "Economics|Prakash", "Economics|Prakash", "Accountancy|Nathulal", "Accountancy|Nathulal"],
+  ],
+  "Class 11 Arts": [
+    ["English Literature|Harshita", "Economics|Prakash", "Economics|Prakash", "English compulsory|Pradhyuman", "Hindi|Jainendra", "Geography|Prakash", "NoteBook Checking|Antima", "Political Science|Pradhyuman"],
+    ["English Literature|Harshita", "Geography|Prakash", "English Literature|Harshita", "Political Science|Pradhyuman", "Geography|Prakash", "Economics|Prakash", "Hindi|Jainendra", "English compulsory|Pradhyuman"],
+    ["English Literature|Harshita", "Geography|Prakash", "CCS|Maya", "Political Science|Pradhyuman", "English compulsory|Pradhyuman", "Hindi|Jainendra", "Economics|Prakash", "Geography|Prakash"],
+    ["English Literature|Harshita", "English Literature|Harshita", "Geography|Prakash", "Sports|Rakesh", "Economics|Prakash", "English compulsory|Pradhyuman", "Hindi|Jainendra", "Political Science|Pradhyuman"],
+    ["English Literature|Harshita", "English compulsory|Pradhyuman", "Hindi|Jainendra", "Geography|Prakash", "Political Science|Pradhyuman", "Economics|Prakash", "English Literature|Harshita", "Geography|Prakash"],
+    ["English Literature|Harshita", "Hindi|Jainendra", "English compulsory|Pradhyuman", "Political Science|Pradhyuman", "Economics|Prakash", "Economics|Prakash", "Sports|Rakesh", "Geography|Prakash"],
+  ],
+  "Class 12 Science": [
+    ["Chemistry|Toshit", "Physics|Mahesh", "Physics|Mahesh", "Biology|Hemlata", "Biology|Hemlata", "Hindi|Jainendra", "English compulsory|Pradhyuman", "Free"],
+    ["Chemistry|Toshit", "Chemistry|Toshit", "Physics|Mahesh", "Sports|Rakesh", "Hindi|Jainendra", "English compulsory|Pradhyuman", "Biology|Hemlata", "Free"],
+    ["Chemistry|Toshit", "Chemistry|Toshit", "Physics|Mahesh", "Biology|Hemlata", "Biology|Hemlata", "English compulsory|Pradhyuman", "Hindi|Jainendra", "Free"],
+    ["Chemistry|Toshit", "Chemistry|Toshit", "Physics|Mahesh", "Biology|Hemlata", "English compulsory|Pradhyuman", "Hindi|Jainendra", "NoteBook Checking|Antima", "Free"],
+    ["Chemistry|Toshit", "Physics|Mahesh", "Physics|Mahesh", "English compulsory|Pradhyuman", "Hindi|Jainendra", "Biology|Hemlata", "Free", "Free"],
+    ["Chemistry|Toshit", "Physics|Mahesh", "Physics|Mahesh", "Sports|Rakesh", "Biology|Hemlata", "Biology|Hemlata", "English compulsory|Pradhyuman", "Hindi|Jainendra"],
+  ],
+  "Class 12 Commerce": [
+    ["Accountancy|Nathulal", "Accountancy|Nathulal", "Business Studies|Nidhika", "Economics|Prakash", "Sports|Rakesh", "Hindi|Jainendra", "English compulsory|Pradhyuman", "Free"],
+    ["Accountancy|Nathulal", "Accountancy|Nathulal", "CCS|Maya", "Business Studies|Nidhika", "Hindi|Jainendra", "English compulsory|Pradhyuman", "Sports|Rakesh", "Economics|Prakash"],
+    ["Accountancy|Nathulal", "Accountancy|Nathulal", "Economics|Prakash", "CCS|Maya", "Economics|Prakash", "English compulsory|Pradhyuman", "Hindi|Jainendra", "Business Studies|Nidhika"],
+    ["Accountancy|Nathulal", "Accountancy|Nathulal", "NoteBook Checking|Antima", "Economics|Prakash", "English compulsory|Pradhyuman", "Hindi|Jainendra", "Business Studies|Nidhika", "Free"],
+    ["Accountancy|Nathulal", "Accountancy|Nathulal", "Economics|Prakash", "English compulsory|Pradhyuman", "Hindi|Jainendra", "Business Studies|Nidhika", "Business Studies|Nidhika", "Free"],
+    ["Accountancy|Nathulal", "Accountancy|Nathulal", "Economics|Prakash", "Economics|Prakash", "Business Studies|Nidhika", "Business Studies|Nidhika", "English compulsory|Pradhyuman", "Hindi|Jainendra"],
+  ],
+  "Class 12 Arts": [
+    ["Geography|Prakash", "Political Science|Pradhyuman", "Sports|Rakesh", "Economics|Prakash", "CCS|Maya", "Hindi|Jainendra", "English compulsory|Pradhyuman", "English Literature|Harshita"],
+    ["Geography|Prakash", "English Literature|Harshita", "Political Science|Pradhyuman", "CCS|Maya", "Hindi|Jainendra", "English compulsory|Pradhyuman", "English Literature|Harshita", "Economics|Prakash"],
+    ["Geography|Prakash", "Political Science|Pradhyuman", "Economics|Prakash", "Geography|Prakash", "Economics|Prakash", "English compulsory|Pradhyuman", "Hindi|Jainendra", "English Literature|Harshita"],
+    ["Geography|Prakash", "Geography|Prakash", "Sports|Rakesh", "Economics|Prakash", "English compulsory|Pradhyuman", "Hindi|Jainendra", "Political Science|Pradhyuman", "English Literature|Harshita"],
+    ["Geography|Prakash", "Geography|Prakash", "Economics|Prakash", "English compulsory|Pradhyuman", "Hindi|Jainendra", "Political Science|Pradhyuman", "NoteBook Checking|Antima", "English Literature|Harshita"],
+    ["Geography|Prakash", "English Literature|Harshita", "Economics|Prakash", "Economics|Prakash", "Political Science|Pradhyuman", "English Literature|Harshita", "English compulsory|Pradhyuman", "Hindi|Jainendra"],
+  ],
+};

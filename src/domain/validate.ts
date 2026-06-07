@@ -1,167 +1,88 @@
-// Shared validation core. PURE — used by BOTH the editor (live badges) and the
-// solver (feasibility oracle). One implementation, never duplicated.
+// Shared validation core (PURE) — used by BOTH the editor (live badges) and the
+// solver (feasibility oracle). One implementation, never duplicated (AGENTS §3).
 //
-// Implements hard constraints H1–H6, H8, H9 (see docs/CONSTRAINTS.md).
-// H7 (quota exact) is reported as status, not a violation, until generation
-// exists (M3) — see `quotaStatus`. H10 (pinned immovable) is a solver-time
-// invariant with no static representation, so it is enforced in solver/, not here.
+// Implements the event-model hard constraints HE1–HE7 (docs/CONSTRAINTS.md):
+//   HE1 teacher clash, HE2 class clash, HE3 qualification, HE4 availability,
+//   HE5 fixed-slot, HE6 event integrity, HE7 duration fit.
+// HE8 (pinned immovable) is a solver-time invariant with no static representation
+// (enforced in solver/, RB5). Configurable rules join here in RB6.
+//
+// THE clash rule: a (entity, day, slot) collision is a real clash ONLY when the
+// occupancies come from DIFFERENT eventIds. Same-event overlap (joint_class's many
+// classes, team_block's many teachers) is legal by construction.
 
-import {
-  deriveMaps,
-  occupiedPeriods,
-  type DerivedMaps,
-} from "./derive";
-import { mustRuleViolations } from "./rules";
+import { distinctEventIds, deriveMaps, findProfile, type DerivedMaps } from "./derive";
+import { isTeachingSlot, occupiedSlots, slotLabel } from "./profile";
+import { evaluateRules } from "./rules";
 import type {
-  CurriculumRequirement,
   Day,
   Id,
-  Lesson,
+  Profile,
   Project,
+  SchoolClass,
   Subject,
   Teacher,
   Timetable,
+  TimetableEvent,
   Violation,
 } from "./types";
 
-interface NameLookups {
+interface Lookups {
   teacher: Map<Id, Teacher>;
-  className: Map<Id, string>;
+  klass: Map<Id, SchoolClass>;
   subject: Map<Id, Subject>;
+  /** `${teacherId}#${subjectId}#${classId}` set of allowed qualification triples. */
+  quals: Set<string>;
 }
 
-function buildLookups(project: Project): NameLookups {
+function buildLookups(project: Project): Lookups {
   const teacher = new Map<Id, Teacher>();
   for (const t of project.teachers) teacher.set(t.id, t);
-  const className = new Map<Id, string>();
-  for (const c of project.classes) className.set(c.id, c.name);
+  const klass = new Map<Id, SchoolClass>();
+  for (const c of project.classes) klass.set(c.id, c);
   const subject = new Map<Id, Subject>();
   for (const s of project.subjects) subject.set(s.id, s);
-  return { teacher, className, subject };
+  const quals = new Set<string>();
+  for (const q of project.qualifications) quals.add(`${q.teacherId}#${q.subjectId}#${q.classId}`);
+  return { teacher, klass, subject, quals };
 }
 
-const tName = (l: NameLookups, id: Id) => l.teacher.get(id)?.name ?? id;
-const cName = (l: NameLookups, id: Id) => l.className.get(id) ?? id;
-const sName = (l: NameLookups, id: Id) => l.subject.get(id)?.name ?? id;
-const slotLabel = (day: Day, period: number) => `${day} P${period}`;
+const tName = (l: Lookups, id: Id) => l.teacher.get(id)?.name ?? id;
+const cName = (l: Lookups, id: Id) => l.klass.get(id)?.name ?? id;
+const sName = (l: Lookups, id: Id) => l.subject.get(id)?.name ?? id;
+const at = (p: Profile, day: Day, slot: number) => `${day} ${slotLabel(p, slot)}`;
 
-function periodsPerDay(project: Project, timetable: Timetable): number {
-  const profile = project.profiles.find((p) => p.id === timetable.profileId);
-  return profile ? profile.periods.length : 6;
-}
-
-// --- H1: teacher clash ---
-function checkTeacherClash(maps: DerivedMaps, look: NameLookups): Violation[] {
-  const out: Violation[] = [];
-  for (const [teacherId, slots] of maps.teacherCells) {
-    for (const [, occ] of slots) {
-      // Each placement contributes exactly one teacher occupancy per slot, so
-      // >1 occupancy == >1 placement here == a clash (incl. two placements of
-      // the same canonical lesson, or two overlapping blocks).
-      if (occ.length > 1) {
-        const { day, period } = occ[0]!;
-        out.push({
-          constraintId: "H1",
-          severity: "hard",
-          message: `${tName(look, teacherId)} is double-booked at ${slotLabel(
-            day,
-            period,
-          )} (${occ.length} activities).`,
-          slots: [{ teacherId, day, period }],
-        });
-      }
-    }
-  }
-  return out;
-}
-
-// --- H2: class clash ---
-function checkClassClash(maps: DerivedMaps, look: NameLookups): Violation[] {
-  const out: Violation[] = [];
-  for (const [classId, slots] of maps.classCells) {
-    for (const [, occ] of slots) {
-      if (occ.length > 1) {
-        const { day, period } = occ[0]!;
-        out.push({
-          constraintId: "H2",
-          severity: "hard",
-          message: `${cName(look, classId)} has ${occ.length} activities at ${slotLabel(
-            day,
-            period,
-          )}.`,
-          slots: [{ classId, day, period }],
-        });
-      }
-    }
-  }
-  return out;
-}
-
-// --- H3 (structural block integrity) + H4 (bounds: any multi-period unit fits
-// inside the day — blocks AND duration-2 "double" lessons; single lessons
-// always fit, so they never trip H4). ---
-function checkBounds(
-  project: Project,
-  timetable: Timetable,
+// --- HE1 / HE2: clash = >1 distinct eventId in one slot ---
+function checkClashes(
   maps: DerivedMaps,
-  look: NameLookups,
+  look: Lookups,
+  profile: Profile,
 ): Violation[] {
   const out: Violation[] = [];
-  const ppd = periodsPerDay(project, timetable);
-  for (const placement of timetable.placements) {
-    const activity = maps.activityIndex.get(placement.activityId);
-    if (!activity) continue;
-    const span = activity.kind === "block" ? activity.length : activity.duration ?? 1;
-    if (activity.kind === "block") {
-      // H3: a block must be whole — non-degenerate definition.
-      if (activity.length < 1 || activity.classIds.length === 0 || activity.teacherIds.length === 0) {
-        out.push({
-          constraintId: "H3",
-          severity: "hard",
-          message: `Block "${activity.name}" is not atomic: needs length ≥ 1 and at least one class and teacher.`,
-          slots: [{ day: placement.day, period: placement.period }],
-        });
-      }
-    }
-    if (span <= 1) continue; // single lessons can't overflow
-    // H4: the unit fits inside the day.
-    const last = placement.period + span - 1;
-    if (placement.period < 1 || last > ppd) {
-      const what =
-        activity.kind === "block"
-          ? `Block "${activity.name}"`
-          : `${sName(look, activity.subjectId)} (${cName(look, activity.classId)}) double period`;
-      const classId = activity.kind === "lesson" ? activity.classId : undefined;
-      out.push({
-        constraintId: "H4",
-        severity: "hard",
-        message: `${what} at ${slotLabel(placement.day, placement.period)} runs to P${last}, outside the ${ppd}-period day.`,
-        slots: occupiedPeriods(activity, placement.period).map((period) => ({
-          ...(classId ? { classId } : {}),
-          day: placement.day,
-          period,
-        })),
-      });
-    }
-  }
-  return out;
-}
-
-// --- H5: teacher availability ---
-function checkAvailability(maps: DerivedMaps, look: NameLookups): Violation[] {
-  const out: Violation[] = [];
   for (const [teacherId, slots] of maps.teacherCells) {
-    const teacher = look.teacher.get(teacherId);
-    if (!teacher || teacher.unavailable.length === 0) continue;
-    const blocked = new Set(teacher.unavailable.map((s) => `${s.day}#${s.period}`));
-    for (const [key, occ] of slots) {
-      if (blocked.has(key)) {
-        const { day, period } = occ[0]!;
+    for (const occ of slots.values()) {
+      const ids = distinctEventIds(occ);
+      if (ids.length > 1) {
+        const { day, slot } = occ[0]!;
         out.push({
-          constraintId: "H5",
+          constraintId: "HE1",
           severity: "hard",
-          message: `${teacher.name} is scheduled at ${slotLabel(day, period)} but marked unavailable.`,
-          slots: [{ teacherId, day, period }],
+          message: `${tName(look, teacherId)} is double-booked at ${at(profile, day, slot)} (${ids.length} different lessons).`,
+          slots: [{ teacherId, day, slot }],
+        });
+      }
+    }
+  }
+  for (const [classId, slots] of maps.classCells) {
+    for (const occ of slots.values()) {
+      const ids = distinctEventIds(occ);
+      if (ids.length > 1) {
+        const { day, slot } = occ[0]!;
+        out.push({
+          constraintId: "HE2",
+          severity: "hard",
+          message: `${cName(look, classId)} has ${ids.length} different lessons at ${at(profile, day, slot)}.`,
+          slots: [{ classId, day, slot }],
         });
       }
     }
@@ -169,95 +90,55 @@ function checkAvailability(maps: DerivedMaps, look: NameLookups): Violation[] {
   return out;
 }
 
-// --- H6: qualified teacher (lessons only; blocks carry no subject) ---
+// --- HE3: qualification — every (teacher, subject, class) used must be a triple ---
 function checkQualified(
   timetable: Timetable,
   maps: DerivedMaps,
-  look: NameLookups,
+  look: Lookups,
+  profile: Profile,
 ): Violation[] {
   const out: Violation[] = [];
   for (const placement of timetable.placements) {
-    const activity = maps.activityIndex.get(placement.activityId);
-    if (!activity || activity.kind !== "lesson") continue;
-    const lesson = activity;
-    for (const teacherId of lesson.teacherIds) {
-      const teacher = look.teacher.get(teacherId);
-      if (teacher && !teacher.subjects.includes(lesson.subjectId)) {
-        out.push({
-          constraintId: "H6",
-          severity: "hard",
-          message: `${teacher.name} is not qualified to teach ${sName(look, lesson.subjectId)} (${cName(look, lesson.classId)} at ${slotLabel(placement.day, placement.period)}).`,
-          slots: [{ classId: lesson.classId, teacherId, day: placement.day, period: placement.period }],
-        });
+    const event = maps.eventIndex.get(placement.eventId);
+    if (!event || event.teacherIds.length === 0) continue; // free/self-study: nobody to qualify
+    for (const teacherId of event.teacherIds) {
+      for (const classId of event.classIds) {
+        if (!look.quals.has(`${teacherId}#${event.subjectId}#${classId}`)) {
+          out.push({
+            constraintId: "HE3",
+            severity: "hard",
+            message: `${tName(look, teacherId)} is not qualified to teach ${sName(look, event.subjectId)} to ${cName(look, classId)} (${at(profile, placement.day, placement.slot)}).`,
+            slots: [{ classId, teacherId, eventId: event.id, day: placement.day, slot: placement.slot }],
+          });
+        }
       }
     }
   }
   return out;
 }
 
-// --- H8: daily max per requirement (class+subject per day ≤ maxPerDay) ---
-function checkDailyMax(
-  project: Project,
-  timetable: Timetable,
-  maps: DerivedMaps,
-  look: NameLookups,
-): Violation[] {
-  const out: Violation[] = [];
-  const reqBySubjectClass = new Map<string, CurriculumRequirement>();
-  for (const r of project.requirements.curriculum) {
-    reqBySubjectClass.set(`${r.classId}#${r.subjectId}`, r);
-  }
-  // count subject-PERIODS per (classId#subjectId#day) — a duration-2 lesson is
-  // two periods of that subject on the day, so count occupied periods, not placements.
-  const counts = new Map<string, { day: Day; classId: Id; subjectId: Id; n: number }>();
-  for (const placement of timetable.placements) {
-    const activity = maps.activityIndex.get(placement.activityId);
-    if (!activity || activity.kind !== "lesson") continue;
-    const lesson: Lesson = activity;
-    const periods = occupiedPeriods(lesson, placement.period).length;
-    const key = `${lesson.classId}#${lesson.subjectId}#${placement.day}`;
-    const cur = counts.get(key);
-    if (cur) cur.n += periods;
-    else counts.set(key, { day: placement.day, classId: lesson.classId, subjectId: lesson.subjectId, n: periods });
-  }
-  for (const { day, classId, subjectId, n } of counts.values()) {
-    const req = reqBySubjectClass.get(`${classId}#${subjectId}`);
-    // H8 is scoped "per requirement" (CONSTRAINTS.md). Without a requirement
-    // there is no cap to enforce — the `default 2` belongs to a requirement
-    // that omits maxPerDay, not a global floor. This keeps H8 coherent with
-    // H7's deferral and avoids false flags on freshly imported real data.
-    if (!req) continue;
-    const maxPerDay = req.maxPerDay ?? 2;
-    if (n > maxPerDay) {
-      out.push({
-        constraintId: "H8",
-        severity: "hard",
-        message: `${cName(look, classId)} has ${n} periods of ${sName(look, subjectId)} on ${day} (max ${maxPerDay}/day).`,
-        slots: [{ classId, day, period: 0 }],
-      });
-    }
-  }
-  return out;
-}
-
-// --- H9: teacher daily load ≤ maxPeriodsPerDay ---
-function checkTeacherLoad(maps: DerivedMaps, look: NameLookups): Violation[] {
+// --- HE4: availability — no teacher in an unavailable slot; non-schedulable never placed ---
+function checkAvailability(maps: DerivedMaps, look: Lookups, profile: Profile): Violation[] {
   const out: Violation[] = [];
   for (const [teacherId, slots] of maps.teacherCells) {
     const teacher = look.teacher.get(teacherId);
     if (!teacher) continue;
-    const perDay = new Map<Day, number>();
+    const blocked = new Set(teacher.unavailable.map((u) => `${u.day}#${u.slot}`));
     for (const occ of slots.values()) {
-      const { day } = occ[0]!;
-      perDay.set(day, (perDay.get(day) ?? 0) + 1);
-    }
-    for (const [day, n] of perDay) {
-      if (n > teacher.maxPeriodsPerDay) {
+      const { day, slot } = occ[0]!;
+      if (!teacher.schedulable) {
         out.push({
-          constraintId: "H9",
+          constraintId: "HE4",
           severity: "hard",
-          message: `${teacher.name} is scheduled ${n} periods on ${day} (max ${teacher.maxPeriodsPerDay}/day).`,
-          slots: [{ teacherId, day, period: 0 }],
+          message: `${teacher.name} is not a schedulable teacher but is placed at ${at(profile, day, slot)}.`,
+          slots: [{ teacherId, day, slot }],
+        });
+      } else if (blocked.has(`${day}#${slot}`)) {
+        out.push({
+          constraintId: "HE4",
+          severity: "hard",
+          message: `${teacher.name} is scheduled at ${at(profile, day, slot)} but is unavailable then.`,
+          slots: [{ teacherId, day, slot }],
         });
       }
     }
@@ -265,55 +146,85 @@ function checkTeacherLoad(maps: DerivedMaps, look: NameLookups): Violation[] {
   return out;
 }
 
-/** Run all implemented hard constraints plus enabled "must" rules.
- * Pure; sorted by constraintId for stability. */
+// --- HE5 (fixed slot) + HE7 (duration fit): every placement lands on teaching
+// slots and fits the day. A start on Assembly/Recess is HE5; an overflow is HE7. ---
+function checkPlacementBounds(
+  timetable: Timetable,
+  maps: DerivedMaps,
+  look: Lookups,
+  profile: Profile,
+): Violation[] {
+  const out: Violation[] = [];
+  for (const placement of timetable.placements) {
+    const event = maps.eventIndex.get(placement.eventId);
+    if (!event) continue;
+    if (!isTeachingSlot(profile, placement.slot)) {
+      out.push({
+        constraintId: "HE5",
+        severity: "hard",
+        message: `${sName(look, event.subjectId)} is placed on ${at(profile, placement.day, placement.slot)}, which is not a teaching period.`,
+        slots: [{ eventId: event.id, day: placement.day, slot: placement.slot }],
+      });
+      continue;
+    }
+    if (occupiedSlots(profile, placement.slot, event.duration) === null) {
+      out.push({
+        constraintId: "HE7",
+        severity: "hard",
+        message: `${sName(look, event.subjectId)} at ${at(profile, placement.day, placement.slot)} runs past the end of the day (${event.duration} periods don't fit).`,
+        slots: [{ eventId: event.id, day: placement.day, slot: placement.slot }],
+      });
+    }
+  }
+  return out;
+}
+
+// --- HE6: event integrity — joint/team/normal events are well-formed ---
+function checkEventIntegrity(project: Project, look: Lookups): Violation[] {
+  const out: Violation[] = [];
+  const bad = (e: TimetableEvent, why: string): Violation => ({
+    constraintId: "HE6",
+    severity: "hard",
+    message: `${sName(look, e.subjectId)} event (${e.type}) is malformed: ${why}.`,
+    slots: [{ eventId: e.id, day: "Mon", slot: 0 }],
+  });
+  for (const e of project.events) {
+    if (e.type === "normal" && e.classIds.length !== 1) {
+      out.push(bad(e, "a normal lesson must have exactly one class"));
+    } else if (e.type === "joint_class" && (e.classIds.length < 2 || e.teacherIds.length < 1)) {
+      out.push(bad(e, "a joint class needs ≥2 classes and a teacher"));
+    } else if (e.type === "team_block" && (e.classIds.length < 2 || e.teacherIds.length < 2)) {
+      out.push(bad(e, "a team block needs ≥2 classes and ≥2 teachers"));
+    } else if (e.classIds.length === 0) {
+      out.push(bad(e, "an event must have at least one class"));
+    }
+  }
+  return out;
+}
+
+/** Run all implemented event-model hard constraints. Pure; sorted for stability. */
 export function validate(project: Project, timetable: Timetable): Violation[] {
+  const profile = findProfile(project, timetable);
+  if (!profile) {
+    return [
+      {
+        constraintId: "HE0",
+        severity: "hard",
+        message: `Timetable "${timetable.name}" references an unknown profile.`,
+        slots: [],
+      },
+    ];
+  }
   const look = buildLookups(project);
   const maps = deriveMaps(project, timetable);
   const violations: Violation[] = [
-    ...checkTeacherClash(maps, look),
-    ...checkClassClash(maps, look),
-    ...checkBounds(project, timetable, maps, look),
-    ...checkAvailability(maps, look),
-    ...checkQualified(timetable, maps, look),
-    ...checkDailyMax(project, timetable, maps, look),
-    ...checkTeacherLoad(maps, look),
-    ...mustRuleViolations(project, timetable),
+    ...checkClashes(maps, look, profile),
+    ...checkQualified(timetable, maps, look, profile),
+    ...checkAvailability(maps, look, profile),
+    ...checkPlacementBounds(timetable, maps, look, profile),
+    ...checkEventIntegrity(project, look),
+    ...evaluateRules(project, timetable), // R1–R15 (RB6): must→hard, prefer→soft
   ];
   violations.sort((a, b) => a.constraintId.localeCompare(b.constraintId));
   return violations;
-}
-
-// --- H7 quota status (not a violation until generation; M3) ---
-export interface QuotaStatus {
-  requirementId: Id;
-  classId: Id;
-  subjectId: Id;
-  required: number;
-  placed: number;
-  status: "ok" | "short" | "excess";
-}
-
-export function quotaStatus(project: Project, timetable: Timetable): QuotaStatus[] {
-  const maps = deriveMaps(project, timetable);
-  const placedCount = new Map<string, number>();
-  for (const placement of timetable.placements) {
-    const activity = maps.activityIndex.get(placement.activityId);
-    if (!activity || activity.kind !== "lesson") continue;
-    const key = `${activity.classId}#${activity.subjectId}`;
-    placedCount.set(key, (placedCount.get(key) ?? 0) + 1);
-  }
-  return project.requirements.curriculum.map((r) => {
-    const placed = placedCount.get(`${r.classId}#${r.subjectId}`) ?? 0;
-    const status: QuotaStatus["status"] =
-      placed === r.periodsPerWeek ? "ok" : placed < r.periodsPerWeek ? "short" : "excess";
-    return {
-      requirementId: r.id,
-      classId: r.classId,
-      subjectId: r.subjectId,
-      required: r.periodsPerWeek,
-      placed,
-      status,
-    };
-  });
 }

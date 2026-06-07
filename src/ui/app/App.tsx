@@ -1,282 +1,224 @@
-import { useEffect, useState } from "react";
+// RB2 single-screen editor. The app opens to the real timetable; click any class
+// cell to get the legal-only picker (it can only place clash-free, qualified
+// lessons). Class and Teacher views are projections of one store, so an edit in one
+// shows in the other. Global undo. RB2 niceties (ghost autocomplete, drag-swap,
+// richer health) layer on next.
+
+import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
+import { useMemo, useState } from "react";
+import { validate } from "../../domain/validate";
+import type { Day } from "../../domain/types";
+import { runFill } from "../../solver/fillClient";
+import type { FillResult } from "../../solver/fill";
 import { useProjectStore } from "../../store/projectStore";
-import { useEditorStore } from "../../store/editorStore";
-import { useUiStore } from "../../store/uiStore";
-import { useDerived } from "./hooks";
-import { useHashRoute } from "./useHashRoute";
-import { Sidebar } from "./Sidebar";
-import { Tour } from "./Tour";
-import { nextStep } from "../../solver/guidance";
-import { GridWorkspace } from "./GridWorkspace";
-import { DraftSwitcher } from "./DraftSwitcher";
-import { CompleteButton } from "../solverui/CompleteButton";
-import { CandidateCompare } from "../solverui/CandidateCompare";
-import { SubstitutionView } from "../substitution/SubstitutionView";
-import { ExportImport } from "../io/ExportImport";
-import { EmptyState } from "./EmptyState";
-import { RecoveryScreen } from "./RecoveryScreen";
-import { SetupWizard } from "../manage/SetupWizard";
-import { QuotaMatrix } from "../manage/QuotaMatrix";
-import { ClassesPage, TeachersPage, SettingsPage, BlocksPage } from "../manage/ManagePages";
-import { RulesPage } from "../manage/RulesPage";
+import { CellPicker } from "../editor/CellPicker";
+import { TeacherGrid } from "../grid/TeacherGrid";
+import { WeekGrid } from "../grid/WeekGrid";
+import { InsightsView } from "../insights/InsightsView";
+import { FillReview } from "../panels/FillReview";
+import { ClassHealth, TeacherLoad } from "../panels/Insights";
+import { IssuesPanel } from "../panels/Issues";
+import { RulesPanel } from "../panels/RulesPanel";
+import { ReportsView } from "../reports/ReportsView";
+import { ToolsView } from "../tools/ToolsView";
 
-export function App() {
-  const init = useProjectStore((s) => s.init);
-  const loadDemo = useProjectStore((s) => s.loadDemo);
-  const initialized = useProjectStore((s) => s.initialized);
-  const storageStatus = useProjectStore((s) => s.storageStatus);
-  const saveFailed = useProjectStore((s) => s.saveFailed);
-  const bundledStale = useProjectStore((s) => s.bundledStale);
-  const adoptBundled = useProjectStore((s) => s.adoptBundled);
-  const dismissStale = useProjectStore((s) => s.dismissStale);
-  const restorePrevious = useProjectStore((s) => s.restorePrevious);
-  const project = useProjectStore((s) => s.project);
-  const [undoKey, setUndoKey] = useState<string | null>(null);
-  const derived = useDerived();
-  const [view, navigate] = useHashRoute();
-  const [showGenerate, setShowGenerate] = useState(false);
-  const [showIO, setShowIO] = useState(false);
-  const [showWizard, setShowWizard] = useState(false);
-  const { past, future } = useEditorStore();
-  const { undo, redo } = useEditorStore.getState();
-  const advanced = useUiStore((s) => s.advanced);
-  const toggleAdvanced = useUiStore((s) => s.toggleAdvanced);
+type View = "class" | "teacher" | "insights" | "rules" | "reports" | "tools";
 
-  useEffect(() => {
-    void init();
-  }, [init]);
+export function App(): React.ReactElement {
+  const { project, timetableId, place, clear, tryDrop, applyFix, addRule, toggleRule, removeRule, undo, past } = useProjectStore();
+  const timetable = project.timetables.find((t) => t.id === timetableId)!;
 
-  // Storage wedged/erroring — show a recovery screen, never an endless spinner.
-  if (storageStatus === "error") {
-    return <RecoveryScreen variant="storage-error" />;
-  }
-  if (!initialized) {
-    // Bounded: init() always settles within the storage timeout (~3s) and flips
-    // this to ready/error, so this spinner can't linger.
-    return <div className="p-6 text-slate-500">Loading…</div>;
-  }
-  if (!project) {
-    return (
-      <>
-        <EmptyState
-          onSetup={() => setShowWizard(true)}
-          onImport={() => setShowIO(true)}
-          onDemo={loadDemo}
-        />
-        {showWizard && <SetupWizard onClose={() => setShowWizard(false)} />}
-        {showIO && <ExportImport onClose={() => setShowIO(false)} />}
-      </>
+  const [view, setView] = useState<View>("class");
+  const [classId, setClassId] = useState(project.classes[0]!.id);
+  const [teacherId, setTeacherId] = useState(project.teachers.find((t) => t.schedulable)!.id);
+  const [cell, setCell] = useState<{ day: Day; slot: number } | null>(null);
+  const [flash, setFlash] = useState<string | null>(null);
+  const [fillResult, setFillResult] = useState<FillResult | null>(null);
+  const [fillSeed, setFillSeed] = useState(1);
+  const [filling, setFilling] = useState(false);
+
+  const onFillGaps = async () => {
+    setFilling(true);
+    setFlash(null);
+    const result = await runFill(project, timetableId, fillSeed);
+    setFilling(false);
+    if (result.added.length === 0) {
+      setFlash("No gaps to fill — the timetable is already complete.");
+      return;
+    }
+    setFillResult(result);
+  };
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+  const openCell = (day: Day, slot: number) => { setFlash(null); setCell({ day, slot }); };
+
+  const parseCell = (id: string | number) => {
+    const [day, slot] = String(id).split("#");
+    return { day: day as Day, slot: Number(slot) };
+  };
+  const handleDragEnd = (e: DragEndEvent) => {
+    if (!e.over) return;
+    const r = tryDrop({ classId, ...parseCell(e.active.id) }, { classId, ...parseCell(e.over.id) });
+    setCell(null);
+    setFlash(
+      r === "swapped" ? "Swapped — both lessons stay valid." : r === "moved" ? "Moved." : "Can’t drop there — it would clash.",
     );
-  }
-  if (!derived) {
-    // Project loaded but its active timetable is missing (corrupt/truncated
-    // save). Don't strand on a spinner — offer backup + start-fresh.
-    return <RecoveryScreen variant="corrupt-data" project={project} />;
-  }
-  const { timetable, violations, maps, quota } = derived;
-  const hardCount = violations.filter((v) => v.severity === "hard").length;
-  const days = project.profiles.find((p) => p.id === timetable.profileId)?.days ?? [];
-  const hint = nextStep(project, timetable.id, hardCount);
-  const onHint = () => {
-    if (!hint) return;
-    if (hint.cta === "Create timetable") setShowGenerate(true);
-    else navigate(hint.view);
   };
-  const onUpdateBundled = async () => {
-    const ok = await adoptBundled();
-    if (ok) setUndoKey(useProjectStore.getState().lastPreviousKey);
-  };
-  const onUndoUpdate = async () => {
-    if (undoKey) await restorePrevious(undoKey);
-    setUndoKey(null);
-  };
+
+  const clashCount = useMemo(
+    () => validate(project, timetable).filter((v) => v.severity === "hard").length,
+    [project, timetable],
+  );
+
+  const tabBtn = (v: View) =>
+    `rounded px-3 py-1 text-sm ${view === v ? "bg-slate-800 text-white" : "bg-slate-100 text-slate-700"}`;
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
-      <div className="app-shell">
-      {saveFailed && (
-        <div
-          role="alert"
-          className="no-print flex flex-wrap items-center justify-between gap-2 bg-amber-100 px-4 py-2 text-sm text-amber-900 sm:px-6"
-        >
-          <span>
-            Your changes aren't being saved to this browser right now. Download a backup so you
-            don't lose your work.
-          </span>
-          <button
-            type="button"
-            onClick={() => setShowIO(true)}
-            className="rounded border border-amber-400 bg-white px-2 py-1 font-medium hover:bg-amber-50"
-          >
-            Download a backup
-          </button>
-        </div>
-      )}
-      {bundledStale && (
-        <div
-          role="alert"
-          className="no-print flex flex-wrap items-center justify-between gap-2 bg-indigo-100 px-4 py-2 text-sm text-indigo-900 sm:px-6"
-        >
-          <span>
-            The built-in school timetable has been updated. Load the latest? Your current
-            timetable is kept as a draft you can restore anytime.
-          </span>
-          <div className="flex shrink-0 gap-2">
-            <button
-              type="button"
-              onClick={() => void onUpdateBundled()}
-              className="rounded bg-indigo-600 px-2 py-1 font-medium text-white hover:bg-indigo-700"
-            >
-              Update timetable
-            </button>
-            <button
-              type="button"
-              onClick={dismissStale}
-              className="rounded border border-indigo-400 bg-white px-2 py-1 font-medium hover:bg-indigo-50"
-            >
-              Not now
-            </button>
+    <div className="min-h-screen bg-white font-sans text-slate-800">
+      <div className="mx-auto max-w-[1280px] p-4">
+        <header className="mb-4 flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h1 className="text-xl font-semibold">{project.school.name}</h1>
+            <p className="text-sm text-slate-500">Real 2026-27 timetable · 8 periods · Mon–Sat</p>
           </div>
-        </div>
-      )}
-      {undoKey && (
-        <div
-          role="status"
-          className="no-print flex flex-wrap items-center justify-between gap-2 bg-emerald-100 px-4 py-2 text-sm text-emerald-900 sm:px-6"
-        >
-          <span>
-            Updated to the latest school timetable. Your previous timetable is saved as a draft.
-          </span>
-          <div className="flex shrink-0 gap-2">
+          <div className="flex items-center gap-2">
+            <span
+              className={`rounded-full px-3 py-1 text-sm font-medium ${
+                clashCount === 0 ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"
+              }`}
+            >
+              {clashCount === 0 ? "All clear" : `${clashCount} to fix`}
+            </span>
             <button
-              type="button"
-              onClick={() => void onUndoUpdate()}
-              className="rounded border border-emerald-500 bg-white px-2 py-1 font-medium hover:bg-emerald-50"
+              onClick={onFillGaps}
+              disabled={filling || fillResult !== null}
+              className="rounded border border-sky-300 bg-sky-50 px-3 py-1 text-sm text-sky-700 hover:bg-sky-100 disabled:opacity-40"
+            >
+              {filling ? "Filling…" : "Fill the gaps"}
+            </button>
+            <button
+              onClick={undo}
+              disabled={past.length === 0}
+              className="rounded border border-slate-300 px-3 py-1 text-sm disabled:opacity-40"
             >
               Undo
             </button>
-            <button
-              type="button"
-              onClick={() => setUndoKey(null)}
-              aria-label="Dismiss"
-              className="rounded border border-emerald-400 bg-white px-2 py-1 font-medium hover:bg-emerald-50"
-            >
-              Dismiss
-            </button>
           </div>
-        </div>
-      )}
-      {hint && (
-        <button
-          type="button"
-          onClick={onHint}
-          className="no-print flex w-full items-center justify-between gap-2 border-b border-indigo-100 bg-indigo-50 px-4 py-1.5 text-left text-sm text-indigo-900 hover:bg-indigo-100 sm:px-6"
-        >
-          <span>
-            <span className="font-medium">Next step:</span> {hint.message}
-          </span>
-          <span className="shrink-0 font-medium text-indigo-700">{hint.cta} →</span>
-        </button>
-      )}
-      <header className="no-print flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-slate-200 bg-white px-4 py-3 sm:px-6">
-        <div className="flex items-center gap-3">
-          <div>
-            <h1 className="text-lg font-semibold">Timetable Studio</h1>
-            <p className="text-xs text-slate-500">
-              {project.school.name} ·{" "}
-              {hardCount === 0 ? (
-                <span className="text-emerald-600">Ready — no conflicts</span>
-              ) : (
-                <span className="text-hard">
-                  {hardCount} {hardCount === 1 ? "conflict" : "conflicts"} to fix
-                </span>
-              )}
-            </p>
+        </header>
+
+        <div className="mb-3 flex flex-wrap items-center gap-3">
+          <div className="flex gap-1">
+            <button className={tabBtn("class")} onClick={() => { setView("class"); setCell(null); }}>By class</button>
+            <button className={tabBtn("teacher")} onClick={() => { setView("teacher"); setCell(null); }}>By teacher</button>
+            <button className={tabBtn("insights")} onClick={() => { setView("insights"); setCell(null); }}>Insights</button>
+            <button className={tabBtn("rules")} onClick={() => { setView("rules"); setCell(null); }}>Rules</button>
+            <button className={tabBtn("reports")} onClick={() => { setView("reports"); setCell(null); }}>Reports</button>
+            <button className={tabBtn("tools")} onClick={() => { setView("tools"); setCell(null); }}>Tools</button>
           </div>
-          <DraftSwitcher />
-        </div>
-        <div className="flex flex-wrap items-center gap-2 text-sm">
-          <CompleteButton />
-          <button
-            type="button"
-            onClick={() => setShowGenerate(true)}
-            className="rounded bg-indigo-600 px-3 py-1 font-medium text-white hover:bg-indigo-700"
-          >
-            Create timetables
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowIO(true)}
-            className="rounded border border-slate-300 px-3 py-1 hover:bg-slate-50"
-          >
-            📤 File
-          </button>
-          <button
-            type="button"
-            onClick={() => window.print()}
-            className="rounded border border-slate-300 px-3 py-1 hover:bg-slate-50"
-          >
-            🖨 Print
-          </button>
-          <button
-            type="button"
-            onClick={toggleAdvanced}
-            aria-pressed={advanced}
-            title="Show developer details (codes, seeds, scores)"
-            className={`rounded border px-3 py-1 ${advanced ? "border-slate-800 bg-slate-800 text-white" : "border-slate-300 hover:bg-slate-50"}`}
-          >
-            Advanced
-          </button>
-          <span className="mx-1 h-5 w-px bg-slate-200" />
-          <button
-            type="button"
-            onClick={undo}
-            disabled={past.length === 0}
-            className="rounded border border-slate-300 px-2 py-1 disabled:opacity-40"
-          >
-            ↶ Undo
-          </button>
-          <button
-            type="button"
-            onClick={redo}
-            disabled={future.length === 0}
-            className="rounded border border-slate-300 px-2 py-1 disabled:opacity-40"
-          >
-            ↷ Redo
-          </button>
-        </div>
-      </header>
-
-      <div className="sm:flex">
-        <Sidebar view={view} onNavigate={navigate} />
-        <main className="min-w-0 flex-1">
-          {view === "timetable" && (
-            <GridWorkspace
-              project={project}
-              timetable={timetable}
-              violations={violations}
-              maps={maps}
-              quota={quota}
-              days={days}
-            />
+          {["insights", "rules", "reports", "tools"].includes(view) ? null : view === "class" ? (
+            <label className="flex items-center gap-2 text-sm">
+              <span className="text-slate-500">Class</span>
+              <select className="rounded border border-slate-300 px-2 py-1" value={classId} onChange={(e) => { setClassId(e.target.value); setCell(null); }}>
+                {project.classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+              <ClassHealth project={project} timetable={timetable} classId={classId} />
+            </label>
+          ) : (
+            <label className="flex items-center gap-2 text-sm">
+              <span className="text-slate-500">Teacher</span>
+              <select className="rounded border border-slate-300 px-2 py-1" value={teacherId} onChange={(e) => setTeacherId(e.target.value)}>
+                {project.teachers.filter((t) => t.schedulable).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+              <TeacherLoad project={project} timetable={timetable} teacherId={teacherId} />
+            </label>
           )}
-          {view === "teachers" && <TeachersPage />}
-          {view === "classes" && <ClassesPage />}
-          {view === "quotas" && <QuotaMatrix />}
-          {view === "blocks" && <BlocksPage />}
-          {view === "rules" && <RulesPage />}
-          {view === "substitutions" && <SubstitutionView />}
-          {view === "settings" && (
-            <SettingsPage onStartDifferent={() => setShowWizard(true)} />
-          )}
-        </main>
-      </div>
-      </div>
+        </div>
 
-      {showGenerate && <CandidateCompare onClose={() => setShowGenerate(false)} />}
-      {showIO && <ExportImport onClose={() => setShowIO(false)} />}
-      {showWizard && <SetupWizard onClose={() => setShowWizard(false)} />}
-      <Tour />
+        {fillResult && (
+          <FillReview
+            project={project}
+            result={fillResult}
+            onAccept={() => {
+              const n = fillResult.added.length;
+              applyFix(fillResult.project);
+              setFillResult(null);
+              setFillSeed((s) => s + 1);
+              setFlash(`Filled ${n} ${n === 1 ? "gap" : "gaps"} — you can Undo it.`);
+            }}
+            onReject={() => {
+              setFillResult(null);
+              setFillSeed((s) => s + 1); // a fresh seed → "Fill the gaps" can try a different arrangement
+              setFlash("Discarded the suggested fill.");
+            }}
+          />
+        )}
+
+        <IssuesPanel
+          project={project}
+          timetable={timetable}
+          onJump={(c, day, slot) => { setView("class"); setClassId(c); setFlash(null); setCell({ day, slot }); }}
+          onFix={(next) => { applyFix(next); setCell(null); setFlash("Fixed — and you can Undo it."); }}
+        />
+
+        {flash && (
+          <p className="mb-2 rounded bg-slate-100 px-3 py-1.5 text-sm text-slate-600" role="status">{flash}</p>
+        )}
+
+        <div className="flex flex-col gap-4 lg:flex-row">
+          <div className="min-w-0 flex-1 overflow-auto">
+            {view === "class" ? (
+              <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+                <WeekGrid
+                  project={project}
+                  timetable={timetable}
+                  classId={classId}
+                  selected={cell}
+                  onSelectCell={openCell}
+                />
+              </DndContext>
+            ) : view === "teacher" ? (
+              <TeacherGrid project={project} timetable={timetable} teacherId={teacherId} />
+            ) : view === "insights" ? (
+              <InsightsView project={project} timetable={timetable} />
+            ) : view === "reports" ? (
+              <ReportsView project={project} timetable={timetable} timetableId={timetableId} />
+            ) : view === "tools" ? (
+              <ToolsView project={project} timetable={timetable} />
+            ) : (
+              <RulesPanel
+                project={project}
+                timetable={timetable}
+                onAdd={(r) => { addRule(r); setFlash("Rule added — you can Undo it."); }}
+                onToggle={toggleRule}
+                onRemove={removeRule}
+              />
+            )}
+          </div>
+          {view === "class" && cell && (
+            <div className="lg:w-80">
+              <CellPicker
+                project={project}
+                timetableId={timetableId}
+                classId={classId}
+                day={cell.day}
+                slot={cell.slot}
+                onPlace={(subjectId, teacherIds) => { place(classId, cell.day, cell.slot, subjectId, teacherIds); setCell(null); }}
+                onClear={() => { clear(classId, cell.day, cell.slot); setCell(null); }}
+                onSwap={(target) => {
+                  const r = tryDrop({ classId, day: cell.day, slot: cell.slot }, { classId, ...target });
+                  setCell(null);
+                  setFlash(r === "swapped" ? "Swapped — both lessons stay valid." : r === "moved" ? "Moved." : "Couldn’t swap.");
+                }}
+                onClose={() => setCell(null)}
+              />
+            </div>
+          )}
+        </div>
+
+        <p className="mt-3 text-xs text-slate-400">
+          Amber = ELGA team block · violet = combined senior class. Click a class cell to edit (only legal options shown), or drag a lesson onto another slot to swap.
+        </p>
+      </div>
     </div>
   );
 }
