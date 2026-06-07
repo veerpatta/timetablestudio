@@ -15,6 +15,7 @@ import { CellPicker } from "../editor/CellPicker";
 import { TeacherGrid } from "../grid/TeacherGrid";
 import { WeekGrid } from "../grid/WeekGrid";
 import { InsightsView } from "../insights/InsightsView";
+import { ManageView } from "../manage/ManageView";
 import { FillReview } from "../panels/FillReview";
 import { ClassHealth, TeacherLoad } from "../panels/Insights";
 import { IssuesPanel } from "../panels/Issues";
@@ -22,15 +23,21 @@ import { RulesPanel } from "../panels/RulesPanel";
 import { ReportsView } from "../reports/ReportsView";
 import { ToolsView } from "../tools/ToolsView";
 
-type View = "class" | "teacher" | "insights" | "rules" | "reports" | "tools";
+type View = "class" | "teacher" | "setup" | "insights" | "rules" | "reports" | "tools";
 
 export function App(): React.ReactElement {
   const { project, timetableId, place, clear, tryDrop, applyFix, addRule, toggleRule, removeRule, undo, past } = useProjectStore();
   const timetable = project.timetables.find((t) => t.id === timetableId)!;
 
   const [view, setView] = useState<View>("class");
-  const [classId, setClassId] = useState(project.classes[0]!.id);
-  const [teacherId, setTeacherId] = useState(project.teachers.find((t) => t.schedulable)!.id);
+  const [classSel, setClassId] = useState(project.classes[0]!.id);
+  const [teacherSel, setTeacherId] = useState(project.teachers.find((t) => t.schedulable)!.id);
+  // A class/teacher can be removed in Setup; fall back to the first so the grid never
+  // points at a vanished id.
+  const classId = project.classes.some((c) => c.id === classSel) ? classSel : project.classes[0]!.id;
+  const teacherId = project.teachers.some((t) => t.id === teacherSel && t.schedulable)
+    ? teacherSel
+    : project.teachers.find((t) => t.schedulable)!.id;
   const [cell, setCell] = useState<{ day: Day; slot: number } | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
   const [fillResult, setFillResult] = useState<FillResult | null>(null);
@@ -110,12 +117,13 @@ export function App(): React.ReactElement {
           <div className="flex gap-1">
             <button className={tabBtn("class")} onClick={() => { setView("class"); setCell(null); }}>By class</button>
             <button className={tabBtn("teacher")} onClick={() => { setView("teacher"); setCell(null); }}>By teacher</button>
+            <button className={tabBtn("setup")} onClick={() => { setView("setup"); setCell(null); }}>Setup</button>
             <button className={tabBtn("insights")} onClick={() => { setView("insights"); setCell(null); }}>Insights</button>
             <button className={tabBtn("rules")} onClick={() => { setView("rules"); setCell(null); }}>Rules</button>
             <button className={tabBtn("reports")} onClick={() => { setView("reports"); setCell(null); }}>Reports</button>
             <button className={tabBtn("tools")} onClick={() => { setView("tools"); setCell(null); }}>Tools</button>
           </div>
-          {["insights", "rules", "reports", "tools"].includes(view) ? null : view === "class" ? (
+          {["setup", "insights", "rules", "reports", "tools"].includes(view) ? null : view === "class" ? (
             <label className="flex items-center gap-2 text-sm">
               <span className="text-slate-500">Class</span>
               <select className="rounded border border-slate-300 px-2 py-1" value={classId} onChange={(e) => { setClassId(e.target.value); setCell(null); }}>
@@ -178,6 +186,8 @@ export function App(): React.ReactElement {
               </DndContext>
             ) : view === "teacher" ? (
               <TeacherGrid project={project} timetable={timetable} teacherId={teacherId} />
+            ) : view === "setup" ? (
+              <ManageView project={project} timetable={timetable} />
             ) : view === "insights" ? (
               <InsightsView project={project} timetable={timetable} />
             ) : view === "reports" ? (

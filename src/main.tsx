@@ -1,10 +1,15 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { App } from "./ui/app/App";
+import { enablePersistence } from "./store/projectStore";
 import "./index.css";
 
 const root = document.getElementById("root");
 if (!root) throw new Error("Root element #root not found");
+
+// Load any saved project and write-through on every change (C1: edits survive reload).
+// Best-effort: the app renders from the bundled seed first, then swaps in saved data.
+void enablePersistence();
 
 ReactDOM.createRoot(root).render(
   <React.StrictMode>
