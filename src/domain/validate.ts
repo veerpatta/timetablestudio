@@ -13,6 +13,7 @@
 
 import { distinctEventIds, deriveMaps, findProfile, type DerivedMaps } from "./derive";
 import { isTeachingSlot, occupiedSlots, slotLabel } from "./profile";
+import { evaluateRules } from "./rules";
 import type {
   Day,
   Id,
@@ -222,6 +223,7 @@ export function validate(project: Project, timetable: Timetable): Violation[] {
     ...checkAvailability(maps, look, profile),
     ...checkPlacementBounds(timetable, maps, look, profile),
     ...checkEventIntegrity(project, look),
+    ...evaluateRules(project, timetable), // R1–R15 (RB6): must→hard, prefer→soft
   ];
   violations.sort((a, b) => a.constraintId.localeCompare(b.constraintId));
   return violations;
