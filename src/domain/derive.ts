@@ -1,121 +1,68 @@
-// Derived selectors over a Timetable. PURE — no DOM/IndexedDB/window.
+// Derived selectors over a Timetable (PURE — no DOM/IndexedDB/window).
 //
-// A Placement references an Activity by id and pins it to (day, startPeriod).
-// We "expand" placements into atomic per-(entity, day, period) occupancies so
-// validation can detect clashes uniformly. A BlockActivity expands to one class
-// occupancy per (class × period in range) and one teacher occupancy per
-// (teacher × period in range) — atomicity is structural (AGENTS.md §6, H3).
+// A Placement pins an event to (day, startSlot). We expand placements into atomic
+// per-(entity, day, slot) occupancies so the three views (class / teacher / day)
+// and clash detection all read one structure. Each occupancy carries its
+// `eventId` — that is what makes joint_class / team_block overlaps legal: a clash
+// is >1 DISTINCT eventId in a slot, never just >1 occupancy (docs/REBUILD.md §clash).
 
+import { occupiedSlots } from "./profile";
 import type {
-  Activity,
   Day,
   Id,
   Placement,
+  Profile,
   Project,
   Timetable,
+  TimetableEvent,
 } from "./types";
 
-/** A single class's occupancy of one (day, period) by one placement. */
-export interface ClassOccupancy {
-  classId: Id;
+/** One entity's occupancy of one (day, slot) by one placement of one event. */
+export interface Occupancy {
   day: Day;
-  period: number;
-  activityId: Id;
-  activity: Activity;
+  slot: number;
+  eventId: Id;
+  event: TimetableEvent;
   pinned: boolean;
 }
 
-/** A single teacher's occupancy of one (day, period) by one placement. */
-export interface TeacherOccupancy {
-  teacherId: Id;
-  day: Day;
-  period: number;
-  activityId: Id;
-  activity: Activity;
-  pinned: boolean;
-}
-
-/** `${day}#${period}` */
+/** `${day}#${slot}` */
 export type SlotKey = string;
-export const slotKey = (day: Day, period: number): SlotKey => `${day}#${period}`;
+export const slotKey = (day: Day, slot: number): SlotKey => `${day}#${slot}`;
 
-/** The periods a placement occupies: the run for a block, [p] for a single
- * lesson, [p, p+1] for a duration-2 (double-period) lesson. Duration-2 lessons
- * are placed/moved/removed as one unit and clash-checked like a mini-block. */
-export function occupiedPeriods(activity: Activity, startPeriod: number): number[] {
-  const span = activity.kind === "block" ? activity.length : activity.duration ?? 1;
-  const out: number[] = [];
-  for (let p = startPeriod; p < startPeriod + span; p++) out.push(p);
-  return out;
-}
-
-export function buildActivityIndex(project: Project): Map<Id, Activity> {
-  const index = new Map<Id, Activity>();
-  for (const a of project.activities) index.set(a.id, a);
+export function buildEventIndex(project: Project): Map<Id, TimetableEvent> {
+  const index = new Map<Id, TimetableEvent>();
+  for (const e of project.events) index.set(e.id, e);
   return index;
 }
 
-/** Expand one placement into its class and teacher occupancies. */
-export function expandPlacement(
+export function findProfile(project: Project, timetable: Timetable): Profile | undefined {
+  return project.profiles.find((p) => p.id === timetable.profileId);
+}
+
+/**
+ * The slot indices a placement occupies, or null if it overflows the day / starts
+ * on a non-teaching slot. Reads the event's `duration`; skips fixed slots (Recess).
+ */
+export function placementSlots(
+  profile: Profile,
   placement: Placement,
-  activity: Activity,
-): { classCells: ClassOccupancy[]; teacherCells: TeacherOccupancy[] } {
-  const periods = occupiedPeriods(activity, placement.period);
-  // De-dupe ids within ONE activity so each placement contributes at most one
-  // occupancy per (entity, slot). Clash detection then reduces to "more than one
-  // occupancy in a slot" without false positives from a malformed id list.
-  const classIds = [
-    ...new Set(activity.kind === "block" ? activity.classIds : [activity.classId]),
-  ];
-  const teacherIds = [...new Set(activity.teacherIds)];
-
-  const classCells: ClassOccupancy[] = [];
-  for (const classId of classIds) {
-    for (const period of periods) {
-      classCells.push({
-        classId,
-        day: placement.day,
-        period,
-        activityId: activity.id,
-        activity,
-        pinned: placement.pinned,
-      });
-    }
-  }
-
-  // Teacher occupancy is per (teacher × period), once — independent of class
-  // count (an ELGA block occupies each teacher once per period, not 5×).
-  const teacherCells: TeacherOccupancy[] = [];
-  for (const teacherId of teacherIds) {
-    for (const period of periods) {
-      teacherCells.push({
-        teacherId,
-        day: placement.day,
-        period,
-        activityId: activity.id,
-        activity,
-        pinned: placement.pinned,
-      });
-    }
-  }
-
-  return { classCells, teacherCells };
+  event: TimetableEvent,
+): number[] | null {
+  return occupiedSlots(profile, placement.slot, event.duration);
 }
 
 export interface DerivedMaps {
-  /** classId -> slotKey -> occupancies (length > 1 ⇒ H2 class clash). */
-  classCells: Map<Id, Map<SlotKey, ClassOccupancy[]>>;
-  /** teacherId -> slotKey -> occupancies (length > 1 ⇒ H1 teacher clash). */
-  teacherCells: Map<Id, Map<SlotKey, TeacherOccupancy[]>>;
-  activityIndex: Map<Id, Activity>;
+  /** classId -> slotKey -> occupancies (>1 distinct eventId ⇒ HE2 class clash). */
+  classCells: Map<Id, Map<SlotKey, Occupancy[]>>;
+  /** teacherId -> slotKey -> occupancies (>1 distinct eventId ⇒ HE1 teacher clash). */
+  teacherCells: Map<Id, Map<SlotKey, Occupancy[]>>;
+  /** day -> slotKey -> placements (the whole-school day view). */
+  daySlots: Map<Day, Map<SlotKey, Placement[]>>;
+  eventIndex: Map<Id, TimetableEvent>;
 }
 
-function pushNested<V>(
-  map: Map<Id, Map<SlotKey, V[]>>,
-  outer: Id,
-  key: SlotKey,
-  value: V,
-): void {
+function pushNested<V>(map: Map<Id, Map<SlotKey, V[]>>, outer: Id, key: SlotKey, value: V): void {
   let inner = map.get(outer);
   if (!inner) {
     inner = new Map();
@@ -126,19 +73,49 @@ function pushNested<V>(
   else inner.set(key, [value]);
 }
 
-/** Build class- and teacher-occupancy maps for a timetable. */
+/** Build class-, teacher-, and day-occupancy maps for a timetable. */
 export function deriveMaps(project: Project, timetable: Timetable): DerivedMaps {
-  const activityIndex = buildActivityIndex(project);
+  const eventIndex = buildEventIndex(project);
+  const profile = findProfile(project, timetable);
   const classCells: DerivedMaps["classCells"] = new Map();
   const teacherCells: DerivedMaps["teacherCells"] = new Map();
+  const daySlots: DerivedMaps["daySlots"] = new Map();
 
   for (const placement of timetable.placements) {
-    const activity = activityIndex.get(placement.activityId);
-    if (!activity) continue; // dangling placement; not derive's job to flag
-    const { classCells: cc, teacherCells: tc } = expandPlacement(placement, activity);
-    for (const c of cc) pushNested(classCells, c.classId, slotKey(c.day, c.period), c);
-    for (const t of tc) pushNested(teacherCells, t.teacherId, slotKey(t.day, t.period), t);
+    const event = eventIndex.get(placement.eventId);
+    if (!event || !profile) continue; // dangling placement / unknown profile
+    const slots = placementSlots(profile, placement, event);
+    if (!slots) continue; // out-of-bounds placement; flagged by validate (HE7)
+
+    const classIds = [...new Set(event.classIds)];
+    const teacherIds = [...new Set(event.teacherIds)];
+
+    for (const slot of slots) {
+      const dayMap = daySlots.get(placement.day) ?? new Map<SlotKey, Placement[]>();
+      const dk = slotKey(placement.day, slot);
+      const dArr = dayMap.get(dk);
+      if (dArr) dArr.push(placement);
+      else dayMap.set(dk, [placement]);
+      daySlots.set(placement.day, dayMap);
+
+      const occ: Occupancy = {
+        day: placement.day,
+        slot,
+        eventId: event.id,
+        event,
+        pinned: placement.pinned,
+      };
+      for (const classId of classIds) pushNested(classCells, classId, dk, occ);
+      // Teacher occupancy is per (teacher × slot), once — an ELGA block occupies
+      // each teacher once per slot, not once per class.
+      for (const teacherId of teacherIds) pushNested(teacherCells, teacherId, dk, occ);
+    }
   }
 
-  return { classCells, teacherCells, activityIndex };
+  return { classCells, teacherCells, daySlots, eventIndex };
+}
+
+/** Distinct eventIds among occupancies — the clash test (>1 ⇒ real clash). */
+export function distinctEventIds(occ: Occupancy[]): Id[] {
+  return [...new Set(occ.map((o) => o.eventId))];
 }

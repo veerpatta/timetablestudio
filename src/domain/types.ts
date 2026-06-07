@@ -1,100 +1,122 @@
-// Canonical domain types — implements docs/DATA_MODEL.md verbatim.
+// Canonical domain types — implements docs/DATA_MODEL.md § "v6 event model" verbatim.
 // This is the ONLY place domain shapes are declared (AGENTS.md §1, §3).
 // Any change here requires editing docs/DATA_MODEL.md in the same commit.
+//
+// v6 REBUILD (2026-06-07): the cell model (Lesson / BlockActivity / per-cell
+// Placement) is gone. The source of truth is now the EVENT model: one
+// TimetableEvent may span many classes AND many teachers. See docs/REBUILD.md.
 
 export type Id = string; // nanoid-style opaque ids
+export type Day = "Mon" | "Tue" | "Wed" | "Thu" | "Fri" | "Sat";
+
+// --- Time grid: a profile is Assembly + N teaching periods + a positioned Recess ---
+
+export interface SlotDef {
+  index: number; // 0 = Assembly, 1..8 teaching, 9 = Recess, etc.
+  label: string; // "Assembly", "P1", "Recess"
+  start: string; // "08:00"
+  end: string; // "08:30"
+  teaching: boolean; // false for Assembly/Recess (engine never fills these)
+}
+
+export interface Profile {
+  id: Id;
+  name: string; // "Regular 2026-27" (default) | "Heatwave"
+  days: Day[]; // Mon–Sat
+  slots: SlotDef[]; // regular = Assembly, P1..P8, Recess
+  isDefault?: boolean;
+}
+
+// --- Core entities ---
 
 export interface Teacher {
   id: Id;
-  name: string; // unique display name, e.g. "Bindu"
-  subjects: Id[]; // subject ids they can teach
-  maxPeriodsPerDay: number; // default 6
-  maxPeriodsPerWeek: number; // default 36
-  unavailable: SlotRef[]; // hard blocks (part-time, duties)
+  name: string;
+  maxPerDay: number;
+  maxPerWeek: number;
+  schedulable: boolean; // Director = false
+  // availability: which (day, teaching-slot) this teacher CANNOT work.
+  // Absent entry = available. Use for Mahesh (narrow) / Anjana (P5–P8 only).
+  unavailable: { day: Day; slot: number }[];
 }
+
+export type Band = "primary" | "middle" | "secondary" | "senior";
 
 export interface SchoolClass {
   id: Id;
   name: string; // "Class 7", "Class 11 Science"
-  group: "primary" | "middle" | "senior";
-  classTeacherId?: Id; // v2: homeroom teacher (powers rule R4)
-  isBoardClass?: boolean; // v2: board-class priority flag (powers rule R9)
+  band: Band;
+  stream?: "Science" | "Commerce" | "Arts";
+  classTeacherId?: Id;
+  isBoardClass?: boolean;
 }
 
 export interface Subject {
   id: Id;
   name: string; // "Maths", "ELGA", "Physics"
-  color?: string; // UI hint
+  bands: Band[]; // scoping; "Science" is 3 subjects in middle, 1 in secondary
+  kind: "academic" | "activity" | "study" | "fixed";
+  // activity = Sports/Robotics/CCS, study = Free/SelfStudy, fixed = Assembly/Recess
+  color?: string;
 }
 
-export interface SlotRef {
-  day: Day;
-  period: number;
-} // period is 1-based
-
-export type Day = "Mon" | "Tue" | "Wed" | "Thu" | "Fri" | "Sat";
-
-// --- Schedule profile (timings are metadata, never columns) ---
-
-export interface ScheduleProfile {
+export interface Room {
   id: Id;
-  name: string; // "heatwave", "winter"
-  days: Day[]; // typically all 6
-  periods: PeriodDef[]; // length 6 currently
-  break?: ProfileBreak; // v2: a positioned break (e.g. after P4, 10:10–10:25)
+  name: string;
+} // lab, ground, robotics — optional on events
+
+// --- THE central concept: one event, possibly many classes AND many teachers ---
+
+export type EventType =
+  | "normal" // 1 class, 1+ teachers
+  | "joint_class" // many classes, 1 teacher (senior combined English/Hindi/Economics)
+  | "team_block" // many classes, many teachers (ELGA)
+  | "self_study"
+  | "free"
+  | "sports"
+  | "robotics"
+  | "ccs"
+  | "notebook_check"
+  | "assembly"
+  | "recess";
+
+export type EventSource = "imported" | "manual" | "generated" | "locked";
+
+export interface TimetableEvent {
+  id: Id;
+  type: EventType;
+  subjectId: Id;
+  classIds: Id[]; // 1..n
+  teacherIds: Id[]; // 0..n (study/free may have 0; team_block has n)
+  roomId?: Id;
+  duration: number; // teaching slots occupied as one unit (1 default, 2 = double)
+  source: EventSource;
+  notes?: string;
 }
 
-export interface PeriodDef {
-  label: string;
-  start: string;
-  end: string;
-} // "07:30"
+export interface Placement {
+  eventId: Id;
+  day: Day;
+  slot: number; // start slot; a duration-2 event also occupies slot+1
+  pinned: boolean; // locked: solver never moves/removes
+}
 
-export interface ProfileBreak {
-  afterPeriod: number; // break sits between this period and the next
-  start: string;
-  end: string;
-} // v2
+// What a teacher CAN teach. The engine may use ONLY these triples.
+export interface Qualification {
+  teacherId: Id;
+  subjectId: Id;
+  classId: Id;
+}
 
-// --- Activities — what occupies cells ---
-
-// A normal single-cell lesson
-export interface Lesson {
-  kind: "lesson";
+// Weekly demand per (class, subject); drives fill + quota checks.
+export interface Requirement {
   id: Id;
   classId: Id;
   subjectId: Id;
-  teacherIds: Id[]; // 1..n (multi-teacher cells allowed)
-  duration?: number; // v2: periods occupied as one unit (1 default, 2 = double period)
-  // A duration-2 lesson placed at (day, p) occupies p and p+1 atomically —
-  // moved/removed as one unit, clash-checked like a 2-period mini-block.
-}
-
-// An atomic multi-class multi-period block (ELGA)
-export interface BlockActivity {
-  kind: "block";
-  id: Id;
-  name: string; // "ELGA"
-  classIds: Id[]; // all 5 primary classes
-  teacherIds: Id[]; // all 5 primary teachers
-  length: number; // consecutive periods, e.g. 3
-  allowedDays?: Day[]; // v2: days the block may run (ELGA = Mon–Thu); powers rule R7
-  fixedStartPeriod?: number; // v2: forced start period (ELGA = P3); powers rule R7
-  // Placement of a block = (day, startPeriod). It fills
-  // [startPeriod, startPeriod+length) for EVERY class in classIds
-  // and occupies EVERY teacher in teacherIds for those periods.
-}
-
-export type Activity = Lesson | BlockActivity;
-
-// --- The timetable ---
-
-// One placement = activity pinned to a slot.
-export interface Placement {
-  activityId: Id;
-  day: Day;
-  period: number; // for blocks: the START period
-  pinned: boolean; // pinned placements are immovable by the solver
+  teacherIds: Id[];
+  periodsPerWeek: number;
+  preferDouble?: boolean;
+  maxPerDay?: number;
 }
 
 export interface Timetable {
@@ -102,54 +124,33 @@ export interface Timetable {
   name: string;
   profileId: Id;
   placements: Placement[];
-  // Derived (never stored): cell map class×day×period -> Activity,
-  // teacher occupancy map teacher×day×period -> Activity.
-  // Build these with selectors in domain/derive.ts.
 }
-
-// --- Requirements (drive generation & quota validation) ---
-
-// "Class 7 needs 5 periods of Maths per week taught by Nidhika"
-export interface CurriculumRequirement {
-  id: Id;
-  classId: Id;
-  subjectId: Id;
-  teacherIds: Id[]; // allowed teachers (usually 1)
-  periodsPerWeek: number;
-  maxPerDay?: number; // default 2
-}
-
-// "ELGA runs Mon/Tue/Wed as a 3-period block starting P3"
-export interface BlockRequirement {
-  id: Id;
-  blockActivityId: Id;
-  occurrences: { day: Day; startPeriod?: number }[]; // startPeriod omitted = solver decides
-}
-
-// --- Project file (persistence unit) ---
 
 export interface Project {
-  schemaVersion: 2;
-  /** v5: the built-in-timetable revision this project was seeded from. Stamped
-   * only on bundled-derived projects (the real VPPS school); absent on
-   * user-built/imported projects. Drives stale-data detection — a stored VPPS
-   * project older than the current bundled version offers a one-click update. */
-  bundledDataVersion?: number;
+  schemaVersion: 6;
+  bundledDataVersion: number; // bump when the built-in 2026-27 timetable changes
   school: { name: string };
+  profiles: Profile[];
   teachers: Teacher[];
   classes: SchoolClass[];
   subjects: Subject[];
-  profiles: ScheduleProfile[];
-  activities: Activity[];
-  requirements: { curriculum: CurriculumRequirement[]; blocks: BlockRequirement[] };
-  rules: Rule[]; // v2: user-configurable constraints (R1–R15)
-  timetables: Timetable[]; // multiple drafts/candidates
+  rooms: Room[];
+  qualifications: Qualification[];
+  requirements: Requirement[];
+  events: TimetableEvent[];
+  rules: Rule[]; // carried from v2 catalog, evaluated on the event model (RB6)
+  timetables: Timetable[];
   activeTimetableId: Id | null;
 }
 
-// --- Rules (v2) — user-configurable constraints, see docs/DATA_MODEL.md ---
+// --- Rules (carried from v2 catalog; re-evaluated on the event model in RB6) ---
 // Discriminated union on `template` keeps params type-safe (no `any`).
 // Each template maps 1:1 to a row of docs/CONSTRAINTS.md § v4 (R1–R15).
+
+export interface SlotRef {
+  day: Day;
+  slot: number;
+}
 
 export type RuleSeverity = "must" | "prefer"; // must = hard, prefer = weighted soft
 export type HalfOfDay = "first" | "second";
@@ -161,100 +162,82 @@ export interface RuleBase {
   weight: number; // soft weight when severity === "prefer"
 }
 
-// R1 "{subject} only in periods {set}"
 export interface R1Rule extends RuleBase {
   template: "R1";
   subjectIds: Id[];
   classIds: Id[];
-  periods: number[];
+  slots: number[];
 }
-// R2 "{subject} never in period {set}"
 export interface R2Rule extends RuleBase {
   template: "R2";
   subjectIds: Id[];
   classIds: Id[];
-  periods: number[];
+  slots: number[];
 }
-// R3 "{subject} in the first/second half of the day"
 export interface R3Rule extends RuleBase {
   template: "R3";
   subjectIds: Id[];
   classIds: Id[];
   half: HalfOfDay;
 }
-// R4 "{teacher} is class teacher of {class} — takes period 1 daily"
-// teacher is read from SchoolClass.classTeacherId; subjectId optionally fixes the P1 subject.
 export interface R4Rule extends RuleBase {
   template: "R4";
   classId: Id;
   subjectId?: Id;
 }
-// R5 "{subject} same period every day in {class}"
 export interface R5Rule extends RuleBase {
   template: "R5";
   classId: Id;
   subjectId: Id;
-  period?: number;
+  slot?: number;
 }
-// R6 "{subject} as a double period ({n}×/week) in {class}"
 export interface R6Rule extends RuleBase {
   template: "R6";
   classId: Id;
   subjectId: Id;
   count: number;
 }
-// R7 "Block {name} runs only on {days}, starting period {p}"
-// days = block.allowedDays, start = block.fixedStartPeriod (structural facts on the block).
 export interface R7Rule extends RuleBase {
   template: "R7";
-  blockId: Id;
+  eventId: Id;
 }
-// R8 "{teacher} not available {slots}" (rule-layer complement to Teacher.unavailable / H5)
 export interface R8Rule extends RuleBase {
   template: "R8";
   teacherId: Id;
   slots: SlotRef[];
 }
-// R9 "{class} is a board class — protect core subjects"
-// gated by SchoolClass.isBoardClass; operationalized as "no non-core subject in P1–3".
 export interface R9Rule extends RuleBase {
   template: "R9";
   classId: Id;
   coreSubjectIds: Id[];
 }
-// R10 "{subject} spread across ≥{n} different days"
 export interface R10Rule extends RuleBase {
   template: "R10";
   subjectId: Id;
   classIds: Id[];
   minDays: number;
 }
-// R11 "Max {n} periods/day of {subject} for {class}"
 export interface R11Rule extends RuleBase {
   template: "R11";
   subjectId: Id;
   classId: Id;
   maxPerDay: number;
 }
-// R12 "{teacher} max {n} periods per day / {m} per week"
 export interface R12Rule extends RuleBase {
   template: "R12";
   teacherId: Id;
   maxPerDay: number;
   maxPerWeek: number;
 }
-// R13 "Teachers' days compact (few free gaps)" (global; prefer)
 export interface R13Rule extends RuleBase {
   template: "R13";
 }
-// R14 "{subject A} before {subject B} on the same day"
 export interface R14Rule extends RuleBase {
   template: "R14";
   classId: Id;
   beforeSubjectId: Id;
   afterSubjectId: Id;
 }
-// R15 "Teacher {T} max {n} consecutive periods"
 export interface R15Rule extends RuleBase {
   template: "R15";
   teacherId: Id;
@@ -283,8 +266,8 @@ export type RuleTemplate = Rule["template"];
 // --- Validation result shape (shared by editor & solver) ---
 
 export interface Violation {
-  constraintId: string; // from docs/CONSTRAINTS.md, e.g. "H1"
+  constraintId: string; // event-model hard ids "HE1".."HE8", or rule template "R4"
   severity: "hard" | "soft";
   message: string; // human-readable, names entities
-  slots: { classId?: Id; teacherId?: Id; day: Day; period: number }[];
+  slots: { classId?: Id; teacherId?: Id; eventId?: Id; day: Day; slot: number }[];
 }

@@ -4,9 +4,23 @@ This file is the bridge between work sessions. The agent MUST update it after ev
 
 ---
 
-## Current state
+## Current state (v6 REBUILD in progress)
 
-- **Last completed milestone**: **M19 — Zero-setup bundled real timetable (v5 start).** 197 tests green (45 files); build (104.8 KB gzip) + lint clean.
+- **Branch**: working on **`rebuild`** (NOT `main`). `main` auto-deploys to GitHub Pages; RB0–RB1 leave the app a placeholder until the editor returns in RB2, so RBn accumulate on `rebuild` and merge to `main` only once the app is back at parity. `main` still holds the live M19 cell-model app.
+- **Last completed (REBUILD)**: **RB0 — event-model foundation.** 16 tests green (2 files); build (46 KB gzip) + lint clean.
+  - **AC met**: event-aware `validate()` proves a senior joint_class (3 classes, 1 teacher) and the ELGA team_block (5 classes × 5 teachers) in one slot are NOT clashes, AND two *different* events on one teacher/class in a slot ARE exactly one clash (`validate.test.ts`); build + lint green.
+  - Built (new event-model `src/`): `domain/types.ts` (v6 verbatim + carried Rule catalog in event-model terms + Violation), `domain/profile.ts` (real 8-period grid; `occupiedSlots` skips fixed slots), `domain/derive.ts` (occupancy maps keyed by `eventId`; `distinctEventIds`), `domain/validate.ts` (HE1–HE7), `fixtures/synthetic.ts` (mini school w/ ELGA + joint + clash cases), `profile.test.ts`, `validate.test.ts`, placeholder `main.tsx`.
+  - Deleted: all cell-model `src/` (domain/solver/store/ui/worker/persistence + cell fixtures). Kept `fixtures/classWisePdf.ts` (6-period real cell data — RB1 raw material), `test/setup.ts`, `index.css`.
+
+## Next action (REBUILD — start RB1)
+
+**RB1 — Real 2026-27 timetable as bundled default.** Transcribe the full 8-period timetable (all 16 classes) into the event model: normal lessons, the ELGA team_block, all senior joint classes (English/Hindi/Economics), special slots, qualifications, Mahesh/Anjana availability windows. AC: app opens to it with 0 real clashes; joint/team render as single events; a fixture test matches the source views cell-for-cell.
+
+**⚠ RESOLVE FIRST (RB0 forward flag):** the only in-repo cell-level real data (`fixtures/classWisePdf.ts`, `docs/sources/rawData.vpps.txt`) is **6-period** (576 cells); the two 2026-27 analyses give the 8-period grid only structurally (weekly counts + ELGA/joint/availability facts), not a full 8-period cell grid. So "cell-for-cell match" for 8 periods has no in-repo ground truth yet. Before transcribing, check `docs/sources/Class_Wise.pdf` (and Teacher/Day PDFs) for whether they are 8-period; if not, this is an **owner question** (ask for the 8-period source) or a **documented reconstruction** from the structural facts (note in DECISIONS.md). Don't fabricate an 8-period grid that claims to be authoritative.
+
+## (archived) v5 state at the pivot
+
+- **M19 — Zero-setup bundled real timetable (v5 start).** 197 tests green (45 files); build (104.8 KB gzip) + lint clean. (Now superseded by the REBUILD; lives on `main` until `rebuild` merges.)
   - **AC met (live-verified)**: (1) a cleared browser opens straight into the real VPPS timetable — full 6-day grid, rules on (43 detected), 0 conflicts — with NO user action (`init()` seeds `buildBundledProject()` when storage is empty; `db.test`/`onboarding.test`/`bundled.test`); (2) a simulated pre-v5 stored VPPS project triggers the update banner, and one-click "Update timetable" adopts the latest (version 1, 43 rules) while keeping the old project under a `previous:` draft key with one-step Undo (`bundledUpdate.test` + live IDB check). Settings gained "Reset to school timetable", "Start a different school", and a "Saved drafts" restore list.
   - Built: `src/fixtures/bundled.ts` (`BUNDLED_DATA_VERSION`, `buildBundledProject`, `isStaleBundled`), `Project.bundledDataVersion?` (types + DATA_MODEL), projectStore seeding + `adoptBundled`/`restorePrevious`/`deletePrevious`/`refreshPreviousKeys` + `bundledStale`, App stale/undo banners, SettingsPage controls.
 - **Prior milestone**: **M18 — Real-data reconciliation + everyday-ops polish. v4 (M15–M18) COMPLETE.** 192 tests green (43 files); build (103 KB gzip) + lint clean.
