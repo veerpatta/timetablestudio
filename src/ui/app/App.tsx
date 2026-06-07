@@ -8,8 +8,8 @@ import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } f
 import { useMemo, useState } from "react";
 import { validate } from "../../domain/validate";
 import type { Day } from "../../domain/types";
-import { runFill } from "../../solver/fillClient";
-import type { FillResult } from "../../solver/fill";
+import { runGenerate } from "../../solver/fillClient";
+import type { GenerateResult } from "../../solver/generate";
 import { useProjectStore } from "../../store/projectStore";
 import { CellPicker } from "../editor/CellPicker";
 import { TeacherGrid } from "../grid/TeacherGrid";
@@ -40,14 +40,13 @@ export function App(): React.ReactElement {
     : project.teachers.find((t) => t.schedulable)!.id;
   const [cell, setCell] = useState<{ day: Day; slot: number } | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
-  const [fillResult, setFillResult] = useState<FillResult | null>(null);
-  const [fillSeed, setFillSeed] = useState(1);
+  const [fillResult, setFillResult] = useState<GenerateResult | null>(null);
   const [filling, setFilling] = useState(false);
 
   const onFillGaps = async () => {
     setFilling(true);
     setFlash(null);
-    const result = await runFill(project, timetableId, fillSeed);
+    const result = await runGenerate(project, timetableId);
     setFilling(false);
     if (result.added.length === 0) {
       setFlash("No gaps to fill — the timetable is already complete.");
@@ -148,12 +147,10 @@ export function App(): React.ReactElement {
               const n = fillResult.added.length;
               applyFix(fillResult.project);
               setFillResult(null);
-              setFillSeed((s) => s + 1);
               setFlash(`Filled ${n} ${n === 1 ? "gap" : "gaps"} — you can Undo it.`);
             }}
             onReject={() => {
               setFillResult(null);
-              setFillSeed((s) => s + 1); // a fresh seed → "Fill the gaps" can try a different arrangement
               setFlash("Discarded the suggested fill.");
             }}
           />

@@ -1,19 +1,22 @@
-// Web Worker entry for the auto-fill solver (RB5) — the solver MUST run off the main
-// thread (AGENTS §1). This is a thin marshalling shell: it receives a Project + timetable
-// id + seed, runs the PURE fill(), and posts the FillResult back. All logic lives in
-// fill.ts; the Node AC test calls fill() directly, never this worker.
+// Web Worker entry for the auto-fill / generate solver (RB5 + C6) — the solver MUST run off
+// the main thread (AGENTS §1). Thin marshalling shell: it receives a Project + timetable id
+// + seed (and an optional `seeds` count for best-of-N generate), runs the PURE solver, and
+// posts the result back. All logic lives in fill.ts / generate.ts; Node tests call those
+// directly, never this worker.
 
 import type { Id, Project } from "../domain/types";
 import { fill } from "./fill";
+import { generate } from "./generate";
 
 interface FillRequest {
   project: Project;
   timetableId: Id;
   seed: number;
+  seeds?: number; // > 1 → best-of-N generate (optimise prefers); else single greedy fill
 }
 
 self.onmessage = (e: MessageEvent<FillRequest>): void => {
-  const { project, timetableId, seed } = e.data;
-  const result = fill(project, timetableId, { seed });
+  const { project, timetableId, seed, seeds } = e.data;
+  const result = seeds && seeds > 1 ? generate(project, timetableId, { seeds }) : fill(project, timetableId, { seed });
   (self as unknown as { postMessage: (m: unknown) => void }).postMessage(result);
 };
