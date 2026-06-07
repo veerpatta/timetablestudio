@@ -48,9 +48,20 @@ export function FillReview({ project, result, onAccept, onReject }: Props): Reac
 
       {result.remainingShortfall > 0 && (
         <p className="mt-2 text-xs text-amber-700">
-          {result.remainingShortfall} {result.remainingShortfall === 1 ? "period" : "periods"} couldn’t be placed (every
-          qualified teacher was busy) — those slots stay empty for you to sort out by hand.
+          {result.remainingShortfall} {result.remainingShortfall === 1 ? "period" : "periods"} couldn’t be placed — those
+          slots stay empty for you to sort out by hand.
         </p>
+      )}
+
+      {result.blockers.length > 0 && (
+        <div className="mt-2 rounded border border-amber-200 bg-amber-50 p-2" role="region" aria-label="Why some lessons couldn't be placed">
+          <p className="mb-1 text-xs font-semibold text-amber-800">Why some lessons couldn’t be placed:</p>
+          <ul className="list-disc space-y-0.5 pl-4 text-xs text-amber-700">
+            {result.blockers.map((b) => (
+              <li key={b}>{b}</li>
+            ))}
+          </ul>
+        </div>
       )}
     </section>
   );
