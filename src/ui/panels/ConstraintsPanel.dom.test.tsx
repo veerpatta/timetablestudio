@@ -12,9 +12,9 @@ describe("Constraints panel (C3, through the UI)", () => {
     render(<App />);
     fireEvent.click(screen.getByRole("button", { name: "Constraints" }));
 
-    // default template is subject_half_of_day; pick Maths + Class 7 + first half
-    fireEvent.change(screen.getByLabelText("Subject"), { target: { value: "Maths" } });
-    fireEvent.change(screen.getByLabelText("Class"), { target: { value: "Class 7" } });
+    // default template is subject_half_of_day; tick Maths + Class 7 (first half default)
+    fireEvent.click(screen.getByLabelText("Subjects: Maths"));
+    fireEvent.click(screen.getByLabelText("For classes: Class 7"));
     fireEvent.click(screen.getByRole("button", { name: "Add constraint" }));
 
     expect(proj().constraints.length).toBe(1);

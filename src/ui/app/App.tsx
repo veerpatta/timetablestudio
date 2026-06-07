@@ -196,6 +196,7 @@ export function App(): React.ReactElement {
             ) : (
               <ConstraintsPanel
                 project={project}
+                timetable={timetable}
                 onAdd={(c) => { addConstraint(c); setFlash("Constraint added — you can Undo it."); }}
                 onToggle={toggleConstraint}
                 onRemove={removeConstraint}

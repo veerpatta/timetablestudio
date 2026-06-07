@@ -283,26 +283,137 @@ export interface ConstraintBase {
   enabled: boolean;
 }
 
-// "{subjects} must be in the first/second half of the day for {classes}"  (placement-local)
+// ---- PLACEMENT-LOCAL templates (judged from a single placement → fill pre-respects musts)
+// "{subjects} in the first/second half of the day for {classes}"
 export interface SubjectHalfOfDayConstraint extends ConstraintBase {
   template: "subject_half_of_day";
   params: { subjectIds: Id[]; classIds: Id[]; half: HalfOfDay };
 }
-// "{teacher} teaches at most {max} periods a week"  (aggregate)
+// "{subjects} only in periods {slots} for {classes}"
+export interface SubjectOnlyPeriodsConstraint extends ConstraintBase {
+  template: "subject_only_periods";
+  params: { subjectIds: Id[]; classIds: Id[]; slots: number[] };
+}
+// "{subjects} never in periods {slots} for {classes}"
+export interface SubjectNeverPeriodsConstraint extends ConstraintBase {
+  template: "subject_never_periods";
+  params: { subjectIds: Id[]; classIds: Id[]; slots: number[] };
+}
+// "{subjects} never in the last period for {classes}"
+export interface SubjectNotLastConstraint extends ConstraintBase {
+  template: "subject_not_last";
+  params: { subjectIds: Id[]; classIds: Id[] };
+}
+// "{teacher} never teaches the first period"
+export interface TeacherNotFirstConstraint extends ConstraintBase {
+  template: "teacher_not_first_period";
+  params: { teacherId: Id };
+}
+// "{teacher} never teaches the last period"
+export interface TeacherNotLastConstraint extends ConstraintBase {
+  template: "teacher_not_last_period";
+  params: { teacherId: Id };
+}
+
+// ---- AGGREGATE templates (whole-timetable; surfaced as issues, not pre-respected by fill)
 export interface TeacherMaxPerWeekConstraint extends ConstraintBase {
   template: "teacher_max_per_week";
   params: { teacherId: Id; max: number };
 }
-// "{class}'s class teacher takes period 1 every day"  (aggregate; reads classTeacherId)
+export interface TeacherMaxPerDayConstraint extends ConstraintBase {
+  template: "teacher_max_per_day";
+  params: { teacherId: Id; max: number };
+}
+export interface TeacherMaxConsecutiveConstraint extends ConstraintBase {
+  template: "teacher_max_consecutive";
+  params: { teacherId: Id; max: number };
+}
+export interface TeacherMaxDaysPerWeekConstraint extends ConstraintBase {
+  template: "teacher_max_days_per_week";
+  params: { teacherId: Id; max: number };
+}
+export interface TeacherMinFreePerWeekConstraint extends ConstraintBase {
+  template: "teacher_min_free_per_week";
+  params: { teacherId: Id; min: number };
+}
+export interface TeacherCompactDayConstraint extends ConstraintBase {
+  template: "teacher_compact_day";
+  params: { teacherId: Id };
+}
+export interface SubjectMaxPerDayConstraint extends ConstraintBase {
+  template: "subject_max_per_day";
+  params: { subjectIds: Id[]; classIds: Id[]; max: number };
+}
+export interface SubjectSpreadMinDaysConstraint extends ConstraintBase {
+  template: "subject_spread_min_days";
+  params: { subjectIds: Id[]; classIds: Id[]; minDays: number };
+}
+export interface SubjectOrderConstraint extends ConstraintBase {
+  template: "subject_order";
+  params: { classId: Id; beforeSubjectId: Id; afterSubjectId: Id };
+}
+export interface SubjectNotAdjacentConstraint extends ConstraintBase {
+  template: "subject_not_adjacent_to";
+  params: { classId: Id; subjectAId: Id; subjectBId: Id };
+}
 export interface ClassTeacherP1Constraint extends ConstraintBase {
   template: "class_teacher_p1";
   params: { classId: Id; subjectId?: Id };
 }
+export interface ClassMaxTeachersPerDayConstraint extends ConstraintBase {
+  template: "class_max_teachers_per_day";
+  params: { classId: Id; max: number };
+}
+export interface ClassDailyVarietyConstraint extends ConstraintBase {
+  template: "class_daily_variety";
+  params: { classId: Id };
+}
+export interface ClassMaxConsecutiveSameConstraint extends ConstraintBase {
+  template: "class_max_consecutive_same";
+  params: { classId: Id; max: number };
+}
+export interface ClassNoFreeConstraint extends ConstraintBase {
+  template: "class_no_free";
+  params: { classId: Id };
+}
+export interface ClassBoardProtectConstraint extends ConstraintBase {
+  template: "class_board_protect";
+  params: { classId: Id; coreSubjectIds: Id[] };
+}
+export interface BalanceTeacherLoadsConstraint extends ConstraintBase {
+  template: "balance_teacher_loads";
+  params: { maxSpread: number };
+}
+export interface CoreSubjectsEarlyConstraint extends ConstraintBase {
+  template: "core_subjects_early";
+  params: { subjectIds: Id[] };
+}
 
 export type Constraint =
   | SubjectHalfOfDayConstraint
+  | SubjectOnlyPeriodsConstraint
+  | SubjectNeverPeriodsConstraint
+  | SubjectNotLastConstraint
+  | TeacherNotFirstConstraint
+  | TeacherNotLastConstraint
   | TeacherMaxPerWeekConstraint
-  | ClassTeacherP1Constraint;
+  | TeacherMaxPerDayConstraint
+  | TeacherMaxConsecutiveConstraint
+  | TeacherMaxDaysPerWeekConstraint
+  | TeacherMinFreePerWeekConstraint
+  | TeacherCompactDayConstraint
+  | SubjectMaxPerDayConstraint
+  | SubjectSpreadMinDaysConstraint
+  | SubjectOrderConstraint
+  | SubjectNotAdjacentConstraint
+  | ClassTeacherP1Constraint
+  | ClassMaxTeachersPerDayConstraint
+  | ClassDailyVarietyConstraint
+  | ClassMaxConsecutiveSameConstraint
+  | ClassNoFreeConstraint
+  | ClassBoardProtectConstraint
+  | BalanceTeacherLoadsConstraint
+  | CoreSubjectsEarlyConstraint;
 
 export type ConstraintTemplate = Constraint["template"];
 
