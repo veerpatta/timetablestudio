@@ -126,7 +126,6 @@ function RemovePanel(props: {
   const lines: string[] = [];
   if (impact.placements > 0) lines.push(`${impact.placements} timetable cell${impact.placements === 1 ? "" : "s"} (${impact.events.length} lesson${impact.events.length === 1 ? "" : "s"})`);
   if (impact.classTeacherOf.length > 0) lines.push(`class teacher of ${impact.classTeacherOf.map((c) => c.name).join(", ")}`);
-  if (impact.rules.length > 0) lines.push(`${impact.rules.length} rule${impact.rules.length === 1 ? "" : "s"}`);
 
   return (
     <div className="mt-2 rounded border border-rose-200 bg-rose-50 p-3 text-sm">

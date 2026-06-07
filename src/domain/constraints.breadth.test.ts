@@ -27,7 +27,7 @@ function mini(): Project {
       { id: "CB", name: "Class B", band: "middle" },
     ],
     subjects: [su("Math"), su("Sci"), su("Eng"), su("Free", "study")],
-    rooms: [], qualifications: [], requirements: [], events: [], rules: [], constraints: [],
+    rooms: [], qualifications: [], requirements: [], events: [], constraints: [],
     timetables: [{ id: T, name: "d", profileId: profile.id, placements: [] }],
     activeTimetableId: T,
   };

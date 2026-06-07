@@ -101,10 +101,10 @@ export function removeTeacher(project: Project, id: Id, opts: { reassignTo?: Id 
     return seen.has(k) ? false : (seen.add(k), true);
   });
 
-  // Rules that name only this teacher are dropped (a rule about a gone teacher is dead).
-  const rules = project.rules.filter((r) => !("teacherId" in r && r.teacherId === id));
+  // Constraints that name this teacher are pruned (dropped if that leaves them empty).
+  const constraints = pruneConstraints(project.constraints, "teacher", id);
 
-  return { ...project, teachers, classes, events, requirements, qualifications, rules };
+  return { ...project, teachers, classes, events, requirements, qualifications, constraints };
 }
 
 // --- Subjects ---------------------------------------------------------------
@@ -137,20 +137,12 @@ export function removeSubject(project: Project, id: Id): Project {
     events: project.events.filter((e) => e.subjectId !== id),
     qualifications: project.qualifications.filter((q) => q.subjectId !== id),
     requirements: project.requirements.filter((r) => r.subjectId !== id),
-    rules: project.rules.filter((r) => !subjectRuleDead(r, id)),
+    constraints: pruneConstraints(project.constraints, "subject", id),
     timetables: project.timetables.map((tt) => ({
       ...tt,
       placements: tt.placements.filter((p) => !deadEvents.has(p.eventId)),
     })),
   };
-}
-
-function subjectRuleDead(r: Project["rules"][number], id: Id): boolean {
-  if ("subjectId" in r && r.subjectId === id) return true;
-  if ("subjectIds" in r && r.subjectIds.includes(id) && r.subjectIds.length === 1) return true;
-  if ("beforeSubjectId" in r && (r.beforeSubjectId === id || r.afterSubjectId === id)) return true;
-  if ("coreSubjectIds" in r && r.coreSubjectIds.includes(id) && r.coreSubjectIds.length === 1) return true;
-  return false;
 }
 
 // --- Classes ----------------------------------------------------------------
@@ -206,7 +198,7 @@ export function removeClass(project: Project, id: Id): Project {
     events,
     qualifications: project.qualifications.filter((q) => q.classId !== id),
     requirements: project.requirements.filter((r) => r.classId !== id),
-    rules: project.rules.filter((r) => !classRuleDead(r, id)),
+    constraints: pruneConstraints(project.constraints, "class", id),
     timetables: project.timetables.map((tt) => ({
       ...tt,
       placements: tt.placements.filter((p) => !deadEvents.has(p.eventId)),
@@ -214,11 +206,36 @@ export function removeClass(project: Project, id: Id): Project {
   };
 }
 
-function classRuleDead(r: Project["rules"][number], id: Id): boolean {
-  if ("classId" in r && r.classId === id) return true;
-  if ("classIds" in r && r.classIds.includes(id) && r.classIds.length === 1) return true;
-  return false;
+/**
+ * Remove every reference to a deleted entity from constraints: clear it from single-id
+ * params (dropping the whole constraint), and from id-array params (dropping the
+ * constraint only if the array would empty out). Keeps findDanglingRefs() at [].
+ */
+function pruneConstraints(constraints: Project["constraints"], kind: EntityKind, id: Id): Project["constraints"] {
+  const singleKeys = kind === "teacher" ? ["teacherId"]
+    : kind === "class" ? ["classId"]
+    : ["subjectId", "beforeSubjectId", "afterSubjectId", "subjectAId", "subjectBId"];
+  const arrayKeys = kind === "class" ? ["classIds"] : kind === "subject" ? ["subjectIds", "coreSubjectIds"] : [];
+
+  const out: Project["constraints"] = [];
+  for (const c of constraints) {
+    const p = { ...(c.params as Record<string, unknown>) };
+    if (singleKeys.some((k) => p[k] === id)) continue; // names the gone entity → drop
+    let emptied = false;
+    for (const k of arrayKeys) {
+      if (Array.isArray(p[k])) {
+        const next = (p[k] as string[]).filter((x) => x !== id);
+        if (next.length === 0 && (p[k] as string[]).includes(id)) { emptied = true; break; }
+        p[k] = next;
+      }
+    }
+    if (emptied) continue;
+    out.push({ ...c, params: p } as Project["constraints"][number]);
+  }
+  return out;
 }
+
+type EntityKind = "teacher" | "subject" | "class";
 
 // --- Periods (scope: rename/retime, append, remove-with-impact) -------------
 // Mid-grid INSERT (which would reindex every placement.slot / unavailable.slot /

@@ -23,7 +23,7 @@ import { addQualification, removeQualification, setClassTeacher } from "../domai
 import { canMove, canSwap, type Cell } from "../domain/swaps";
 import { buildBundledProject } from "../fixtures/bundled";
 import { loadProject, saveProject } from "../persistence/db";
-import type { Band, Constraint, Day, Id, Placement, Project, Rule, SchoolClass } from "../domain/types";
+import type { Band, Constraint, Day, Id, Placement, Project, SchoolClass } from "../domain/types";
 
 export type DropResult = "swapped" | "moved" | "illegal";
 
@@ -45,10 +45,6 @@ interface ProjectState {
   tryDrop: (source: Cell, target: Cell) => DropResult;
   /** Apply a precomputed fix (from suggestFixes) — undoable like any edit. */
   applyFix: (next: Project) => void;
-  /** Rules (RB6): add (from a suggestion or builder), toggle on/off, remove. Undoable. */
-  addRule: (rule: Rule) => void;
-  toggleRule: (id: Id) => void;
-  removeRule: (id: Id) => void;
   /** Entity CRUD (C1) — every op is undoable and persisted. Returns the new id on add. */
   addTeacher: (name: string) => Id;
   renameTeacher: (id: Id, name: string) => void;
@@ -124,15 +120,6 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     return "illegal";
   },
   applyFix: (next) => set((s) => ({ past: [...s.past, s.project], project: next })),
-  addRule: (rule) =>
-    set((s) => ({ past: [...s.past, s.project], project: { ...s.project, rules: [...s.project.rules, rule] } })),
-  toggleRule: (id) =>
-    set((s) => ({
-      past: [...s.past, s.project],
-      project: { ...s.project, rules: s.project.rules.map((r) => (r.id === id ? { ...r, enabled: !r.enabled } : r)) },
-    })),
-  removeRule: (id) =>
-    set((s) => ({ past: [...s.past, s.project], project: { ...s.project, rules: s.project.rules.filter((r) => r.id !== id) } })),
 
   addTeacher: (name) => {
     const { project, id } = addTeacher(get().project, name);

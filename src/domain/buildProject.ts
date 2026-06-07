@@ -278,7 +278,6 @@ export function buildProject(input: BuildInput): Project {
     qualifications,
     requirements,
     events: timetableEvents,
-    rules: [],
     constraints: [],
     timetables: [{ id: "tt-real", name: "2026-27", profileId: regular.id, placements }],
     activeTimetableId: "tt-real",

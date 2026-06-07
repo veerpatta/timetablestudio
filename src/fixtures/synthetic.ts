@@ -121,7 +121,6 @@ export function makeMiniSchool(): Project {
     qualifications: buildQualifications(),
     requirements: [],
     events,
-    rules: [],
     constraints: [],
     timetables: [{ id: "tt", name: "Draft", profileId: REGULAR_PROFILE_ID, placements: [] }],
     activeTimetableId: "tt",

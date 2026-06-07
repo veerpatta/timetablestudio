@@ -32,13 +32,12 @@ describe("persistence — edits survive a reload (C1 AC)", () => {
 describe("normalizeProject — survives schema growth", () => {
   it("fills missing array fields (forward-compat for later milestones)", () => {
     const partial = { ...buildBundledProject() } as Partial<Project> & Record<string, unknown>;
-    delete partial.rules;
+    delete partial.constraints;
     delete partial.rooms;
     const n = normalizeProject(partial as Project) as Project & Record<string, unknown>;
-    expect(Array.isArray(n.rules)).toBe(true);
     expect(Array.isArray(n.rooms)).toBe(true);
-    // forward-compat seams present even though C1 doesn't use them yet
     expect(Array.isArray(n.constraints)).toBe(true);
+    // forward-compat seams present even though they aren't used yet
     expect(Array.isArray(n.electiveGroups)).toBe(true);
     expect(Array.isArray(n.studentGroups)).toBe(true);
   });
@@ -47,5 +46,13 @@ describe("normalizeProject — survives schema growth", () => {
     const full = normalizeProject(buildBundledProject());
     const again = normalizeProject(full);
     expect(again).toBe(full); // no needless copy
+  });
+
+  it("migrates a legacy R4 rule (from a C2 blob) to a class_teacher_p1 constraint, dropping rules", () => {
+    const blob = { ...buildBundledProject() } as Project & Record<string, unknown>;
+    blob.rules = [{ id: "R4:Class 7", template: "R4", classId: "Class 7", enabled: true, severity: "prefer", weight: 3 }];
+    const n = normalizeProject(blob) as Project & Record<string, unknown>;
+    expect(n.rules).toBeUndefined(); // legacy field not carried forward
+    expect(n.constraints.some((c) => c.template === "class_teacher_p1" && (c.params as { classId: string }).classId === "Class 7")).toBe(true);
   });
 });

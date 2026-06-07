@@ -10,7 +10,7 @@
 // Enumerated straight from types.ts — a missed site is exactly the dangling
 // reference the C1 acceptance criteria forbid.
 
-import type { Id, Project, Rule, SchoolClass, TimetableEvent } from "./types";
+import type { Id, Project, SchoolClass, TimetableEvent } from "./types";
 
 export type EntityKind = "teacher" | "subject" | "class";
 
@@ -29,21 +29,7 @@ export interface EntityImpact {
   requirements: number;
   /** Classes whose class-teacher is this teacher (teacher kind only). */
   classTeacherOf: SchoolClass[];
-  /** Rule ids that reference the entity. */
-  rules: Id[];
 }
-
-const ruleRefsTeacher = (r: Rule, id: Id): boolean =>
-  ("teacherId" in r && r.teacherId === id);
-
-const ruleRefsSubject = (r: Rule, id: Id): boolean =>
-  ("subjectId" in r && r.subjectId === id) ||
-  ("subjectIds" in r && r.subjectIds.includes(id)) ||
-  ("beforeSubjectId" in r && (r.beforeSubjectId === id || r.afterSubjectId === id)) ||
-  ("coreSubjectIds" in r && r.coreSubjectIds.includes(id));
-
-const ruleRefsClass = (r: Rule, id: Id): boolean =>
-  ("classId" in r && r.classId === id) || ("classIds" in r && r.classIds.includes(id));
 
 function eventRefs(e: TimetableEvent, kind: EntityKind, id: Id): boolean {
   if (kind === "teacher") return e.teacherIds.includes(id);
@@ -71,12 +57,6 @@ export function referencesOf(project: Project, kind: EntityKind, id: Id): Entity
   const classTeacherOf =
     kind === "teacher" ? project.classes.filter((c) => c.classTeacherId === id) : [];
 
-  const rules = project.rules
-    .filter((r) =>
-      kind === "teacher" ? ruleRefsTeacher(r, id) : kind === "subject" ? ruleRefsSubject(r, id) : ruleRefsClass(r, id),
-    )
-    .map((r) => r.id);
-
   const name =
     (kind === "teacher"
       ? project.teachers
@@ -85,7 +65,7 @@ export function referencesOf(project: Project, kind: EntityKind, id: Id): Entity
         : project.classes
     ).find((x) => x.id === id)?.name ?? id;
 
-  return { kind, id, name, events, placements, qualifications, requirements, classTeacherOf, rules };
+  return { kind, id, name, events, placements, qualifications, requirements, classTeacherOf };
 }
 
 /**
@@ -125,12 +105,21 @@ export function findDanglingRefs(project: Project): string[] {
     for (const p of tt.placements)
       if (!eventIds.has(p.eventId)) out.push(`a placement names missing event "${p.eventId}"`);
   }
-  for (const r of project.rules) {
-    if ("teacherId" in r && !teacherIds.has(r.teacherId)) out.push(`rule ${r.id} names missing teacher "${r.teacherId}"`);
-    if ("classId" in r && !classIds.has(r.classId)) out.push(`rule ${r.id} names missing class "${r.classId}"`);
-    if ("classIds" in r) for (const c of r.classIds) if (!classIds.has(c)) out.push(`rule ${r.id} names missing class "${c}"`);
-    if ("subjectId" in r && r.subjectId && !subjectIds.has(r.subjectId)) out.push(`rule ${r.id} names missing subject "${r.subjectId}"`);
-    if ("subjectIds" in r) for (const s of r.subjectIds) if (!subjectIds.has(s)) out.push(`rule ${r.id} names missing subject "${s}"`);
+  for (const c of project.constraints) {
+    const p = c.params as Record<string, unknown>;
+    const one = (key: string, set: Set<string>, kind: string) => {
+      const v = p[key];
+      if (typeof v === "string" && !set.has(v)) out.push(`constraint ${c.id} names missing ${kind} "${v}"`);
+    };
+    const many = (key: string, set: Set<string>, kind: string) => {
+      const v = p[key];
+      if (Array.isArray(v)) for (const x of v) if (typeof x === "string" && !set.has(x)) out.push(`constraint ${c.id} names missing ${kind} "${x}"`);
+    };
+    for (const k of ["teacherId"]) one(k, teacherIds, "teacher");
+    for (const k of ["classId"]) one(k, classIds, "class");
+    for (const k of ["subjectId", "beforeSubjectId", "afterSubjectId", "subjectAId", "subjectBId"]) one(k, subjectIds, "subject");
+    for (const k of ["classIds"]) many(k, classIds, "class");
+    for (const k of ["subjectIds", "coreSubjectIds"]) many(k, subjectIds, "subject");
   }
   return out;
 }

@@ -138,131 +138,14 @@ export interface Project {
   qualifications: Qualification[];
   requirements: Requirement[];
   events: TimetableEvent[];
-  rules: Rule[]; // DEPRECATED (RB6 R1–R15) — evaluated in parallel until C4 ports the catalog
-  constraints: Constraint[]; // v6.1 (C3) — the authoritative applied constraint system
+  constraints: Constraint[]; // v6.1 (C3/C4) — the applied constraint system (replaced rules)
   timetables: Timetable[];
   activeTimetableId: Id | null;
 }
 
-// --- Rules (carried from v2 catalog; re-evaluated on the event model in RB6) ---
-// Discriminated union on `template` keeps params type-safe (no `any`).
-// Each template maps 1:1 to a row of docs/CONSTRAINTS.md § v4 (R1–R15).
-
-export interface SlotRef {
-  day: Day;
-  slot: number;
-}
-
-export type RuleSeverity = "must" | "prefer"; // must = hard, prefer = weighted soft
+// HalfOfDay is still used by the applied-constraint system (subject_half_of_day).
+// The legacy R1–R15 Rule union was removed in C4 — `constraints` is the only system now.
 export type HalfOfDay = "first" | "second";
-
-export interface RuleBase {
-  id: Id;
-  enabled: boolean; // off rules are ignored by validate/score
-  severity: RuleSeverity;
-  weight: number; // soft weight when severity === "prefer"
-}
-
-export interface R1Rule extends RuleBase {
-  template: "R1";
-  subjectIds: Id[];
-  classIds: Id[];
-  slots: number[];
-}
-export interface R2Rule extends RuleBase {
-  template: "R2";
-  subjectIds: Id[];
-  classIds: Id[];
-  slots: number[];
-}
-export interface R3Rule extends RuleBase {
-  template: "R3";
-  subjectIds: Id[];
-  classIds: Id[];
-  half: HalfOfDay;
-}
-export interface R4Rule extends RuleBase {
-  template: "R4";
-  classId: Id;
-  subjectId?: Id;
-}
-export interface R5Rule extends RuleBase {
-  template: "R5";
-  classId: Id;
-  subjectId: Id;
-  slot?: number;
-}
-export interface R6Rule extends RuleBase {
-  template: "R6";
-  classId: Id;
-  subjectId: Id;
-  count: number;
-}
-export interface R7Rule extends RuleBase {
-  template: "R7";
-  eventId: Id;
-}
-export interface R8Rule extends RuleBase {
-  template: "R8";
-  teacherId: Id;
-  slots: SlotRef[];
-}
-export interface R9Rule extends RuleBase {
-  template: "R9";
-  classId: Id;
-  coreSubjectIds: Id[];
-}
-export interface R10Rule extends RuleBase {
-  template: "R10";
-  subjectId: Id;
-  classIds: Id[];
-  minDays: number;
-}
-export interface R11Rule extends RuleBase {
-  template: "R11";
-  subjectId: Id;
-  classId: Id;
-  maxPerDay: number;
-}
-export interface R12Rule extends RuleBase {
-  template: "R12";
-  teacherId: Id;
-  maxPerDay: number;
-  maxPerWeek: number;
-}
-export interface R13Rule extends RuleBase {
-  template: "R13";
-}
-export interface R14Rule extends RuleBase {
-  template: "R14";
-  classId: Id;
-  beforeSubjectId: Id;
-  afterSubjectId: Id;
-}
-export interface R15Rule extends RuleBase {
-  template: "R15";
-  teacherId: Id;
-  maxConsecutive: number;
-}
-
-export type Rule =
-  | R1Rule
-  | R2Rule
-  | R3Rule
-  | R4Rule
-  | R5Rule
-  | R6Rule
-  | R7Rule
-  | R8Rule
-  | R9Rule
-  | R10Rule
-  | R11Rule
-  | R12Rule
-  | R13Rule
-  | R14Rule
-  | R15Rule;
-
-export type RuleTemplate = Rule["template"];
 
 // --- Applied constraints (v6.1, C3) — the user-created, APPLIED constraint system ---
 // Replaces the static R-rules (which are deprecated and evaluated in parallel until the
