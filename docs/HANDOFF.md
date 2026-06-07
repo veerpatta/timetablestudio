@@ -7,14 +7,24 @@ This file is the bridge between work sessions. The agent MUST update it after ev
 ## Current state (v6 REBUILD in progress)
 
 - **Branch**: working on **`rebuild`** (NOT `main`). `main` auto-deploys to GitHub Pages; RB0–RB1 leave the app a placeholder until the editor returns in RB2, so RBn accumulate on `rebuild` and merge to `main` only once the app is back at parity. `main` still holds the live M19 cell-model app.
-- **Last completed (REBUILD)**: **RB1 — Real 2026-27 timetable as bundled default.** 26 tests green (5 files); build (52 KB gzip) + lint clean; live-verified in browser.
+- **Last completed (REBUILD)**: **RB2 — the legal-only editor (gating AC met).** 38 tests green (8 files); build (56 KB gzip) + lint clean; live-verified end-to-end (click cell → legal picker → place → grid + teacher view update, stays clash-free). Two starred niceties (drag-auto-swap, ghost autocomplete) remain as the next increment before merge.
+- **Prior (REBUILD)**: **RB1 — Real 2026-27 timetable as bundled default.** 26 tests; build 52 KB; live-verified.
   - **AC met**: (1) the app OPENS to the real 8-period timetable, pre-loaded, with **0 real clashes** (`validate(buildBundledProject()) == []`, `bundled.test.ts`; live: green "No clashes" badge); (2) ELGA renders as ONE team_block (5 classes × 5 teachers, Mon–Thu, duration 3) and senior combined classes as 6 joint_class events (English/Hindi × 11&12, Economics × Com+Arts 11&12) — asserted + live (amber/violet cells); (3) a fixture test matches the source cell-for-cell — all 768 cells round-trip (`realGrid.test.ts`), and an INDEPENDENT cross-check shows 18/18 teacher weekly loads equal the analysis §6 table (class-wise ≡ teacher-wise).
   - Built: `fixtures/realGrid.ts` (authoritative 8-period transcription, coordinate-extracted from the owner's PDF), `domain/buildProject.ts` (pure grid→events folder: normal/joint/team detection), `domain/gridReconstruct.ts` (project→grid for the round-trip), `fixtures/bundled.ts` (`buildBundledProject`, `BUNDLED_DATA_VERSION=1`, VPPS metadata), read-only `ui/app/App.tsx` + `ui/grid/WeekGrid.tsx` (+ `App.test.tsx`), heatwave profile (`buildHeatwaveProfile`).
 - **Prior (REBUILD)**: **RB0 — event-model foundation.** `domain/types.ts` (v6), `profile.ts`, `derive.ts` (eventId-keyed occupancy), `validate.ts` (HE1–HE7), clash tests both directions. Deleted all cell-model `src/`.
 
-## Next action (REBUILD — start RB2)
+## Next action (REBUILD — finish RB2 niceties, then RB3)
 
-**RB2 — The legal-only editor (the heart).** Turn the read-only RB1 shell into the single-screen editor: class/teacher/day view toggle, click-a-slot → **legal-only picker** (offers ONLY qualified, conflict-free placements — never an unqualified teacher or a clashing slot), drag-with-auto-swap, ghost autocomplete, inline class-health dots + teacher load bars, "Explain this cell". No modals for editing. AC: a scripted test proves the picker NEVER offers a clashing/unqualified option (use the legal-move rule in DATA_MODEL § v6); editing in one view updates the others; full keyboard + mobile-readable.
+**RB2 is AC-complete** (committed). The legal-only editor works end-to-end: click a class cell → picker offers ONLY legal options; class/teacher views share one store and update together; Explain-this-cell; inline class-health dot + teacher load bar; global undo; keyboard-accessible cells; mobile-readable layout. Tests: independent-oracle picker legality (both sides), edit isolation, cross-view store test (38 tests green).
+
+**Remaining RB2 polish (next increment, before merging `rebuild`→`main`):** the two starred niceties not yet built — (a) **drag-with-auto-swap** (drop a lesson on an occupied slot → offer the clean swap instead of erroring; `movePlacement` exists, add a legal-swap finder reusing `legalOptions`/`validate`); (b) **ghost autocomplete** (empty teaching slots show a faint best-legal suggestion, click to accept). Both ride on `domain/legalMoves` + `domain/edit` — no new model. Consider a thin IndexedDB persistence layer so edits survive reload (optional; RB2 AC doesn't require it).
+
+**Then RB3 — Smart validation & fixes.** Plain-language issue list distinguishing real clashes from joint events, click-to-jump, one-click safe fix where one exists. AC: 0 false clashes on the bundled data; a deliberately broken placement yields a readable issue + working fix. (`validate()` already powers the clash count; build the readable panel + fixes on it.)
+
+### RB2 build state (what exists)
+- Pure core: `domain/legalMoves.ts` (`legalOptions`), `domain/edit.ts` (`clearCell`/`placeNormalLesson`/`movePlacement`/`ensureEvent`, placement-granular + immutable).
+- Store: `store/projectStore.ts` (Zustand, in-memory, seeds `buildBundledProject`, undo).
+- UI: `ui/app/App.tsx` (view toggle + selectors + header health/undo), `ui/grid/WeekGrid.tsx` (clickable+keyboard class grid), `ui/grid/TeacherGrid.tsx` (read-only teacher view), `ui/editor/CellPicker.tsx` (legal palette + Explain + shared-cell guard), `ui/panels/Insights.tsx` (class dot + teacher load bar).
 
 Foundations ready for RB2: the legal-move rule is specified (DATA_MODEL § v6 "Legal-move rule"); `validate()` is the feasibility oracle; `deriveMaps` gives class/teacher/day occupancy; `WeekGrid` is the starting grid component.
 

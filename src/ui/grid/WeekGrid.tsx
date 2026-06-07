@@ -13,9 +13,11 @@ interface Props {
   project: Project;
   timetable: Timetable;
   classId: Id;
+  onSelectCell?: (day: Day, slot: number) => void;
+  selected?: { day: Day; slot: number } | null;
 }
 
-export function WeekGrid({ project, timetable, classId }: Props): React.ReactElement {
+export function WeekGrid({ project, timetable, classId, onSelectCell, selected }: Props): React.ReactElement {
   const profile = findProfile(project, timetable);
   if (!profile) return <p>Unknown profile.</p>;
   const maps = deriveMaps(project, timetable);
@@ -55,8 +57,34 @@ export function WeekGrid({ project, timetable, classId }: Props): React.ReactEle
               }
               const occ = byClass?.get(slotKey(day, s.index));
               const event = occ?.[0]?.event;
+              const isSel = selected?.day === day && selected?.slot === s.index;
+              const ring = isSel ? "ring-2 ring-inset ring-sky-500" : "";
+              const clickable = onSelectCell ? "cursor-pointer hover:bg-sky-50" : "";
+              const handle = onSelectCell ? () => onSelectCell(day, s.index) : undefined;
+              const a11y = onSelectCell
+                ? {
+                    role: "button" as const,
+                    tabIndex: 0,
+                    "aria-label": `${day} ${s.label}`,
+                    onKeyDown: (e: React.KeyboardEvent) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        onSelectCell(day, s.index);
+                      }
+                    },
+                  }
+                : {};
               if (!event) {
-                return <td key={s.index} className="border p-2 text-center text-slate-300">—</td>;
+                return (
+                  <td
+                    key={s.index}
+                    onClick={handle}
+                    {...a11y}
+                    className={`border p-2 text-center text-slate-300 ${clickable} ${ring}`}
+                  >
+                    +
+                  </td>
+                );
               }
               const who = event.teacherIds.map((t) => teachers.get(t) ?? t).join(", ");
               const tint =
@@ -68,7 +96,12 @@ export function WeekGrid({ project, timetable, classId }: Props): React.ReactEle
                       ? "bg-slate-50"
                       : "";
               return (
-                <td key={s.index} className={`border p-2 align-top ${tint}`}>
+                <td
+                  key={s.index}
+                  onClick={handle}
+                  {...a11y}
+                  className={`border p-2 align-top ${tint} ${clickable} ${ring}`}
+                >
                   <div className="font-medium text-slate-800">{subjects.get(event.subjectId) ?? event.subjectId}</div>
                   {who && <div className="text-[11px] text-slate-500">{who}</div>}
                 </td>
