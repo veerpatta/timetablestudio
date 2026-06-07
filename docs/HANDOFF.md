@@ -16,7 +16,18 @@ This file is the bridge between work sessions. The agent MUST update it after ev
 
 **RB2 — The legal-only editor (the heart).** Turn the read-only RB1 shell into the single-screen editor: class/teacher/day view toggle, click-a-slot → **legal-only picker** (offers ONLY qualified, conflict-free placements — never an unqualified teacher or a clashing slot), drag-with-auto-swap, ghost autocomplete, inline class-health dots + teacher load bars, "Explain this cell". No modals for editing. AC: a scripted test proves the picker NEVER offers a clashing/unqualified option (use the legal-move rule in DATA_MODEL § v6); editing in one view updates the others; full keyboard + mobile-readable.
 
-Foundations ready for RB2: the legal-move rule is specified (DATA_MODEL § v6 "Legal-move rule"); `validate()` is the feasibility oracle; `deriveMaps` gives class/teacher/day occupancy; `WeekGrid` is the starting grid component. RB2 will need a store (Zustand) + persistence (IndexedDB) to hold edits and seed `buildBundledProject()` on first run — deleted in RB0, rebuild on the event model.
+Foundations ready for RB2: the legal-move rule is specified (DATA_MODEL § v6 "Legal-move rule"); `validate()` is the feasibility oracle; `deriveMaps` gives class/teacher/day occupancy; `WeekGrid` is the starting grid component.
+
+**RB2 build order + constraints (from advisor, binding):**
+1. **`legalOptions(project, timetable, classId, day, slot): Candidate[]`** — a PURE domain fn applying the legal-move rule (qualified ∀(subject,class), available, no different-event occupancy in any covered slot, duration fits, no enabled `must` rule). The heart; unit-testable without a DOM. Add the teacher-view dual.
+2. **Independent-oracle test (assert BOTH sides):** for each (entity, slot), apply each offered candidate → `validate()` reports 0 new hard; AND a known clashing/unqualified placement is ABSENT. (A one-sided test passes even if the picker offers nothing.)
+3. **⚠ Edit primitive = placement-granular.** Events are SHARED across placements ("Class 1 Maths/Bindu" is ONE event with ~10 placements). NEVER mutate `event.teacherIds` in place (it rewrites all 10 cells). Edits re-point/insert/remove a `Placement`; reuse-or-create the target event by signature via an `ensureEvent(type,subject,teachers,classIds)` helper. **Test:** after editing one cell, every OTHER placement of the former event is unchanged. This also gives joint/team moves for free (one placement, many classIds — can't split a stream out).
+4. **One store mutation path over placements** → the 3 views (class/teacher/day, all from `deriveMaps`) update together automatically. Wire the single path before adding view #2. In-memory Zustand is enough for the RB2 AC; add IndexedDB only when edits must survive reload (late RB2 / its own step). Seed `buildBundledProject()` on load.
+5. Niceties (ghost autocomplete, drag-auto-swap, health dots, explain-cell) ride on `legalOptions` + the edit primitive — build AFTER 1–3 pass.
+
+**Decision (settled):** emptying a cell = REMOVE its placement (event keeps its other placements); not "park". Keeps undo + health counts coherent.
+
+**Picker scope note:** qualifications are exactly the (teacher,subject,class) triples used by the real grid — so "who else can teach X" is usually just the incumbent (no invented quals). Design the picker around legal *placement* (where/when a lesson can move), not teacher substitution.
 
 ## Carried notes / open items
 - **Branch discipline (still active):** all RBn on `rebuild`; `main` keeps the live M19 cell-model app and auto-deploys. Merge `rebuild`→`main` only once the editor (RB2) restores parity, so a placeholder/read-only build never deploys over the working timetable.
