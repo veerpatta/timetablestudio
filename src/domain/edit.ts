@@ -42,7 +42,7 @@ function ensureEvent(
 }
 
 /** All placements whose event covers (classId, day, slot). */
-function placementsCovering(project: Project, timetableId: Id, classId: Id, day: Day, slot: number): Placement[] {
+export function placementsCovering(project: Project, timetableId: Id, classId: Id, day: Day, slot: number): Placement[] {
   const tt = project.timetables.find((t) => t.id === timetableId);
   const profile = tt && findProfile(project, tt);
   if (!tt || !profile) return [];
@@ -102,6 +102,27 @@ export function movePlacement(
 ): Project {
   const { placements } = withTimetable(project, timetableId, (ps) =>
     ps.map((p) => (p === placement ? { ...p, day, slot } : p)),
+  );
+  return writeTimetable(project, timetableId, placements);
+}
+
+/**
+ * Exchange the (day, slot) of two placements in ONE pass. Used by drag-with-auto-swap
+ * (RB2). Pure: returns a new Project; the events are untouched (a swap only moves the
+ * two placements). Both placements must belong to this timetable.
+ */
+export function swapPlacements(
+  project: Project,
+  timetableId: Id,
+  a: Placement,
+  b: Placement,
+): Project {
+  const { placements } = withTimetable(project, timetableId, (ps) =>
+    ps.map((p) => {
+      if (p === a) return { ...p, day: b.day, slot: b.slot };
+      if (p === b) return { ...p, day: a.day, slot: a.slot };
+      return p;
+    }),
   );
   return writeTimetable(project, timetableId, placements);
 }
