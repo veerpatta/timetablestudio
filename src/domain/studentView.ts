@@ -4,10 +4,14 @@
 // subject never appears — the dropper sees Self Study at that slot instead.
 //
 // Built on the SAME oracle as the clash rule (deriveMaps + attendeesOf), so a personal
-// timetable can never disagree with the grid. Relies on the slot-exclusive invariant: a
-// student attends AT MOST ONE event per slot (option lines are slot-exclusive per HE2; every
-// dropper gets a Study shadow at each dropped-elective slot from seedArtsElectives). The C7
-// test enforces that invariant across all groups, so a silent drop can't slip in unnoticed.
+// timetable can never disagree with the grid. On a CLASH-FREE grid a student attends exactly
+// one event per slot (option lines are slot-exclusive per HE2; every dropper gets a Study
+// shadow at each dropped-elective slot from seedArtsElectives) — the C7 test verifies this
+// invariant independently across all groups. On a NON-clash-free grid (two whole-class
+// lessons double-booked) this view shows one of the clashing lessons; that is not hidden —
+// the clash is surfaced by validate()/the Issues panel, which is where a double-booking
+// belongs, not silently in a per-student read. We deliberately do NOT throw here (it would
+// crash report rendering on exactly the dirty grid the user is trying to debug).
 
 import { attendeesOf, buildGroupsByClass } from "./attendees";
 import { deriveMaps } from "./derive";

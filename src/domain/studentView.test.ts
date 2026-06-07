@@ -4,6 +4,7 @@
 // attends, identical to the class grid's event there).
 
 import { describe, expect, it } from "vitest";
+import { attendeesOf, buildGroupsByClass } from "./attendees";
 import { deriveMaps } from "./derive";
 import { electiveReport, studentTimetable } from "./studentView";
 import { buildBundledProject } from "../fixtures/bundled";
@@ -44,14 +45,28 @@ describe("C7 student view — clean per-combination personal timetable", () => {
 
   it("reconciles with derive(): each busy class slot → exactly one attended event, matching the grid", () => {
     const maps = deriveMaps(base, tt);
+    const groupsByClass = buildGroupsByClass(base);
     for (const group of artsGroups) {
       const personal = studentTimetable(base, tt, group.id);
       const cells = maps.classCells.get(group.classId)!;
-      // every slot the class occupies yields exactly one personal event (no silent drop / dup)
+      // every slot the class occupies yields exactly one personal event (no empty slot)
       expect(personal.size).toBe(cells.size);
-      for (const [key, slot] of personal) {
-        const occ = cells.get(key)!;
-        expect(occ.some((o) => o.event.id === slot.event.id)).toBe(true); // it's a real event at that slot
+      for (const [key, occ] of cells) {
+        // INDEPENDENTLY (not via studentTimetable's break) count the distinct events at this
+        // slot whose audience includes the group: the slot-exclusive invariant is EXACTLY ONE.
+        // This is the assertion the personal view relies on — a multi-attendee slot would make
+        // studentTimetable silently drop an event, and this catches it where `break` can't.
+        const seen = new Set<string>();
+        let attended = 0;
+        for (const o of occ) {
+          if (seen.has(o.event.id)) continue;
+          seen.add(o.event.id);
+          const att = attendeesOf(o.event, group.classId, groupsByClass);
+          if (att.kind === "all" || att.ids.has(group.id)) attended++;
+        }
+        expect(attended).toBe(1);
+        // and the event the personal view recorded is genuinely one at that slot
+        expect(occ.some((o) => o.event.id === personal.get(key)!.event.id)).toBe(true);
       }
     }
   });
