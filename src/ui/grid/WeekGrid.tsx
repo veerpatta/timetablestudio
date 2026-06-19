@@ -87,7 +87,7 @@ function GridCell({ project, timetable, classId, day, s, isSel, flags, onSelectC
       return { sub, tch, note: who.length ? `chose ${who.join("; ")}` : "" };
     };
     return (
-      <td ref={setNodeRef} onClick={handle} {...a11y} title={flagTitle} className={`border p-2 align-top ${clickable} ${ring} ${over} ${flagCls}`}>
+      <td ref={setNodeRef} onClick={handle} {...a11y} title={flagTitle} className={`break-words border p-1.5 align-top ${clickable} ${ring} ${over} ${flagCls}`}>
         <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Option line</div>
         <div className="flex flex-col gap-1">
           {distinctEvents.map((e) => {
@@ -107,7 +107,7 @@ function GridCell({ project, timetable, classId, day, s, isSel, flags, onSelectC
   if (!event) {
     const ghost = ghostSuggestion(project, timetable.id, classId, day, s.index);
     return (
-      <td ref={setNodeRef} onClick={handle} {...a11y} title={flagTitle} className={`border p-2 text-center ${clickable} ${ring} ${over} ${flagCls}`}>
+      <td ref={setNodeRef} onClick={handle} {...a11y} title={flagTitle} className={`break-words border p-1.5 text-center ${clickable} ${ring} ${over} ${flagCls}`}>
         {ghost ? (
           <span className="text-[11px] italic text-slate-300" title="Suggested — click to choose">
             {subjects.get(ghost.subjectId) ?? ghost.subjectId}?
@@ -137,7 +137,7 @@ function GridCell({ project, timetable, classId, day, s, isSel, flags, onSelectC
   );
 
   return (
-    <td ref={setNodeRef} onClick={handle} {...a11y} title={flagTitle} className={`border p-2 align-top ${tint} ${clickable} ${ring} ${over} ${flagCls}`}>
+    <td ref={setNodeRef} onClick={handle} {...a11y} title={flagTitle} className={`break-words border p-1.5 align-top ${tint} ${clickable} ${ring} ${over} ${flagCls}`}>
       {draggable ? <DraggableLesson id={id}>{body}</DraggableLesson> : body}
     </td>
   );
@@ -157,12 +157,12 @@ export function WeekGrid({ project, timetable, classId, onSelectCell, selected, 
       }
 
   return (
-    <table className="w-full border-collapse text-sm">
+    <table className="min-w-[760px] table-fixed border-collapse text-xs sm:min-w-0 sm:w-full">
       <thead>
         <tr>
-          <th className="border bg-slate-100 p-2 text-left">Day</th>
+          <th className="w-12 border bg-slate-100 p-1.5 text-left">Day</th>
           {profile.slots.map((s) => (
-            <th key={s.index} className={`border p-2 ${s.teaching ? "bg-slate-100" : "bg-slate-200 text-slate-500"}`}>
+            <th key={s.index} className={`border p-1.5 ${s.teaching ? "bg-slate-100" : "bg-slate-200 text-slate-500"}`}>
               <div className="font-semibold">{s.label}</div>
               <div className="text-[10px] font-normal text-slate-400">
                 {s.start}–{s.end}
@@ -174,11 +174,11 @@ export function WeekGrid({ project, timetable, classId, onSelectCell, selected, 
       <tbody>
         {DAYS.map((day) => (
           <tr key={day}>
-            <th className="border bg-slate-100 p-2 text-left">{day}</th>
+            <th className="border bg-slate-100 p-1.5 text-left">{day}</th>
             {profile.slots.map((s) => {
               if (!s.teaching) {
                 return (
-                  <td key={s.index} className="border bg-slate-50 p-2 text-center text-slate-400">
+                  <td key={s.index} className="border bg-slate-50 p-1.5 text-center text-slate-400">
                     {s.label}
                   </td>
                 );

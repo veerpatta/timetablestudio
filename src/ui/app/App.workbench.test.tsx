@@ -12,10 +12,10 @@ describe("Workbench editing surface", () => {
     render(<App />);
 
     expect(screen.getByRole("navigation", { name: "Workbench sections" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Timetable" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Requests" })).toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "Cell inspector" })).toBeInTheDocument();
-    expect(screen.getByText("Select a timetable cell")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Make best timetable" })).toBeInTheDocument();
+    expect(screen.getByText("Define what matters")).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Planner result" })).toBeInTheDocument();
+    expect(screen.getByText("Run Make best timetable to see proposed changes before applying them.")).toBeInTheDocument();
   });
 
   it("opens the selected-cell inspector from the class grid and adds a preference request", () => {

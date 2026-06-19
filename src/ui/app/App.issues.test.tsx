@@ -32,9 +32,9 @@ describe("RB3 Issues panel (clash from outside the editor)", () => {
 
     fireEvent.click(fixBtn);
 
-    // Clash resolved: the panel is gone and the header reads clean.
+    // Clash resolved: the problem panel is gone and the planner summary is visible.
     expect(screen.queryByText(/Things to fix/)).not.toBeInTheDocument();
-    expect(screen.getByText("All clear")).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Planner result" })).toBeInTheDocument();
 
     // Undo brings the problem back (the fix was reviewable + reversible).
     fireEvent.click(screen.getByRole("button", { name: "Undo" }));

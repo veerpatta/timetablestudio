@@ -6,6 +6,7 @@
 import type { Id, Project } from "../domain/types";
 import { fill, type FillResult } from "./fill";
 import { generate, type GenerateResult } from "./generate";
+import { planTimetable, type PlanResult } from "./plan";
 
 function runInWorker<R extends FillResult>(project: Project, timetableId: Id, seed: number, seeds?: number): Promise<R> {
   return new Promise<R>((resolve, reject) => {
@@ -44,4 +45,8 @@ export async function runGenerate(project: Project, timetableId: Id, seeds = 8):
     }
   }
   return generate(project, timetableId, { seeds });
+}
+
+export async function runPlanTimetable(project: Project, timetableId: Id, seeds = 32): Promise<PlanResult> {
+  return planTimetable(project, timetableId, { seeds });
 }
