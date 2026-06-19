@@ -8,7 +8,9 @@ import { fill, type FillResult } from "./fill";
 import { generate, type GenerateResult } from "./generate";
 import { planTimetable, type PlanResult } from "./plan";
 
-function runInWorker<R extends FillResult>(project: Project, timetableId: Id, seed: number, seeds?: number): Promise<R> {
+type SolverMode = "fill" | "generate" | "plan";
+
+function runInWorker<R>(project: Project, timetableId: Id, mode: SolverMode, seed: number, seeds?: number): Promise<R> {
   return new Promise<R>((resolve, reject) => {
     const worker = new Worker(new URL("./fillWorker.ts", import.meta.url), { type: "module" });
     worker.onmessage = (e: MessageEvent<R>) => {
@@ -19,7 +21,7 @@ function runInWorker<R extends FillResult>(project: Project, timetableId: Id, se
       worker.terminate();
       reject(e);
     };
-    worker.postMessage({ project, timetableId, seed, seeds });
+    worker.postMessage({ mode, project, timetableId, seed, seeds });
   });
 }
 
@@ -27,7 +29,7 @@ function runInWorker<R extends FillResult>(project: Project, timetableId: Id, se
 export async function runFill(project: Project, timetableId: Id, seed: number): Promise<FillResult> {
   if (typeof Worker !== "undefined") {
     try {
-      return await runInWorker<FillResult>(project, timetableId, seed);
+      return await runInWorker<FillResult>(project, timetableId, "fill", seed);
     } catch {
       // Worker construction failed (e.g. unsupported) — fall back to the main thread.
     }
@@ -39,7 +41,7 @@ export async function runFill(project: Project, timetableId: Id, seed: number): 
 export async function runGenerate(project: Project, timetableId: Id, seeds = 8): Promise<GenerateResult> {
   if (typeof Worker !== "undefined") {
     try {
-      return await runInWorker<GenerateResult>(project, timetableId, 1, seeds);
+      return await runInWorker<GenerateResult>(project, timetableId, "generate", 1, seeds);
     } catch {
       // fall back to the main thread
     }
@@ -48,5 +50,12 @@ export async function runGenerate(project: Project, timetableId: Id, seeds = 8):
 }
 
 export async function runPlanTimetable(project: Project, timetableId: Id, seeds = 32): Promise<PlanResult> {
+  if (typeof Worker !== "undefined") {
+    try {
+      return await runInWorker<PlanResult>(project, timetableId, "plan", 1, seeds);
+    } catch {
+      // fall back to the main thread
+    }
+  }
   return planTimetable(project, timetableId, { seeds });
 }

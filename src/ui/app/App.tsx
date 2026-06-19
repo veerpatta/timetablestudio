@@ -89,9 +89,15 @@ export function App(): React.ReactElement {
     setPlanning(true);
     setSelected(null);
     setFlash(null);
-    const result = await runPlanTimetable(project, timetableId, 48);
-    setPlanResult(result);
-    setPlanning(false);
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      const result = await runPlanTimetable(project, timetableId, 48);
+      setPlanResult(result);
+    } catch {
+      setFlash("Planner could not finish. Check the requests or try again.");
+    } finally {
+      setPlanning(false);
+    }
   };
 
   const handleDragEnd = (e: DragEndEvent) => {

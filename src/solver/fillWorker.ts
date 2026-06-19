@@ -7,8 +7,10 @@
 import type { Id, Project } from "../domain/types";
 import { fill } from "./fill";
 import { generate } from "./generate";
+import { planTimetable } from "./plan";
 
 interface FillRequest {
+  mode?: "fill" | "generate" | "plan";
   project: Project;
   timetableId: Id;
   seed: number;
@@ -16,7 +18,13 @@ interface FillRequest {
 }
 
 self.onmessage = (e: MessageEvent<FillRequest>): void => {
-  const { project, timetableId, seed, seeds } = e.data;
-  const result = seeds && seeds > 1 ? generate(project, timetableId, { seeds }) : fill(project, timetableId, { seed });
+  const { mode, project, timetableId, seed, seeds } = e.data;
+  const kind = mode ?? (seeds && seeds > 1 ? "generate" : "fill");
+  const result =
+    kind === "plan"
+      ? planTimetable(project, timetableId, { seeds })
+      : kind === "generate"
+        ? generate(project, timetableId, { seeds })
+        : fill(project, timetableId, { seed });
   (self as unknown as { postMessage: (m: unknown) => void }).postMessage(result);
 };
