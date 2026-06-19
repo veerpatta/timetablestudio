@@ -10,7 +10,7 @@ describe("Constraints panel (C3, through the UI)", () => {
 
   it("builds a constraint from the sentence form, then toggles and removes it", () => {
     render(<App />);
-    fireEvent.click(screen.getByRole("button", { name: "Constraints" }));
+    fireEvent.click(screen.getByRole("button", { name: "Requests" }));
 
     // default template is subject_half_of_day; tick Maths + Class 7 (first half default)
     fireEvent.click(screen.getByLabelText("Subjects: Maths"));

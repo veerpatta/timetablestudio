@@ -18,7 +18,7 @@ describe("RB5 Fill the gaps (review → accept)", () => {
     useProjectStore.setState({ project: cleared, timetableId: ttId, past: [] });
 
     render(<App />);
-    fireEvent.click(screen.getByRole("button", { name: /Fill the gaps/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Fill gaps/ }));
 
     // The reviewable diff appears (async: solver resolves on the next tick).
     const accept = await screen.findByRole("button", { name: "Accept" });
@@ -27,7 +27,7 @@ describe("RB5 Fill the gaps (review → accept)", () => {
     fireEvent.click(accept);
     // Applied: review gone, header confirms, still clash-free, Undo available.
     expect(screen.queryByRole("button", { name: "Accept" })).not.toBeInTheDocument();
-    expect(screen.getByText(/Filled \d+ gap/)).toBeInTheDocument();
+    expect(screen.getByText(/Accepted \d+ suggested change/)).toBeInTheDocument();
     expect(screen.getByText("All clear")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Undo" })).toBeEnabled();
   });
@@ -38,7 +38,7 @@ describe("RB5 Fill the gaps (review → accept)", () => {
     useProjectStore.setState({ project: clearCell(base, ttId, "Class 1", "Mon", 1), timetableId: ttId, past: [] });
 
     render(<App />);
-    fireEvent.click(screen.getByRole("button", { name: /Fill the gaps/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Fill gaps/ }));
     fireEvent.click(await screen.findByRole("button", { name: "Reject" }));
 
     expect(screen.queryByRole("button", { name: "Accept" })).not.toBeInTheDocument();

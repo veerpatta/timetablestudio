@@ -11,9 +11,11 @@ interface Props {
   project: Project;
   timetable: Timetable;
   teacherId: Id;
+  selected?: { classId: Id; day: Day; slot: number } | null;
+  onSelectCell?: (classId: Id, day: Day, slot: number) => void;
 }
 
-export function TeacherGrid({ project, timetable, teacherId }: Props): React.ReactElement {
+export function TeacherGrid({ project, timetable, teacherId, selected, onSelectCell }: Props): React.ReactElement {
   const profile = findProfile(project, timetable);
   if (!profile) return <p>Unknown profile.</p>;
   const maps = deriveMaps(project, timetable);
@@ -53,8 +55,27 @@ export function TeacherGrid({ project, timetable, teacherId }: Props): React.Rea
                 );
               }
               const where = event.classIds.map((c) => classNames.get(c) ?? c).join(", ");
+              const firstClass = event.classIds[0]!;
+              const isSel = selected?.classId === firstClass && selected.day === day && selected.slot === s.index;
+              const interactive = onSelectCell ? "cursor-pointer hover:bg-sky-50" : "";
+              const ring = isSel ? "ring-2 ring-inset ring-sky-500" : "";
+              const cellLabel = `${teacher?.name ?? teacherId} ${day} ${s.label}`;
               return (
-                <td key={s.index} className="border p-2 align-top">
+                <td
+                  key={s.index}
+                  role={onSelectCell ? "button" : undefined}
+                  tabIndex={onSelectCell ? 0 : undefined}
+                  aria-label={onSelectCell ? cellLabel : undefined}
+                  onClick={onSelectCell ? () => onSelectCell(firstClass, day, s.index) : undefined}
+                  onKeyDown={(e) => {
+                    if (!onSelectCell) return;
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      onSelectCell(firstClass, day, s.index);
+                    }
+                  }}
+                  className={`border p-2 align-top ${interactive} ${ring}`}
+                >
                   <div className="font-medium text-slate-800">{subjects.get(event.subjectId) ?? event.subjectId}</div>
                   <div className="text-[11px] text-slate-500">{where}</div>
                 </td>

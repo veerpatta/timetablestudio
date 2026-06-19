@@ -67,6 +67,8 @@ interface ProjectState {
   updateConstraint: (constraint: Constraint) => void;
   toggleConstraint: (id: Id) => void;
   removeConstraint: (id: Id) => void;
+  setRequirementPeriods: (classId: Id, subjectId: Id, periodsPerWeek: number) => void;
+  setRequirementPreferDouble: (classId: Id, subjectId: Id, preferDouble: boolean) => void;
   /** Named versions (RB8): snapshot the current project; restore is undoable. */
   saveVersion: (name: string) => void;
   restoreVersion: (id: Id) => void;
@@ -174,6 +176,26 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     })),
   removeConstraint: (id) =>
     set((s) => ({ past: [...s.past, s.project], project: { ...s.project, constraints: s.project.constraints.filter((c) => c.id !== id) } })),
+  setRequirementPeriods: (classId, subjectId, periodsPerWeek) =>
+    set((s) => ({
+      past: [...s.past, s.project],
+      project: {
+        ...s.project,
+        requirements: s.project.requirements.map((r) =>
+          r.classId === classId && r.subjectId === subjectId ? { ...r, periodsPerWeek: Math.max(0, periodsPerWeek) } : r,
+        ),
+      },
+    })),
+  setRequirementPreferDouble: (classId, subjectId, preferDouble) =>
+    set((s) => ({
+      past: [...s.past, s.project],
+      project: {
+        ...s.project,
+        requirements: s.project.requirements.map((r) =>
+          r.classId === classId && r.subjectId === subjectId ? { ...r, preferDouble } : r,
+        ),
+      },
+    })),
   saveVersion: (name) =>
     set((s) => ({ versions: [...s.versions, { id: `ver:${s.versions.length + 1}`, name, project: s.project }] })),
   restoreVersion: (id) =>

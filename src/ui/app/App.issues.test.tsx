@@ -45,8 +45,8 @@ describe("RB3 Issues panel (clash from outside the editor)", () => {
     seedClash();
     render(<App />);
     fireEvent.click(screen.getByRole("button", { name: "Show me" }));
-    // The cell picker for the jumped-to slot opens.
-    const picker = screen.getByRole("complementary");
-    expect(within(picker).getByText(/Mon P1/)).toBeInTheDocument();
+    // The right-side inspector opens on the jumped-to slot.
+    const inspector = screen.getByRole("region", { name: "Cell inspector" });
+    expect(within(inspector).getByText(/Mon P1/)).toBeInTheDocument();
   });
 });
