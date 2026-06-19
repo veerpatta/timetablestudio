@@ -1,8 +1,20 @@
 import { describe, expect, it } from "vitest";
 import { validate } from "../domain/validate";
+import { buildBundledProject } from "../fixtures/bundled";
 import { makeMiniSchool } from "../fixtures/synthetic";
-import type { Constraint, Project, Requirement, TimetableEvent } from "../domain/types";
+import type { Constraint, Id, Project, Requirement, Timetable, TimetableEvent } from "../domain/types";
 import { planTimetable } from "./plan";
+
+const ARTS_ELECTIVES = ["Political Science", "Geography", "Economics", "English Literature"];
+
+/** Count placements of `subject` attended by `classId` (any student group). */
+function subjectPlacements(project: Project, timetable: Timetable, classId: Id, subject: Id): number {
+  const byId = new Map(project.events.map((e) => [e.id, e]));
+  return timetable.placements.filter((p) => {
+    const e = byId.get(p.eventId);
+    return e?.subjectId === subject && e.classIds.includes(classId);
+  }).length;
+}
 
 function oneLessonProject(opts?: { pinned?: boolean; noQualifiedTeacher?: boolean }): Project {
   const p = makeMiniSchool();
@@ -64,6 +76,37 @@ describe("planTimetable", () => {
     expect(result.hardCount).toBeGreaterThan(0);
     expect(result.blockers.join(" ")).toMatch(/locked/i);
     expect(result.requestStatuses[0]).toMatchObject({ status: "blocked" });
+  });
+
+  it("keeps Arts electives intact on re-plan (no Self Study collapse)", () => {
+    const project = buildBundledProject();
+    const ttId = project.activeTimetableId!;
+    const before = project.timetables.find((t) => t.id === ttId)!;
+
+    // Sanity: the bundled Arts classes really do run the four electives.
+    for (const cls of ["Class 11 Arts", "Class 12 Arts"]) {
+      for (const sub of ARTS_ELECTIVES) {
+        expect(subjectPlacements(project, before, cls, sub)).toBeGreaterThan(0);
+      }
+    }
+    const studyBefore =
+      subjectPlacements(project, before, "Class 11 Arts", "Self Study") +
+      subjectPlacements(project, before, "Class 12 Arts", "Self Study");
+
+    const result = planTimetable(project, ttId, { seeds: 2 });
+    const after = result.project.timetables.find((t) => t.id === ttId)!;
+
+    // The electives must survive — they must NOT be replaced by whole-class Self Study.
+    for (const cls of ["Class 11 Arts", "Class 12 Arts"]) {
+      for (const sub of ARTS_ELECTIVES) {
+        expect(subjectPlacements(result.project, after, cls, sub)).toBeGreaterThan(0);
+      }
+    }
+    const studyAfter =
+      subjectPlacements(result.project, after, "Class 11 Arts", "Self Study") +
+      subjectPlacements(result.project, after, "Class 12 Arts", "Self Study");
+    expect(studyAfter).toBeLessThanOrEqual(studyBefore);
+    expect(validate(result.project, after).filter((v) => v.severity === "hard")).toEqual([]);
   });
 
   it("returns a plain blocker when no qualified teacher can meet demand", () => {

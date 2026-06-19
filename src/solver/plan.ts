@@ -1,8 +1,10 @@
 import { diffProjects, type CellDiff } from "../domain/diffTimetables";
 import { constraintSentence, evaluateConstraints } from "../domain/constraints";
+import { findProfile, placementSlots } from "../domain/derive";
 import { validate } from "../domain/validate";
-import type { Constraint, Id, Project, Timetable } from "../domain/types";
+import type { Constraint, Id, Placement, Project, Timetable } from "../domain/types";
 import { generate, type GenerateResult } from "./generate";
+import { isReschedulable } from "./schedule";
 
 export type RequestStatus = "satisfied" | "blocked";
 
@@ -27,21 +29,52 @@ function activeTable(project: Project, timetableId: Id): Timetable | undefined {
   return project.timetables.find((t) => t.id === timetableId);
 }
 
-function canPlannerRemove(project: Project, placementEventId: Id): boolean {
-  const event = project.events.find((e) => e.id === placementEventId);
-  return !!event && event.type === "normal" && event.classIds.length === 1 && event.duration === 1;
-}
-
+// "Make best timetable" used to NUKE the whole board (strip every reschedulable lesson) then
+// rebuild from scratch — which threw away a complete, valid timetable and could only ever get
+// back ~98% of it, so a re-plan visibly DEGRADED a good timetable. The smarter rule: keep every
+// valid placement (preserving completeness) and strip ONLY the ordinary lessons that are
+// actually causing a HARD violation, so solve() can re-place those correctly. On an
+// already-valid board nothing is stripped and the timetable is returned intact. Pinned and
+// structural events (joint/team/electives/self_study — `isReschedulable === false`) never move,
+// so a strict request that conflicts with a locked lesson is reported as a blocker, not forced.
 function planningBase(project: Project, timetableId: Id): Project {
+  const tt = activeTable(project, timetableId);
+  const profile = tt && findProfile(project, tt);
+  if (!tt || !profile) return project;
+
+  // (day#slot) cells flagged by any hard violation, with the class/teacher/event they implicate.
+  const hard = validate(project, tt).filter((v) => v.severity === "hard");
+  const flaggedClass = new Set<string>(); // `${classId} ${day}#${slot}`
+  const flaggedTeacher = new Set<string>(); // `${teacherId} ${day}#${slot}`
+  const flaggedEvent = new Set<string>(); // `${eventId} ${day}#${slot}`
+  for (const v of hard) {
+    for (const s of v.slots) {
+      const dk = `${s.day}#${s.slot}`;
+      if (s.classId) flaggedClass.add(`${s.classId} ${dk}`);
+      if (s.teacherId) flaggedTeacher.add(`${s.teacherId} ${dk}`);
+      if (s.eventId) flaggedEvent.add(`${s.eventId} ${dk}`);
+    }
+  }
+  const eventIndex = new Map(project.events.map((e) => [e.id, e]));
+  const inHardViolation = (p: Placement): boolean => {
+    const ev = eventIndex.get(p.eventId);
+    if (!ev) return false;
+    const slots = placementSlots(profile, p, ev);
+    if (!slots) return false;
+    return slots.some((slot) => {
+      const dk = `${p.day}#${slot}`;
+      if (flaggedEvent.has(`${ev.id} ${dk}`)) return true;
+      if (ev.teacherIds.some((t) => flaggedTeacher.has(`${t} ${dk}`))) return true;
+      return ev.classIds.some((c) => flaggedClass.has(`${c} ${dk}`));
+    });
+  };
+
   return {
     ...project,
-    timetables: project.timetables.map((tt) =>
-      tt.id !== timetableId
-        ? tt
-        : {
-            ...tt,
-            placements: tt.placements.filter((p) => p.pinned || !canPlannerRemove(project, p.eventId)),
-          },
+    timetables: project.timetables.map((t) =>
+      t.id !== timetableId
+        ? t
+        : { ...t, placements: t.placements.filter((p) => p.pinned || !isReschedulable(project, p.eventId) || !inHardViolation(p)) },
     ),
   };
 }
@@ -71,9 +104,9 @@ function lockedBlockers(project: Project, timetable: Timetable): string[] {
     : [];
 }
 
-export function planTimetable(project: Project, timetableId: Id, opts?: { seeds?: number }): PlanResult {
+export function planTimetable(project: Project, timetableId: Id, opts?: { seeds?: number; budgetMs?: number }): PlanResult {
   const base = planningBase(project, timetableId);
-  const generated = generate(base, timetableId, { seeds: opts?.seeds ?? 32 });
+  const generated = generate(base, timetableId, { seeds: opts?.seeds ?? 12, budgetMs: opts?.budgetMs });
   const timetable = activeTable(generated.project, timetableId);
   const hard = timetable ? validate(generated.project, timetable).filter((v) => v.severity === "hard") : [];
   const soft = timetable ? validate(generated.project, timetable).filter((v) => v.severity === "soft") : [];
