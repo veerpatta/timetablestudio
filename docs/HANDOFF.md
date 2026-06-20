@@ -4,11 +4,23 @@ This file is the bridge between work sessions. The agent MUST update it after ev
 
 ---
 
-## Current state (REVAMP — v7 decision-grade UI — M26 complete, 2026-06-21)
+## Current state (REVAMP — v7 decision-grade UI — ALL MILESTONES COMPLETE, 2026-06-21)
 
-Branch `main`. 255 tests green (49 files); build (~105 KB gzip main) + lint clean.
+Branch `main`. 258 tests green (49 files); build (109 KB gzip main) + lint clean. All 6 milestones (M23–M28) committed and pushed to origin/main.
 
-**M26 — Multi-candidate generation — COMPLETE (2026-06-21).**
+**Next session**: no pending milestones. The REVAMP plan is complete. Possible follow-ups: browser smoke-test of targeted regenerate UI, or new feature requests.
+
+---
+
+**M28 — Targeted regenerate + verdict polish — COMPLETE (2026-06-21).**
+- `src/solver/targetedRegenerate.ts`: new pure function. For `type:"class"` scope, pins all out-of-scope placements (including multi-class shared events) and clears only events whose `classIds` is EXCLUSIVELY `[targetClassId]`. Multi-class events stay pinned so other classes are not disturbed. Runs `solveTimetable(scopedProject, timetableId, { mode: "prove" })` — for small scopes the exact search either finds a solution or proves impossibility.
+- `src/solver/domains.ts`: pre-computes a `pinnedSlots` set per class; added early-continue guard inside `buildSearchDomains` so `placeNormalLesson` never displaces a pinned event via `clearCell`. Fixes a previously silent bug where targeted regenerate could disturb pinned placements.
+- `src/solver/fillWorker.ts + fillClient.ts`: `TargetedRegenerateMessage` type and `runTargetedRegenerate()` with Worker+fallback client.
+- `src/ui/app/GenerateView.tsx`: "Likely impossible" verdict when all candidates have shortfall > 0; "Re-plan a specific area" collapsible section with class/teacher/day scope tabs, entity dropdown, inline result panel with "Apply targeted result" button.
+- `src/ui/app/App.tsx`: `doTargetedRegenerate` prop wired; imports `runTargetedRegenerate`.
+- 3 AC tests: impossible scope → `proofLevel: "impossible"` with named bottleneck; out-of-scope placements preserved; new placements confined to target-class events.
+
+**M27 — Generate & Compare UI — COMPLETE (2026-06-21).**
 - Created `src/solver/presets.ts`: `Preset` interface + 3 named presets (`BALANCED_PRESET`, `TEACHER_FRIENDLY_PRESET`, `STUDENT_FOCUSED_PRESET`) as data (multiplier maps over `ConstraintTemplate`). Teacher-friendly up-weights: `balance_teacher_loads` 3×, `teacher_compact_day` 3×, plus 6 other teacher templates at 2×. Student-focused up-weights: `core_subjects_early` 3×, `subject_spread_min_days` 3×, `class_daily_variety` 3×, plus 5 other student templates at 2×.
 - Added `Verdict` type and `Candidate` interface to `src/solver/types.ts` (imports `Assessment` from `domain/assessment.ts` — layering sound). `Candidate` carries: `presetLabel`, `project`, `changes`, `seed`, `hardCount`, `remainingShortfall`, `softScore`, `weightedSoftScore`, `assessment`, `verdict`.
 - Added `generateCandidates(project, timetableId, opts?)` to `src/solver/generate.ts` (existing `generate()` unchanged — all callers unaffected). Each preset gets a non-overlapping seed range (preset 0 → seeds 1–N, preset 1 → seeds N+1–2N …) so different presets genuinely explore different parts of the search space. Weighted soft scoring: Σ(`constraint.weight` × `preset.multiplier[template]`) per soft violation — presets with different multipliers select genuinely different seeds as "best." Dedup by placement hash (`placementHash`). `assessTimetable` called once per surviving candidate.
