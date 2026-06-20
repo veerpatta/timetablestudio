@@ -20,6 +20,7 @@ import {
   renameTeacher,
 } from "../domain/entityEdit";
 import { addQualification, removeQualification, setClassTeacher } from "../domain/assign";
+import { removeRequirement, setRequirement } from "../domain/requirementsEdit";
 import { canMove, canSwap, type Cell } from "../domain/swaps";
 import { buildBundledProject } from "../fixtures/bundled";
 import { loadProject, saveProject } from "../persistence/db";
@@ -67,8 +68,10 @@ interface ProjectState {
   updateConstraint: (constraint: Constraint) => void;
   toggleConstraint: (id: Id) => void;
   removeConstraint: (id: Id) => void;
+  /** Subject quotas (B): upsert/remove the weekly required periods for (class, subject). */
   setRequirementPeriods: (classId: Id, subjectId: Id, periodsPerWeek: number) => void;
   setRequirementPreferDouble: (classId: Id, subjectId: Id, preferDouble: boolean) => void;
+  removeRequirement: (classId: Id, subjectId: Id) => void;
   /** Named versions (RB8): snapshot the current project; restore is undoable. */
   saveVersion: (name: string) => void;
   restoreVersion: (id: Id) => void;
@@ -177,15 +180,9 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   removeConstraint: (id) =>
     set((s) => ({ past: [...s.past, s.project], project: { ...s.project, constraints: s.project.constraints.filter((c) => c.id !== id) } })),
   setRequirementPeriods: (classId, subjectId, periodsPerWeek) =>
-    set((s) => ({
-      past: [...s.past, s.project],
-      project: {
-        ...s.project,
-        requirements: s.project.requirements.map((r) =>
-          r.classId === classId && r.subjectId === subjectId ? { ...r, periodsPerWeek: Math.max(0, periodsPerWeek) } : r,
-        ),
-      },
-    })),
+    set((s) => ({ past: [...s.past, s.project], project: setRequirement(s.project, classId, subjectId, periodsPerWeek) })),
+  removeRequirement: (classId, subjectId) =>
+    set((s) => ({ past: [...s.past, s.project], project: removeRequirement(s.project, classId, subjectId) })),
   setRequirementPreferDouble: (classId, subjectId, preferDouble) =>
     set((s) => ({
       past: [...s.past, s.project],

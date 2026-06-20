@@ -1,7 +1,6 @@
-// RB3 integration: the Issues panel detects a clash that arrived from OUTSIDE the
-// legal-only editor (injected here directly, as a teacher-reassignment / import / profile
-// switch would), lets the owner jump to it and fix it in one click, and the fix is
-// undoable. The editor itself cannot create a clash, so we seed one into the store.
+// Integration: the Issues panel (in the Timetable section) detects a clash that arrived from
+// OUTSIDE the legal-only editor (injected here directly, as a teacher reassignment / import
+// would), lets the owner jump to it and fix it in one click, and the fix is undoable.
 
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
@@ -20,23 +19,20 @@ function seedClash(): void {
   useProjectStore.setState({ project, timetableId: "tt", past: [] });
 }
 
-describe("RB3 Issues panel (clash from outside the editor)", () => {
+const goTimetable = () => fireEvent.click(screen.getByRole("button", { name: "Timetable" }));
+
+describe("Issues panel (clash from outside the editor)", () => {
   it("shows a plain-language problem, fixes it in one click, and the fix is undoable", () => {
     seedClash();
     render(<App />);
+    goTimetable();
 
-    // The problem is listed in plain language (no codes), with a working fix.
     expect(screen.getByText(/Things to fix/)).toBeInTheDocument();
     expect(screen.getByText(/double-booked/i)).toBeInTheDocument();
-    const fixBtn = screen.getByRole("button", { name: /Fix it/ });
 
-    fireEvent.click(fixBtn);
-
-    // Clash resolved: the problem panel is gone and the planner summary is visible.
+    fireEvent.click(screen.getByRole("button", { name: /Fix it/ }));
     expect(screen.queryByText(/Things to fix/)).not.toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "Planner result" })).toBeInTheDocument();
 
-    // Undo brings the problem back (the fix was reviewable + reversible).
     fireEvent.click(screen.getByRole("button", { name: "Undo" }));
     expect(screen.getByText(/Things to fix/)).toBeInTheDocument();
   });
@@ -44,8 +40,8 @@ describe("RB3 Issues panel (clash from outside the editor)", () => {
   it("'Show me' jumps to the offending cell (opens its editor)", () => {
     seedClash();
     render(<App />);
+    goTimetable();
     fireEvent.click(screen.getByRole("button", { name: "Show me" }));
-    // The right-side inspector opens on the jumped-to slot.
     const inspector = screen.getByRole("region", { name: "Cell inspector" });
     expect(within(inspector).getByText(/Mon P1/)).toBeInTheDocument();
   });

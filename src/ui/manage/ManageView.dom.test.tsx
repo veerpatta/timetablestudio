@@ -17,7 +17,7 @@ describe("Setup view — the C1 acceptance flow through the UI", () => {
 
   it("a user adds a teacher, renames a subject, and removes a class — no dangling ref, no clash", () => {
     render(<App />);
-    fireEvent.click(screen.getByRole("button", { name: "Staff" }));
+    fireEvent.click(screen.getByRole("button", { name: "Setup" }));
 
     // 1) Add a teacher
     const before = proj().teachers.length;

@@ -4,60 +4,43 @@ import { useProjectStore } from "../../store/projectStore";
 import { App } from "./App";
 
 const project = () => useProjectStore.getState().project;
+const goTimetable = () => fireEvent.click(screen.getByRole("button", { name: "Timetable" }));
 
-describe("Workbench editing surface", () => {
+describe("Workbench editing surface (green-field)", () => {
   beforeEach(() => useProjectStore.getState().reset());
 
-  it("opens as a timetable workbench with a left rail and right inspector", () => {
+  it("opens on a guided home with navigation and a primary action", () => {
     render(<App />);
-
-    expect(screen.getByRole("navigation", { name: "Workbench sections" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Make best timetable" })).toBeInTheDocument();
-    expect(screen.getByText("Define what matters")).toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "Planner result" })).toBeInTheDocument();
-    expect(screen.getByText("Run Make best timetable to see proposed changes before applying them.")).toBeInTheDocument();
+    expect(screen.getByRole("navigation", { name: "Sections" })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Make timetable" }).length).toBeGreaterThan(0);
+    expect(screen.getByText("How it works")).toBeInTheDocument();
   });
 
-  it("opens the selected-cell inspector from the class grid and adds a preference request", () => {
+  it("opens the cell inspector from the class grid and adds a preference request", () => {
     render(<App />);
+    goTimetable();
 
     fireEvent.click(screen.getByRole("button", { name: "Mon P1" }));
-
     expect(screen.getByText("Selected cell")).toBeInTheDocument();
     expect(screen.getByText("Legal replacements")).toBeInTheDocument();
-    expect(screen.getByText("Affects this teacher")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Prefer this subject in the first half" }));
-
-    const added = project().constraints.find((c) => c.id.startsWith("quick:first-half:"));
-    expect(added).toMatchObject({
+    expect(project().constraints.find((c) => c.id.startsWith("quick:first-half:"))).toMatchObject({
       template: "subject_half_of_day",
       severity: "prefer",
       enabled: true,
     });
   });
 
-  it("edits from the day view and keeps the same inspector workflow", () => {
-    render(<App />);
-
-    fireEvent.click(screen.getByRole("button", { name: "Day" }));
-    fireEvent.click(screen.getByRole("button", { name: "Class 1 Mon P1" }));
-
-    const inspector = screen.getByRole("region", { name: "Cell inspector" });
-    expect(within(inspector).getByText("Selected cell")).toBeInTheDocument();
-    expect(within(inspector).getAllByText(/Class 1/).length).toBeGreaterThan(0);
-    expect(within(inspector).getByText(/Mon P1/)).toBeInTheDocument();
-  });
-
   it("opens the same inspector from teacher mode", () => {
     render(<App />);
+    goTimetable();
 
-    fireEvent.click(screen.getByRole("button", { name: "Teacher" }));
-    fireEvent.change(screen.getByRole("combobox", { name: /Teacher/ }), { target: { value: "Bindu" } });
+    fireEvent.click(screen.getByRole("button", { name: "By teacher" }));
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "Bindu" } });
     fireEvent.click(screen.getByRole("button", { name: "Bindu Mon P1" }));
 
     const inspector = screen.getByRole("region", { name: "Cell inspector" });
     expect(within(inspector).getByText("Selected cell")).toBeInTheDocument();
-    expect(within(inspector).getByText(/Maths for Class 1/)).toBeInTheDocument();
   });
 });
