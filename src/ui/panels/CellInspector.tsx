@@ -63,6 +63,30 @@ function firstHalfConstraint(cell: SelectedCell, subjectId: Id): Constraint {
   };
 }
 
+function spreadSubjectConstraint(cell: SelectedCell, subjectId: Id): Constraint {
+  return {
+    id: `quick:spread:${cell.classId}:${subjectId}`,
+    scope: "subject",
+    severity: "prefer",
+    weight: 3,
+    enabled: true,
+    template: "subject_spread_min_days",
+    params: { subjectIds: [subjectId], classIds: [cell.classId], minDays: 3 },
+  };
+}
+
+function teacherWeeklyLimitConstraint(teacherId: Id, currentLoad: number): Constraint {
+  return {
+    id: `quick:teacher-week:${teacherId}`,
+    scope: "teacher",
+    severity: "prefer",
+    weight: 3,
+    enabled: true,
+    template: "teacher_max_per_week",
+    params: { teacherId, max: Math.max(1, currentLoad) },
+  };
+}
+
 export function CellInspector({
   project,
   timetable,
@@ -158,6 +182,14 @@ export function CellInspector({
                 <button onClick={() => onAddConstraint(firstHalfConstraint(selected, event.subjectId))} className="w-full rounded border border-slate-200 px-2 py-1.5 text-left text-sm hover:bg-sky-50">
                   Prefer this subject in the first half
                 </button>
+                <button onClick={() => onAddConstraint(spreadSubjectConstraint(selected, event.subjectId))} className="w-full rounded border border-slate-200 px-2 py-1.5 text-left text-sm hover:bg-sky-50">
+                  Spread this subject across the week
+                </button>
+                {primaryTeacher && (
+                  <button onClick={() => onAddConstraint(teacherWeeklyLimitConstraint(primaryTeacher, teacherWeekLoad(project, timetable, primaryTeacher)))} className="w-full rounded border border-slate-200 px-2 py-1.5 text-left text-sm hover:bg-sky-50">
+                    Limit this teacher's weekly periods
+                  </button>
+                )}
                 {req && (
                   <>
                     <button onClick={() => onSetRequirementPeriods(selected.classId, event.subjectId, req.periodsPerWeek + 1)} className="w-full rounded border border-slate-200 px-2 py-1.5 text-left text-sm hover:bg-sky-50">

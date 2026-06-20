@@ -22,8 +22,28 @@ describe("Planner assistant workflow (green-field)", () => {
     fireEvent.click(headerMakeBtn());
     const apply = await screen.findByRole("button", { name: "Apply this plan" }, { timeout: 5000 });
     expect(screen.getByText(/requests met/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Complete timetable|Best found|Time limit reached/i).length).toBeGreaterThan(0);
 
     fireEvent.click(apply);
     expect(screen.getByText(/Plan applied/)).toBeInTheDocument();
+  });
+
+  it("shows a proved-impossible message only when the solver can prove the setup is blocked", async () => {
+    const project = useProjectStore.getState().project;
+    useProjectStore.setState({
+      project: {
+        ...project,
+        qualifications: [],
+        requirements: [{ id: "req-impossible", classId: "Class 1", subjectId: "Maths", teacherIds: [], periodsPerWeek: 1 }],
+      },
+      timetableId: project.activeTimetableId!,
+      past: [],
+    });
+
+    render(<App />);
+    fireEvent.click(headerMakeBtn());
+
+    expect((await screen.findAllByText(/Cannot satisfy these rules/i, {}, { timeout: 5000 })).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/qualified/i).length).toBeGreaterThan(0);
   });
 });

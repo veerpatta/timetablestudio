@@ -32,6 +32,19 @@ describe("Workbench editing surface (green-field)", () => {
     });
   });
 
+  it("offers common quick requests from a selected cell", () => {
+    render(<App />);
+    goTimetable();
+
+    fireEvent.click(screen.getByRole("button", { name: "Mon P1" }));
+    fireEvent.click(screen.getByRole("button", { name: "Spread this subject across the week" }));
+    fireEvent.click(screen.getByRole("button", { name: "Limit this teacher's weekly periods" }));
+
+    expect(project().constraints.some((c) => c.template === "subject_spread_min_days")).toBe(true);
+    expect(project().constraints.some((c) => c.template === "teacher_max_per_week")).toBe(true);
+    expect(screen.getByText(/request saved/i)).toBeInTheDocument();
+  });
+
   it("opens the same inspector from teacher mode", () => {
     render(<App />);
     goTimetable();

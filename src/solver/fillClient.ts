@@ -1,21 +1,22 @@
-// Client for the auto-fill / generate solver (RB5 + C6). Runs the solver in a Web Worker so
-// the main thread never blocks (AGENTS §1); falls back to a direct call when Worker is
-// unavailable (Node / jsdom tests, or an environment without module workers). The result is
-// identical either way — the solver is pure and deterministic per seed (and per seed-list).
+// Client for the auto-fill / generate solver. Legacy fill/generate calls still return the
+// raw worker result; the deep planner uses structured progress/done messages so the UI can
+// honestly show proof level and best-found state.
 
 import type { Id, Project } from "../domain/types";
+import { candidateResult } from "./candidateScoring";
+import { solveTimetable } from "./deepSearch";
 import { fill, type FillResult } from "./fill";
 import { generate, type GenerateResult } from "./generate";
-import { planTimetable, type PlanResult } from "./plan";
+import type { CandidateResult, SolverProgress, SolverRequest } from "./types";
 
-type SolverMode = "fill" | "generate" | "plan";
+type LegacyMode = "fill" | "generate";
 
-function runInWorker<R>(project: Project, timetableId: Id, mode: SolverMode, seed: number, seeds?: number): Promise<R> {
+function runLegacyInWorker<R>(project: Project, timetableId: Id, mode: LegacyMode, seed: number, seeds?: number): Promise<R> {
   return new Promise<R>((resolve, reject) => {
     const worker = new Worker(new URL("./fillWorker.ts", import.meta.url), { type: "module" });
     worker.onmessage = (e: MessageEvent<R>) => {
-      resolve(e.data);
       worker.terminate();
+      resolve(e.data);
     };
     worker.onerror = (e) => {
       worker.terminate();
@@ -25,13 +26,122 @@ function runInWorker<R>(project: Project, timetableId: Id, mode: SolverMode, see
   });
 }
 
+type WorkerOutbound =
+  | { type: "progress"; progress: SolverProgress }
+  | { type: "candidate"; result: CandidateResult }
+  | { type: "done"; result: CandidateResult }
+  | { type: "error"; message: string };
+
+export interface SolverCallbacks {
+  onProgress?: (progress: SolverProgress) => void;
+}
+
+export interface CancelableSolve {
+  promise: Promise<CandidateResult>;
+  cancel: () => void;
+}
+
+function cancelledResult(project: Project, timetableId: Id, request: SolverRequest, latest: CandidateResult | null, startedAt: number): CandidateResult {
+  if (latest) {
+    return {
+      ...latest,
+      proofLevel: "timeout",
+      stats: { ...latest.stats, timedOut: true, elapsedMs: Date.now() - startedAt },
+      blockers: latest.blockers.length > 0 ? latest.blockers : ["Planning was stopped before it finished."],
+    };
+  }
+  return candidateResult(project, project, timetableId, {
+    mode: request.mode,
+    proofLevel: "timeout",
+    feasibility: { status: "unknown", blockers: [], relaxationSuggestions: [] },
+    triedCandidates: 0,
+    startedAt,
+    timedOut: true,
+    blockers: ["Planning was stopped before it finished."],
+  });
+}
+
+function startSolveInWorker(project: Project, timetableId: Id, request: SolverRequest, callbacks?: SolverCallbacks): CancelableSolve {
+  const startedAt = Date.now();
+  const worker = new Worker(new URL("./fillWorker.ts", import.meta.url), { type: "module" });
+  let latest: CandidateResult | null = null;
+  let settled = false;
+  let resolvePromise: (value: CandidateResult) => void = () => {};
+  let rejectPromise: (reason?: unknown) => void = () => {};
+
+  const promise = new Promise<CandidateResult>((resolve, reject) => {
+    resolvePromise = resolve;
+    rejectPromise = reject;
+    worker.onmessage = (e: MessageEvent<WorkerOutbound>) => {
+      if (settled) return;
+      if (e.data.type === "progress") {
+        callbacks?.onProgress?.(e.data.progress);
+        return;
+      }
+      if (e.data.type === "candidate") {
+        latest = e.data.result;
+        return;
+      }
+      worker.terminate();
+      settled = true;
+      if (e.data.type === "done") resolvePromise(e.data.result);
+      else rejectPromise(new Error(e.data.message));
+    };
+    worker.onerror = (e) => {
+      if (settled) return;
+      worker.terminate();
+      settled = true;
+      rejectPromise(e);
+    };
+    worker.postMessage({ type: "solve", project, timetableId, request });
+  });
+
+  return {
+    promise,
+    cancel: () => {
+      if (settled) return;
+      worker.terminate();
+      settled = true;
+      resolvePromise(cancelledResult(project, timetableId, request, latest, startedAt));
+    },
+  };
+}
+
+export function startSolveTimetable(project: Project, timetableId: Id, request: SolverRequest, callbacks?: SolverCallbacks): CancelableSolve {
+  if (typeof Worker !== "undefined") {
+    try {
+      return startSolveInWorker(project, timetableId, request, callbacks);
+    } catch {
+      // Worker construction failed (e.g. unsupported) - fall back to the main thread.
+    }
+  }
+
+  const startedAt = Date.now();
+  let cancelled = false;
+  const promise = Promise.resolve().then(() => {
+    if (cancelled) return cancelledResult(project, timetableId, request, null, startedAt);
+    callbacks?.onProgress?.({ phase: "preflight", triedCandidates: 0, bestHard: 0, bestMissing: 0, bestSoft: 0, elapsedMs: 0 });
+    const result = solveTimetable(project, timetableId, request);
+    callbacks?.onProgress?.({
+      phase: "done",
+      triedCandidates: result.stats.triedCandidates,
+      bestHard: result.hardCount,
+      bestMissing: result.remainingShortfall,
+      bestSoft: result.softScore,
+      elapsedMs: result.stats.elapsedMs,
+    });
+    return cancelled ? cancelledResult(project, timetableId, request, result, startedAt) : result;
+  });
+  return { promise, cancel: () => { cancelled = true; } };
+}
+
 /** Single greedy fill at one seed (used where a specific seed must be reproduced). */
 export async function runFill(project: Project, timetableId: Id, seed: number): Promise<FillResult> {
   if (typeof Worker !== "undefined") {
     try {
-      return await runInWorker<FillResult>(project, timetableId, "fill", seed);
+      return await runLegacyInWorker<FillResult>(project, timetableId, "fill", seed);
     } catch {
-      // Worker construction failed (e.g. unsupported) — fall back to the main thread.
+      // Worker construction failed (e.g. unsupported) - fall back to the main thread.
     }
   }
   return fill(project, timetableId, { seed });
@@ -41,21 +151,18 @@ export async function runFill(project: Project, timetableId: Id, seed: number): 
 export async function runGenerate(project: Project, timetableId: Id, seeds = 8): Promise<GenerateResult> {
   if (typeof Worker !== "undefined") {
     try {
-      return await runInWorker<GenerateResult>(project, timetableId, "generate", 1, seeds);
+      return await runLegacyInWorker<GenerateResult>(project, timetableId, "generate", 1, seeds);
     } catch {
-      // fall back to the main thread
+      // Fall back to the main thread.
     }
   }
   return generate(project, timetableId, { seeds });
 }
 
-export async function runPlanTimetable(project: Project, timetableId: Id, seeds = 32): Promise<PlanResult> {
-  if (typeof Worker !== "undefined") {
-    try {
-      return await runInWorker<PlanResult>(project, timetableId, "plan", 1, seeds);
-    } catch {
-      // fall back to the main thread
-    }
-  }
-  return planTimetable(project, timetableId, { seeds });
+export async function runSolveTimetable(project: Project, timetableId: Id, request: SolverRequest, callbacks?: SolverCallbacks): Promise<CandidateResult> {
+  return startSolveTimetable(project, timetableId, request, callbacks).promise;
+}
+
+export async function runPlanTimetable(project: Project, timetableId: Id, maxCandidates = 8): Promise<CandidateResult> {
+  return runSolveTimetable(project, timetableId, { mode: "deep", maxCandidates, budgetMs: 5000 });
 }

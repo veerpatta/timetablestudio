@@ -1,30 +1,62 @@
-// Web Worker entry for the auto-fill / generate solver (RB5 + C6) — the solver MUST run off
-// the main thread (AGENTS §1). Thin marshalling shell: it receives a Project + timetable id
-// + seed (and an optional `seeds` count for best-of-N generate), runs the PURE solver, and
-// posts the result back. All logic lives in fill.ts / generate.ts; Node tests call those
-// directly, never this worker.
+// Web Worker entry for the timetable solver. Legacy fill/generate calls stay supported;
+// the deep planner uses structured progress/done/error messages.
 
 import type { Id, Project } from "../domain/types";
+import { solveTimetable } from "./deepSearch";
 import { fill } from "./fill";
 import { generate } from "./generate";
-import { planTimetable } from "./plan";
+import type { SolverProgress, SolverRequest } from "./types";
 
-interface FillRequest {
-  mode?: "fill" | "generate" | "plan";
+interface LegacyRequest {
+  mode?: "fill" | "generate";
   project: Project;
   timetableId: Id;
   seed: number;
-  seeds?: number; // > 1 → best-of-N generate (optimise prefers); else single greedy fill
+  seeds?: number;
 }
 
-self.onmessage = (e: MessageEvent<FillRequest>): void => {
-  const { mode, project, timetableId, seed, seeds } = e.data;
+interface SolveRequestMessage {
+  type: "solve";
+  project: Project;
+  timetableId: Id;
+  request: SolverRequest;
+}
+
+type WorkerRequest = LegacyRequest | SolveRequestMessage;
+
+function post(message: unknown): void {
+  (self as unknown as { postMessage: (m: unknown) => void }).postMessage(message);
+}
+
+function postProgress(progress: SolverProgress): void {
+  post({ type: "progress", progress });
+}
+
+self.onmessage = (e: MessageEvent<WorkerRequest>): void => {
+  if ("type" in e.data && e.data.type === "solve") {
+    const startedAt = Date.now();
+    postProgress({ phase: "preflight", triedCandidates: 0, bestHard: 0, bestMissing: 0, bestSoft: 0, elapsedMs: 0 });
+    try {
+      const result = solveTimetable(e.data.project, e.data.timetableId, e.data.request, {
+        onCandidate: (candidate) => post({ type: "candidate", result: candidate }),
+      });
+      postProgress({
+        phase: "done",
+        triedCandidates: result.stats.triedCandidates,
+        bestHard: result.hardCount,
+        bestMissing: result.remainingShortfall,
+        bestSoft: result.softScore,
+        elapsedMs: Date.now() - startedAt,
+      });
+      post({ type: "done", result });
+    } catch (err) {
+      post({ type: "error", message: err instanceof Error ? err.message : "The solver could not finish." });
+    }
+    return;
+  }
+
+  const legacy = e.data as LegacyRequest;
+  const { mode, project, timetableId, seed, seeds } = legacy;
   const kind = mode ?? (seeds && seeds > 1 ? "generate" : "fill");
-  const result =
-    kind === "plan"
-      ? planTimetable(project, timetableId, { seeds })
-      : kind === "generate"
-        ? generate(project, timetableId, { seeds })
-        : fill(project, timetableId, { seed });
-  (self as unknown as { postMessage: (m: unknown) => void }).postMessage(result);
+  post(kind === "generate" ? generate(project, timetableId, { seeds }) : fill(project, timetableId, { seed }));
 };

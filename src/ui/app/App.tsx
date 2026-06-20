@@ -7,7 +7,7 @@
 import { useMemo, useState } from "react";
 import type { Constraint } from "../../domain/types";
 import { runPlanTimetable } from "../../solver/fillClient";
-import type { PlanResult } from "../../solver/plan";
+import type { CandidateResult } from "../../solver/types";
 import { useProjectStore } from "../../store/projectStore";
 import { InsightsView } from "../insights/InsightsView";
 import { ReportsView } from "../reports/ReportsView";
@@ -27,7 +27,7 @@ export function App(): React.ReactElement {
   const timetable = project.timetables.find((t) => t.id === timetableId)!;
 
   const [section, setSection] = useState<Section>("home");
-  const [planResult, setPlanResult] = useState<PlanResult | null>(null);
+  const [planResult, setPlanResult] = useState<CandidateResult | null>(null);
   const [planning, setPlanning] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
 
@@ -39,7 +39,7 @@ export function App(): React.ReactElement {
     if (project.constraints.some((x) => x.id === c.id)) updateConstraint(c);
     else addConstraint(c);
     setPlanResult(null);
-    setFlash("Rule saved. Run Make timetable to apply it.");
+    setFlash("Request saved. Run Make timetable to apply it.");
   };
 
   const makeBestTimetable = async () => {
