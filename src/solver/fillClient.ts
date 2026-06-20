@@ -6,8 +6,8 @@ import type { Id, Project } from "../domain/types";
 import { candidateResult } from "./candidateScoring";
 import { solveTimetable } from "./deepSearch";
 import { fill, type FillResult } from "./fill";
-import { generate, type GenerateResult } from "./generate";
-import type { CandidateResult, SolverProgress, SolverRequest } from "./types";
+import { generate, generateCandidates, type GenerateResult } from "./generate";
+import type { Candidate, CandidateResult, SolverProgress, SolverRequest } from "./types";
 
 type LegacyMode = "fill" | "generate";
 
@@ -165,4 +165,30 @@ export async function runSolveTimetable(project: Project, timetableId: Id, reque
 
 export async function runPlanTimetable(project: Project, timetableId: Id, maxCandidates = 8): Promise<CandidateResult> {
   return runSolveTimetable(project, timetableId, { mode: "deep", maxCandidates, budgetMs: 5000 });
+}
+
+/** Multi-preset candidate generation (M27). Falls back to main thread if Worker unavailable. */
+export async function runGenerateCandidates(
+  project: Project,
+  timetableId: Id,
+  opts?: { seeds?: number; budgetMs?: number },
+): Promise<Candidate[]> {
+  if (typeof Worker !== "undefined") {
+    try {
+      return await new Promise<Candidate[]>((resolve, reject) => {
+        const worker = new Worker(new URL("./fillWorker.ts", import.meta.url), { type: "module" });
+        type OutMsg = { type: "done_candidates"; candidates: Candidate[] } | { type: "error"; message: string };
+        worker.onmessage = (e: MessageEvent<OutMsg>) => {
+          worker.terminate();
+          if (e.data.type === "done_candidates") resolve(e.data.candidates);
+          else reject(new Error(e.data.message));
+        };
+        worker.onerror = (e) => { worker.terminate(); reject(e); };
+        worker.postMessage({ type: "generateCandidates", project, timetableId, opts });
+      });
+    } catch {
+      // Worker unavailable or threw — fall back to main thread.
+    }
+  }
+  return generateCandidates(project, timetableId, opts);
 }

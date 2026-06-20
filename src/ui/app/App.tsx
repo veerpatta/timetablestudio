@@ -5,9 +5,10 @@
 // presentation and information architecture are new.
 
 import { useMemo, useState } from "react";
-import type { Constraint } from "../../domain/types";
-import { runPlanTimetable } from "../../solver/fillClient";
-import type { CandidateResult } from "../../solver/types";
+import type { Constraint, Project } from "../../domain/types";
+import { analyzeFeasibility } from "../../solver/feasibility";
+import { runGenerateCandidates } from "../../solver/fillClient";
+import type { Candidate, FeasibilityReport } from "../../solver/types";
 import { useProjectStore } from "../../store/projectStore";
 import { InsightsView } from "../insights/InsightsView";
 import { ReportsView } from "../reports/ReportsView";
@@ -27,7 +28,8 @@ export function App(): React.ReactElement {
   const timetable = project.timetables.find((t) => t.id === timetableId)!;
 
   const [section, setSection] = useState<Section>("home");
-  const [planResult, setPlanResult] = useState<CandidateResult | null>(null);
+  const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [feasibility, setFeasibility] = useState<FeasibilityReport | null>(null);
   const [planning, setPlanning] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
 
@@ -38,18 +40,26 @@ export function App(): React.ReactElement {
   const addOrUpdateConstraint = (c: Constraint) => {
     if (project.constraints.some((x) => x.id === c.id)) updateConstraint(c);
     else addConstraint(c);
-    setPlanResult(null);
+    setCandidates([]);
+    setFeasibility(null);
     setFlash("Request saved. Run Make timetable to apply it.");
   };
 
-  const makeBestTimetable = async () => {
+  const makeBestTimetable = async (withProject?: Project) => {
+    const proj = withProject ?? project;
     setPlanning(true);
-    setPlanResult(null);
+    setCandidates([]);
+    setFeasibility(null);
     setFlash(null);
     setSection("generate");
     try {
       await new Promise((r) => setTimeout(r, 0));
-      setPlanResult(await runPlanTimetable(project, timetableId, 8));
+      const feas = analyzeFeasibility(proj, timetableId);
+      setFeasibility(feas);
+      if (feas.status !== "blocked") {
+        const cands = await runGenerateCandidates(proj, timetableId, { seeds: 4, budgetMs: 6000 });
+        setCandidates(cands);
+      }
     } catch {
       setFlash("The planner could not finish. Check your setup and try again.");
     } finally {
@@ -57,15 +67,21 @@ export function App(): React.ReactElement {
     }
   };
 
-  const applyPlan = () => {
-    if (!planResult) return;
-    const n = planResult.changes.length;
+  const applyCandidate = (candidate: Candidate) => {
+    const n = candidate.changes.length;
     // Auto restore point BEFORE applying — survives reload, so a bad plan is always recoverable.
     store.createBackup(`Before applying plan · ${new Date().toLocaleString()}`);
-    store.applyFix(planResult.project);
-    setPlanResult(null);
+    store.applyFix(candidate.project);
+    setCandidates([]);
+    setFeasibility(null);
     setFlash(`Plan applied — ${n} ${n === 1 ? "cell" : "cells"} updated. A restore point was saved (Tools).`);
     setSection("timetable");
+  };
+
+  const applyTweak = (tweakedProject: Project) => {
+    store.createBackup(`Before applying tweak · ${new Date().toLocaleString()}`);
+    store.applyFix(tweakedProject);
+    void makeBestTimetable(tweakedProject);
   };
 
   const navBtn = (s: Section, label: string) => (
@@ -107,19 +123,30 @@ export function App(): React.ReactElement {
           </div>
           <div className="flex items-center gap-2">
             <button onClick={undo} disabled={past.length === 0} className="ts-btn-ghost">Undo</button>
-            <button onClick={makeBestTimetable} disabled={planning} className="ts-btn-primary">{planning ? "Planning…" : "Make timetable"}</button>
+            <button onClick={() => void makeBestTimetable()} disabled={planning} className="ts-btn-primary">{planning ? "Planning…" : "Make timetable"}</button>
           </div>
         </header>
 
         {flash && <p className="no-print mx-6 mt-4 rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-2.5 text-sm text-indigo-800" role="status">{flash}</p>}
 
         <div className="p-6">
-          {section === "home" && <Dashboard project={project} timetable={timetable} planning={planning} onGenerate={makeBestTimetable} onGoto={go} />}
+          {section === "home" && <Dashboard project={project} timetable={timetable} planning={planning} onGenerate={() => void makeBestTimetable()} onGoto={go} />}
           {section === "setup" && <SetupHub project={project} timetable={timetable} onAddConstraint={addOrUpdateConstraint} />}
           {section === "generate" && (
-            <GenerateView project={project} timetable={timetable} result={planResult} planning={planning} onGenerate={makeBestTimetable} onApply={applyPlan} onReject={() => { setPlanResult(null); setFlash("Discarded the proposed plan."); }} />
+            <GenerateView
+              project={project}
+              timetable={timetable}
+              candidates={candidates}
+              feasibility={feasibility}
+              planning={planning}
+              onGenerate={() => void makeBestTimetable()}
+              onApply={applyCandidate}
+              onReject={() => { setCandidates([]); setFeasibility(null); setFlash("Discarded the proposed plan."); }}
+              onApplyTweak={applyTweak}
+              onJumpToTimetable={() => go("timetable")}
+            />
           )}
-          {section === "timetable" && <TimetableWorkspace project={project} timetable={timetable} onAddConstraint={addOrUpdateConstraint} onChanged={(f) => { setPlanResult(null); setFlash(f); }} />}
+          {section === "timetable" && <TimetableWorkspace project={project} timetable={timetable} onAddConstraint={addOrUpdateConstraint} onChanged={(f) => { setCandidates([]); setFeasibility(null); setFlash(f); }} />}
           {section === "insights" && <InsightsView project={project} timetable={timetable} />}
           {section === "reports" && <ReportsView project={project} timetable={timetable} timetableId={timetableId} />}
           {section === "tools" && <ToolsView project={project} timetable={timetable} />}
