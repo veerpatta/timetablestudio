@@ -4,9 +4,17 @@ This file is the bridge between work sessions. The agent MUST update it after ev
 
 ---
 
-## Current state (REVAMP — v7 decision-grade UI — M24 complete, 2026-06-21)
+## Current state (REVAMP — v7 decision-grade UI — M25 complete, 2026-06-21)
 
-Branch `main`. 228 tests green (46 files); build (~104 KB gzip main) + lint clean.
+Branch `main`. 247 tests green (48 files); build (~105 KB gzip main) + lint clean.
+
+**M25 — Assessment engine — COMPLETE (2026-06-21).**
+- Created `src/domain/assessment.ts` (pure, no framework imports): `assessTimetable(project, timetableId, opts?)` → `Assessment` with `score` (0–100), `band` (Great/Good/Fair/Poor), `summary`, `advantages[]`, `disadvantages[]`.
+- Five `Dimension`s: `coverage` (from `coverageGaps`), `teacherFairness` (from `allTeacherLoads` + `loadBalance`), `pedagogy` (soft violations from `validate()`), `boardProtection` (heuristic: academic subjects in last-quarter slots for `isBoardClass` classes), `stability` (from `diffProjects` when `opts.baseline` given).
+- Score = 100 − weighted penalties: 8 pts/gap period, 5 pts/hard violation, 1 pt/soft violation, 0.5 pts/excess fairness spread, 2 pts/late board academic; clamped [0,100].
+- `opts.baseline?: Timetable` — synthetic "before" project passed to `diffProjects`; stability dimension omitted when no baseline.
+- Types (`Assessment`, `Highlight`, `Dimension`, `ScoreBand`) co-located in `assessment.ts` (not `domain/types.ts`); Assessment is computed, not stored.
+- 19 new tests in `src/domain/assessment.test.ts`: coverage (3), teacherFairness (4, inc. property test vs `deriveMaps` directly), stability (3), boardProtection (3), score/band (4), messages (2). AC met.
 
 **M24 — Feasibility & relaxation engine — COMPLETE (2026-06-21).**
 - Added `RelaxationSuggestion` and `Blocker` interfaces to `src/solver/types.ts`. Added optional `structuredBlockers?: Blocker[]` to `FeasibilityReport` (backward compatible — all old construction sites still compile without changes).
@@ -23,8 +31,8 @@ Branch `main`. 228 tests green (46 files); build (~104 KB gzip main) + lint clea
 - Updated `src/ui/panels/Issues.tsx`: "Things to fix" → "Rule broken".
 - AC met: 214 tests green; build + lint clean; live-verified.
 
-**Next action: M25 — Assessment engine (W4).**
-Create `src/domain/assessment.ts` with `assessTimetable(project, timetableId): TimetableAssessment` returning structured pros/cons + an overall score. See REVAMP_PLAN.md W4 for the full spec.
+**Next action: M26 — Multi-candidate generation (W3).**
+Update `solver/generate.ts` to return `Candidate[]` with 2–3 emphasis presets (teacher-friendly, spread, default), each running best-of-N with its own weight multipliers. Each `Candidate` carries `project`, `seed`, `scores`, `assessment` (from M25), `verdict`, and `feasibility`. See REVAMP_PLAN.md W3 for the full spec.
 
 ---
 
