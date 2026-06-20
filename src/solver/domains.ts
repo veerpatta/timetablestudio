@@ -39,12 +39,29 @@ export function buildSearchDomains(project: Project, timetableId: Id): SearchDom
   const profile = timetable && findProfile(project, timetable);
   if (!timetable || !profile) return [];
   const units = outstandingUnits(project, timetableId);
+
+  // Pre-compute which (classId, day, slot) triples are occupied by pinned placements.
+  // placeNormalLesson calls clearCell which would silently displace them; skip those
+  // slots outright so pinned events are never disturbed by the search.
+  const eventMap = new Map(project.events.map((e) => [e.id, e]));
+  const pinnedSlots = new Set<string>();
+  for (const p of timetable.placements) {
+    if (!p.pinned) continue;
+    const ev = eventMap.get(p.eventId);
+    if (ev) {
+      for (const cid of ev.classIds) {
+        pinnedSlots.add(`${cid}|${p.day}|${p.slot}`);
+      }
+    }
+  }
+
   const domains: SearchDomain[] = [];
   for (const unit of units) {
     const options: SearchOption[] = [];
     const teachers = project.qualifications.filter((q) => q.classId === unit.classId && q.subjectId === unit.subjectId).map((q) => q.teacherId);
     for (const day of profile.days) {
       for (const slot of teachingSlots(profile)) {
+        if (pinnedSlots.has(`${unit.classId}|${day}|${slot}`)) continue;
         for (const teacherId of teachers) {
           if (localMustForbids(project, profile, { classId: unit.classId, subjectId: unit.subjectId, teacherIds: [teacherId], day, slot })) continue;
           const next = placeNormalLesson(project, timetableId, unit.classId, day, slot, unit.subjectId, [teacherId]);

@@ -6,7 +6,8 @@ import type { Id, Project } from "../domain/types";
 import { solveTimetable } from "./deepSearch";
 import { fill } from "./fill";
 import { generate, generateCandidates } from "./generate";
-import type { Candidate, SolverProgress, SolverRequest } from "./types";
+import { targetedRegenerate, type TargetedScope } from "./targetedRegenerate";
+import type { Candidate, CandidateResult, SolverProgress, SolverRequest } from "./types";
 
 interface LegacyRequest {
   mode?: "fill" | "generate";
@@ -30,14 +31,23 @@ interface GenerateCandidatesMessage {
   opts?: { seeds?: number; budgetMs?: number };
 }
 
+interface TargetedRegenerateMessage {
+  type: "targetedRegenerate";
+  project: Project;
+  timetableId: Id;
+  scope: TargetedScope;
+  opts?: { budgetMs?: number };
+}
+
 type WorkerOutbound =
   | { type: "done"; result: unknown }
   | { type: "done_candidates"; candidates: Candidate[] }
+  | { type: "done_targeted"; result: CandidateResult }
   | { type: "progress"; progress: SolverProgress }
   | { type: "candidate"; result: unknown }
   | { type: "error"; message: string };
 
-type WorkerRequest = LegacyRequest | SolveRequestMessage | GenerateCandidatesMessage;
+type WorkerRequest = LegacyRequest | SolveRequestMessage | GenerateCandidatesMessage | TargetedRegenerateMessage;
 
 function post(message: WorkerOutbound | unknown): void {
   (self as unknown as { postMessage: (m: unknown) => void }).postMessage(message);
@@ -54,6 +64,16 @@ self.onmessage = (e: MessageEvent<WorkerRequest>): void => {
       post({ type: "done_candidates", candidates });
     } catch (err) {
       post({ type: "error", message: err instanceof Error ? err.message : "generateCandidates failed." });
+    }
+    return;
+  }
+
+  if ("type" in e.data && e.data.type === "targetedRegenerate") {
+    try {
+      const result = targetedRegenerate(e.data.project, e.data.timetableId, e.data.scope, e.data.opts);
+      post({ type: "done_targeted", result });
+    } catch (err) {
+      post({ type: "error", message: err instanceof Error ? err.message : "targetedRegenerate failed." });
     }
     return;
   }

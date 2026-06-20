@@ -1,11 +1,13 @@
-// Generate & Compare (M27). Shows multi-candidate results with pros/cons, a compare table,
-// and the impossible path with one-click relaxation. Nothing changes until the owner applies.
+// Generate & Compare (M27/M28). Shows multi-candidate results with pros/cons, a compare
+// table, the impossible path with one-click relaxation, and targeted re-plan for a
+// specific class/teacher/day. Nothing changes until the owner applies.
 
 import { useState } from "react";
 import { coverageGaps } from "../../domain/coverage";
 import { findProfile } from "../../domain/derive";
 import type { Project, Timetable } from "../../domain/types";
-import type { Candidate, FeasibilityReport, Verdict } from "../../solver/types";
+import type { Candidate, CandidateResult, FeasibilityReport, Verdict } from "../../solver/types";
+import type { ScopeType, TargetedScope } from "../../solver/targetedRegenerate";
 import { projectHealth } from "./status";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -88,6 +90,7 @@ export function GenerateView({
   onReject,
   onApplyTweak,
   onJumpToTimetable,
+  onTargetedRegenerate,
 }: {
   project: Project;
   timetable: Timetable;
@@ -99,14 +102,20 @@ export function GenerateView({
   onReject: () => void;
   onApplyTweak: (p: Project) => void;
   onJumpToTimetable: () => void;
+  onTargetedRegenerate: (scope: TargetedScope) => Promise<CandidateResult>;
 }): React.ReactElement {
   const [activeIdx, setActiveIdx] = useState(0);
   const [compareOpen, setCompareOpen] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  // Targeted regenerate state (M28)
+  const [targetedOpen, setTargetedOpen] = useState(false);
+  const [targetedScopeType, setTargetedScopeType] = useState<ScopeType>("class");
+  const [targetedEntityId, setTargetedEntityId] = useState<string>("");
+  const [targetedResult, setTargetedResult] = useState<CandidateResult | null>(null);
+  const [targetedRunning, setTargetedRunning] = useState(false);
 
   const health = projectHealth(project, timetable);
   const gaps = coverageGaps(project, timetable);
-  const profile = findProfile(project, timetable);
   const labelFor = (slot: number) => profile?.slots.find((s) => s.index === slot)?.label ?? `P${slot}`;
   const enabledRules = project.constraints.filter((c) => c.enabled).length;
 
@@ -121,15 +130,39 @@ export function GenerateView({
     ? Math.max(0, enabledRules - active.softScore - active.hardCount)
     : Math.max(0, enabledRules - health.soft);
 
-  // Overall verdict for the banner
+  // Overall verdict for the banner (M28: "Likely impossible" when all have shortfall)
+  const allIncomplete = candidates.length > 0 && candidates.every((c) => c.remainingShortfall > 0 || c.hardCount > 0);
   type OverallVerdict = Verdict | "Proven impossible";
   const overallVerdict: OverallVerdict | null = feasibility?.status === "blocked"
     ? "Proven impossible"
     : candidates.some((c) => c.verdict === "Complete")
     ? "Complete"
+    : allIncomplete
+    ? "Likely impossible"
     : candidates.length > 0
     ? "Best found"
     : null;
+
+  // Targeted regenerate entities for the current scope type
+  const profile = findProfile(project, timetable);
+  const targetedEntities: { id: string; name: string }[] =
+    targetedScopeType === "class" ? project.classes.map((c) => ({ id: c.id, name: c.name })) :
+    targetedScopeType === "teacher" ? project.teachers.map((t) => ({ id: t.id, name: t.name })) :
+    (profile?.days ?? []).map((d) => ({ id: d, name: d }));
+  const firstEntityId = targetedEntities[0]?.id ?? "";
+  const effectiveEntityId = targetedEntityId || firstEntityId;
+
+  const runTargeted = async () => {
+    if (!effectiveEntityId) return;
+    setTargetedRunning(true);
+    setTargetedResult(null);
+    try {
+      const result = await onTargetedRegenerate({ type: targetedScopeType, id: effectiveEntityId });
+      setTargetedResult(result);
+    } finally {
+      setTargetedRunning(false);
+    }
+  };
 
   const hasResult = !planning && (candidates.length > 0 || (feasibility !== null));
 
@@ -378,6 +411,108 @@ export function GenerateView({
           )}
         </section>
       )}
+
+      {/* ── Targeted regenerate (M28) ───────────────────────────────────────── */}
+      <section className="ts-card p-4">
+        <button
+          onClick={() => setTargetedOpen(!targetedOpen)}
+          className="flex w-full items-center justify-between text-left"
+          aria-expanded={targetedOpen}
+        >
+          <span className="text-sm font-medium text-slate-700">Re-plan a specific area</span>
+          <span className="text-xs text-slate-400">{targetedOpen ? "▲" : "▼"}</span>
+        </button>
+
+        {targetedOpen && (
+          <div className="mt-4 space-y-3">
+            <p className="text-xs text-slate-500">
+              Freeze the rest of the timetable and re-plan just one class, teacher, or day.
+              Uses an exact search — returns Proven impossible if no solution exists for that scope.
+            </p>
+
+            {/* Scope type selector */}
+            <div className="flex gap-1" role="group" aria-label="Scope type">
+              {(["class", "teacher", "day"] as const).map((type) => (
+                <button
+                  key={type}
+                  onClick={() => { setTargetedScopeType(type); setTargetedEntityId(""); setTargetedResult(null); }}
+                  className={`rounded px-3 py-1.5 text-xs font-medium capitalize transition ${
+                    targetedScopeType === type
+                      ? "bg-indigo-600 text-white"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  }`}
+                  aria-pressed={targetedScopeType === type}
+                >
+                  {type}
+                </button>
+              ))}
+            </div>
+
+            {/* Entity selector + run button */}
+            <div className="flex flex-wrap gap-2">
+              <select
+                value={effectiveEntityId}
+                onChange={(e) => { setTargetedEntityId(e.target.value); setTargetedResult(null); }}
+                className="min-w-0 flex-1 rounded border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                aria-label={`Select ${targetedScopeType}`}
+              >
+                {targetedEntities.map((e) => (
+                  <option key={e.id} value={e.id}>{e.name}</option>
+                ))}
+              </select>
+              <button
+                onClick={() => void runTargeted()}
+                disabled={targetedRunning || !effectiveEntityId}
+                className="ts-btn-primary text-sm"
+              >
+                {targetedRunning ? "Planning…" : `Re-plan this ${targetedScopeType}`}
+              </button>
+            </div>
+
+            {/* Targeted result */}
+            {targetedResult && (
+              <div className={`rounded-lg border p-3 ${
+                targetedResult.proofLevel === "complete" ? "border-emerald-200 bg-emerald-50"
+                : targetedResult.proofLevel === "impossible" ? "border-rose-200 bg-rose-50"
+                : "border-amber-200 bg-amber-50"
+              }`}>
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-sm font-semibold text-slate-800">
+                    {targetedResult.proofLevel === "complete" ? "Complete for this scope"
+                     : targetedResult.proofLevel === "impossible" ? "Cannot satisfy these rules for this scope"
+                     : "Best found for this scope"}
+                  </span>
+                  <button
+                    onClick={() => setTargetedResult(null)}
+                    className="text-xs text-slate-400 hover:text-slate-600"
+                    aria-label="Dismiss result"
+                  >✕</button>
+                </div>
+                {targetedResult.blockers.length > 0 && (
+                  <ul className="mb-2 space-y-1">
+                    {targetedResult.blockers.slice(0, 3).map((b, i) => (
+                      <li key={i} className="text-xs text-rose-700">· {b}</li>
+                    ))}
+                  </ul>
+                )}
+                {targetedResult.changes.length > 0 && (
+                  <p className="mb-2 text-xs text-slate-600">
+                    {targetedResult.changes.length} {targetedResult.changes.length === 1 ? "cell" : "cells"} changed
+                  </p>
+                )}
+                {targetedResult.proofLevel !== "impossible" && targetedResult.changes.length > 0 && (
+                  <button
+                    onClick={() => onApplyTweak(targetedResult!.project)}
+                    className="ts-btn-primary text-xs"
+                  >
+                    Apply targeted result
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </section>
     </div>
   );
 }

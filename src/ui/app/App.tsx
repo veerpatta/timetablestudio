@@ -7,8 +7,9 @@
 import { useMemo, useState } from "react";
 import type { Constraint, Project } from "../../domain/types";
 import { analyzeFeasibility } from "../../solver/feasibility";
-import { runGenerateCandidates } from "../../solver/fillClient";
+import { runGenerateCandidates, runTargetedRegenerate } from "../../solver/fillClient";
 import type { Candidate, FeasibilityReport } from "../../solver/types";
+import type { TargetedScope } from "../../solver/targetedRegenerate";
 import { useProjectStore } from "../../store/projectStore";
 import { InsightsView } from "../insights/InsightsView";
 import { ReportsView } from "../reports/ReportsView";
@@ -84,6 +85,9 @@ export function App(): React.ReactElement {
     void makeBestTimetable(tweakedProject);
   };
 
+  const doTargetedRegenerate = (scope: TargetedScope) =>
+    runTargetedRegenerate(project, timetableId, scope);
+
   const navBtn = (s: Section, label: string) => (
     <button
       key={s}
@@ -144,6 +148,7 @@ export function App(): React.ReactElement {
               onReject={() => { setCandidates([]); setFeasibility(null); setFlash("Discarded the proposed plan."); }}
               onApplyTweak={applyTweak}
               onJumpToTimetable={() => go("timetable")}
+              onTargetedRegenerate={doTargetedRegenerate}
             />
           )}
           {section === "timetable" && <TimetableWorkspace project={project} timetable={timetable} onAddConstraint={addOrUpdateConstraint} onChanged={(f) => { setCandidates([]); setFeasibility(null); setFlash(f); }} />}

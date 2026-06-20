@@ -7,6 +7,7 @@ import { candidateResult } from "./candidateScoring";
 import { solveTimetable } from "./deepSearch";
 import { fill, type FillResult } from "./fill";
 import { generate, generateCandidates, type GenerateResult } from "./generate";
+import { targetedRegenerate, type TargetedScope } from "./targetedRegenerate";
 import type { Candidate, CandidateResult, SolverProgress, SolverRequest } from "./types";
 
 type LegacyMode = "fill" | "generate";
@@ -165,6 +166,33 @@ export async function runSolveTimetable(project: Project, timetableId: Id, reque
 
 export async function runPlanTimetable(project: Project, timetableId: Id, maxCandidates = 8): Promise<CandidateResult> {
   return runSolveTimetable(project, timetableId, { mode: "deep", maxCandidates, budgetMs: 5000 });
+}
+
+/** Targeted regenerate for a specific scope (M28). Falls back to main thread if Worker unavailable. */
+export async function runTargetedRegenerate(
+  project: Project,
+  timetableId: Id,
+  scope: TargetedScope,
+  opts?: { budgetMs?: number },
+): Promise<CandidateResult> {
+  if (typeof Worker !== "undefined") {
+    try {
+      return await new Promise<CandidateResult>((resolve, reject) => {
+        const worker = new Worker(new URL("./fillWorker.ts", import.meta.url), { type: "module" });
+        type OutMsg = { type: "done_targeted"; result: CandidateResult } | { type: "error"; message: string };
+        worker.onmessage = (e: MessageEvent<OutMsg>) => {
+          worker.terminate();
+          if (e.data.type === "done_targeted") resolve(e.data.result);
+          else reject(new Error(e.data.message));
+        };
+        worker.onerror = (e) => { worker.terminate(); reject(e); };
+        worker.postMessage({ type: "targetedRegenerate", project, timetableId, scope, opts });
+      });
+    } catch {
+      // Worker unavailable — fall back to main thread.
+    }
+  }
+  return targetedRegenerate(project, timetableId, scope, opts);
 }
 
 /** Multi-preset candidate generation (M27). Falls back to main thread if Worker unavailable. */
