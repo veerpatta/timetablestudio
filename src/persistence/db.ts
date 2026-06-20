@@ -8,7 +8,7 @@
 // is a silent no-op — the app simply runs from the bundled seed.
 
 import { openDB, type IDBPDatabase } from "idb";
-import { seedArtsElectives } from "../domain/electives";
+import { stripElectiveModel } from "../domain/electives";
 import type { Project } from "../domain/types";
 
 // NOTE: a DIFFERENT name than the legacy M19 cell-model DB ("timetable-studio",
@@ -88,16 +88,14 @@ export function normalizeProject(project: Project): Project {
     patch.constraints = constraints;
   }
 
-  // Nothing missing and no legacy field → already current; return as-is (no needless copy).
-  // Such a project already carries electiveGroups, so no elective migration is needed.
+  // Apply field patches + drop the legacy `rules` field, then ALWAYS strip the old elective
+  // option-line model (owner decision 2026-06-20: Arts electives are plain whole-class lessons,
+  // no per-student Self Study). stripElectiveModel is a no-op when there's nothing to strip, so
+  // an already-clean project round-trips unchanged.
   const hadRules = "rules" in p;
-  if (Object.keys(patch).length === 0 && !hadRules) return project;
-
-  const result = { ...project, ...patch } as Project & Record<string, unknown>;
-  delete result.rules; // legacy field is no longer part of the Project shape
-  // Migrate a pre-C5 VPPS project to the elective model on load (idempotent — a no-op if
-  // electives already exist or there are no Arts classes). Returning users get the Arts fix.
-  return seedArtsElectives(result as Project);
+  const base = Object.keys(patch).length === 0 && !hadRules ? project : ({ ...project, ...patch } as Project);
+  delete (base as unknown as Record<string, unknown>).rules;
+  return stripElectiveModel(base);
 }
 
 /** Persist the whole project under the single "current" key. No-op without IndexedDB. */

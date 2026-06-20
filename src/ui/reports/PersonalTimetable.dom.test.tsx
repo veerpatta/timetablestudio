@@ -4,6 +4,7 @@
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { PersonalTimetable } from "./PersonalTimetable";
+import { seedArtsElectives } from "../../domain/electives";
 import { buildBundledProject } from "../../fixtures/bundled";
 import type { Project } from "../../domain/types";
 
@@ -11,7 +12,7 @@ const tableOf = (p: Project) => p.timetables.find((t) => t.id === p.activeTimeta
 
 describe("Personal timetable (C7, through the UI)", () => {
   it("shows the drop-Economics combination with no Economics, plus Self Study", () => {
-    const base = buildBundledProject();
+    const base = seedArtsElectives(buildBundledProject());
     render(<PersonalTimetable project={base} timetable={tableOf(base)} />);
 
     // pick the Class 11 Arts combination that dropped Economics

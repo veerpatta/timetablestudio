@@ -18,6 +18,31 @@ export function canParallelize(studentGroups: StudentGroup[], a: Id, b: Id): boo
   return !studentGroups.some((g) => g.electiveSubjectIds.includes(a) && g.electiveSubjectIds.includes(b));
 }
 
+/**
+ * Reverse of seedArtsElectives (OWNER decision, 2026-06-20): the school's authoritative
+ * timetable shows Arts electives as ordinary whole-class lessons, with NO per-student "Self
+ * Study" splitting — so the default product no longer seeds the option-line model. This strips
+ * it from any project: drop the seeded Self Study events (+ placements), clear studentGroupIds
+ * from every event (electives become whole-class), and empty the elective/student groups.
+ * Returns the SAME object when there is nothing to strip (referentially honest).
+ */
+export function stripElectiveModel(project: Project): Project {
+  const studyIds = new Set(project.events.filter((e) => e.type === "self_study" && (e.id.startsWith("evt:study:") || (e.studentGroupIds?.length ?? 0) > 0)).map((e) => e.id));
+  const hasScoped = project.events.some((e) => (e.studentGroupIds?.length ?? 0) > 0);
+  if (studyIds.size === 0 && !hasScoped && project.electiveGroups.length === 0 && project.studentGroups.length === 0) return project;
+
+  const events = project.events
+    .filter((e) => !studyIds.has(e.id))
+    .map((e) => (e.studentGroupIds && e.studentGroupIds.length > 0 ? { ...e, studentGroupIds: undefined } : e));
+  return {
+    ...project,
+    events,
+    electiveGroups: [],
+    studentGroups: [],
+    timetables: project.timetables.map((t) => ({ ...t, placements: t.placements.filter((p) => !studyIds.has(p.eventId)) })),
+  };
+}
+
 /** Seed Arts electives + student groups into a project. Idempotent: a no-op if electives
  * are already present (so it can run both at build time and on load without double-seeding). */
 export function seedArtsElectives(project: Project): Project {

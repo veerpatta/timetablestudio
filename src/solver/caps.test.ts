@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 import { findProfile } from "../domain/derive";
 import { teachingSlots } from "../domain/profile";
 import { validate } from "../domain/validate";
+import { seedArtsElectives } from "../domain/electives";
 import { buildBundledProject } from "../fixtures/bundled";
 import type { Constraint, Id, Project } from "../domain/types";
 import { fill } from "./fill";
@@ -152,7 +153,7 @@ describe("C6 — infeasible cap produces a plain-language blocker, never an ille
 
 describe("C6 — electives stay legal when a class is regenerated", () => {
   it("clearing + refilling Class 11 Arts keeps 0 hard and never puts a whole-class lesson in an option-line slot", () => {
-    const base = buildBundledProject();
+    const base = seedArtsElectives(buildBundledProject()); // exercise the optional elective model
     const arts = "Class 11 Arts";
     // option-line slots = where a group-scoped (elective) event runs for the class
     const electiveEv = new Set(base.events.filter((e) => e.studentGroupIds && e.classIds.includes(arts)).map((e) => e.id));

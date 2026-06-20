@@ -7,13 +7,14 @@ import { describe, expect, it } from "vitest";
 import { attendeesOf, buildGroupsByClass } from "./attendees";
 import { deriveMaps } from "./derive";
 import { electiveReport, studentTimetable } from "./studentView";
+import { seedArtsElectives } from "./electives";
 import { buildBundledProject } from "../fixtures/bundled";
 import type { Project, Timetable } from "./types";
 
 const tableOf = (p: Project): Timetable => p.timetables.find((t) => t.id === p.activeTimetableId)!;
 
 describe("C7 student view — clean per-combination personal timetable", () => {
-  const base = buildBundledProject();
+  const base = seedArtsElectives(buildBundledProject());
   const tt = tableOf(base);
   const subjName = new Map(base.subjects.map((s) => [s.id, s.name]));
   const offeredByClass = new Map(electiveReport(base).map((l) => [l.classId, new Set(l.offered.map((o) => o.subjectId))]));

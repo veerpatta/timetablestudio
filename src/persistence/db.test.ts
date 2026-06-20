@@ -1,7 +1,8 @@
 import "fake-indexeddb/auto";
 import { beforeEach, describe, expect, it } from "vitest";
 import { addTeacher } from "../domain/entityEdit";
-import { buildBundledProject, buildBundledProjectRaw } from "../fixtures/bundled";
+import { seedArtsElectives } from "../domain/electives";
+import { buildBundledProject } from "../fixtures/bundled";
 import type { Project } from "../domain/types";
 import { clearProject, loadProject, normalizeProject, saveProject } from "./db";
 
@@ -56,13 +57,17 @@ describe("normalizeProject — survives schema growth", () => {
     expect(n.constraints.some((c) => c.template === "class_teacher_p1" && (c.params as { classId: string }).classId === "Class 7")).toBe(true);
   });
 
-  it("seeds Arts electives on load for a pre-C5 VPPS project (no electiveGroups)", () => {
-    // a pre-C5 blob = the raw transcription with the elective fields absent (as C4 saved it)
-    const blob: Record<string, unknown> = { ...buildBundledProjectRaw() };
-    delete blob.electiveGroups;
-    delete blob.studentGroups;
-    const n = normalizeProject(blob as unknown as Project);
-    expect(n.studentGroups.filter((g) => g.classId === "Class 11 Arts").length).toBe(4);
-    expect(n.events.some((e) => e.type === "self_study" && e.classIds.includes("Class 11 Arts"))).toBe(true);
+  it("strips the old elective/Self-Study model on load (owner decision 2026-06-20)", () => {
+    // a project saved while the option-line model was active carries student groups + seeded
+    // Self Study events; loading it must remove that model so electives are plain whole-class.
+    const seeded = seedArtsElectives(buildBundledProject());
+    expect(seeded.studentGroups.length).toBeGreaterThan(0); // precondition: the model is present
+    const n = normalizeProject(JSON.parse(JSON.stringify(seeded)) as Project);
+    expect(n.studentGroups).toEqual([]);
+    expect(n.electiveGroups).toEqual([]);
+    expect(n.events.some((e) => e.id.startsWith("evt:study:"))).toBe(false); // Self Study events gone
+    expect(n.events.every((e) => !e.studentGroupIds || e.studentGroupIds.length === 0)).toBe(true);
+    // the electives themselves survive as ordinary lessons
+    expect(n.events.some((e) => e.subjectId === "Geography" && e.classIds.includes("Class 12 Arts"))).toBe(true);
   });
 });

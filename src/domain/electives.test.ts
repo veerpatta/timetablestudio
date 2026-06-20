@@ -10,7 +10,7 @@ const hard = (p: Project) => validate(p, ttOf(p)).filter((v) => v.severity === "
 const ELECTIVES = ["Political Science", "Geography", "Economics", "English Literature"];
 
 describe("C5 electives — the bundled Arts model is clash-free and forced-sitting is gone", () => {
-  const p = buildBundledProject();
+  const p = seedArtsElectives(buildBundledProject());
 
   it("the elective-modelled bundled project still has ZERO hard violations", () => {
     // The gate: Study events added to elective slots must NOT trip the refined HE2.
@@ -60,7 +60,7 @@ describe("C5 electives — the bundled Arts model is clash-free and forced-sitti
 
 describe("attendee-set clash refinement (two-sided)", () => {
   it("elective + dropping-group Study legally overlap, but two CHOSEN electives in one slot clash", () => {
-    const p = buildBundledProject();
+    const p = seedArtsElectives(buildBundledProject());
     const groupsByClass = buildGroupsByClass(p);
     const cls = "Class 11 Arts";
     const groups = p.studentGroups.filter((g) => g.classId === cls);
@@ -79,7 +79,7 @@ describe("attendee-set clash refinement (two-sided)", () => {
   });
 
   it("injecting a real student-group double-book is caught by validate (HE2)", () => {
-    const p = buildBundledProject();
+    const p = seedArtsElectives(buildBundledProject());
     const cls = "Class 11 Arts";
     const tt = ttOf(p);
     // place a second chosen elective for one group in a slot it already attends a chosen elective
@@ -104,7 +104,7 @@ describe("attendee-set clash refinement (two-sided)", () => {
 
 describe("canParallelize", () => {
   it("is false for every elective pair under free 3-of-4 (each pair is co-taken)", () => {
-    const p = buildBundledProject();
+    const p = seedArtsElectives(buildBundledProject());
     const groups = p.studentGroups.filter((g) => g.classId === "Class 11 Arts");
     expect(canParallelize(groups, "Economics", "Geography")).toBe(false);
     expect(canParallelize(groups, "Political Science", "English Literature")).toBe(false);
