@@ -11,7 +11,7 @@ describe("Who-teaches-what view (C2 AC, through the UI)", () => {
 
   it("sets a class teacher (enabling the P1 rule) and edits the qualification matrix", () => {
     render(<App />);
-    fireEvent.click(screen.getByRole("button", { name: "Staff" }));
+    fireEvent.click(screen.getByRole("button", { name: "Setup" }));
     fireEvent.click(screen.getByRole("button", { name: "Who teaches what" }));
 
     // The default class is Class 1. Set its class teacher to Bindu — of the comboboxes,

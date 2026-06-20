@@ -4,7 +4,24 @@ This file is the bridge between work sessions. The agent MUST update it after ev
 
 ---
 
-## Current state (v6.1 CUSTOMIZE — COMPLETE)
+## Current state (OVERHAUL — engine + green-field UI — COMPLETE, 2026-06-19)
+
+Branch `overhaul/engine-ui`. 201 tests green (43 files); build (~101 KB gzip main, ~39 KB worker) + lint clean. Live-verified in Chrome.
+
+Owner brief: the app was hard to use, "Make best timetable" filled Self Study everywhere, constraints/compulsory-per-week weren't honoured, and the solver was dumb. Owner chose (this session): one combined release · full green-field UI · complete solver (backtracking/repair) · strongly configurable, VPPS default.
+
+Delivered (details in DECISIONS.md, 2026-06-19):
+- **A1 — Self Study collapse fixed.** `isReschedulable` (shared by `solver/plan.ts` + `solver/schedule.ts`) protects group-scoped electives + self_study, so re-plan no longer strips Arts electives and leaves whole-class Self Study. Repro test in `solver/plan.test.ts`.
+- **A2 — compulsory-per-week is real.** New `domain/coverage.ts` (`requirementCoverage`/`coverageGaps`/`totalShortfall`), separate from validate(); drives a three-state status (Ready/Incomplete/Clashes).
+- **A3 — smarter solver.** `solver/schedule.ts` = greedy `fill` + bounded, seeded, validate-gated repair (single-eviction-relocation), best-of-N by completeness then soft. `planTimetable` now strips ONLY hard-violating lessons (was: nuke the whole board), so a re-plan preserves a complete, valid timetable. Honest boundary: a from-scratch full-school build can still leave ~10 deeply-contended gaps (surfaced, never silent).
+- **B — configurability.** `domain/requirementsEdit.ts` + store upsert/remove; new "Weekly subjects" quota editor.
+- **C — green-field UI** (`src/ui` rebuilt): guided Dashboard, Setup hub (People & subjects · Weekly subjects · Rules), Generate/Review screen, Timetable workspace (reuses the tested legal-only editor), reused Insights/Reports/Tools. Design tokens in index.css.
+
+NOT yet done (next session): commit Phases B+C (A is committed `f625a18`); optional — strengthen repair for the from-scratch full-school case; mobile polish pass; merge `overhaul/engine-ui` → `main` (owner authorisation).
+
+---
+
+## Prior state (v6.1 CUSTOMIZE — COMPLETE)
 
 - **🎉 v6.1 CUSTOMIZE COMPLETE (C1–C7, 2026-06-07).** The app is fully editable, has a REAL applied constraint engine that drives validate + generate, the Arts elective problem is fixed end-to-end, and reports include a per-student personal timetable. 180 tests green (36 files); build + lint clean (~93 KB gzip main; ~28 KB worker chunk). No milestone in progress.
 - **🎉 C7 COMPLETE (2026-06-07) — Reports, student view & polish.** `domain/studentView.ts` (`studentTimetable` + `electiveReport`) — a chosen combination's personal timetable, built on the HE2 oracle (deriveMaps + attendeesOf) so it always matches the grid; no non-chosen subject ever appears (dropper sees Self Study). `domain/reports.ts` gains `roomUseReport` (honest: real usage if rooms are ever assigned, else an owner-visible "not assigned yet" note — same gap as C4's deferred `subject_needs_room`). UI: `ReportsView` now hosts `PersonalTimetable` (class+combination picker), `SchoolReports` (elective/option-line report + per-class subject counts + room use), an option-line-aware whole-school day sheet, and print polish (`print:hidden` controls, `breakInside: avoid` sections); legacy text export retained.
