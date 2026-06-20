@@ -4,20 +4,27 @@ This file is the bridge between work sessions. The agent MUST update it after ev
 
 ---
 
-## Current state (REVAMP — v7 decision-grade UI — M23 complete, 2026-06-20)
+## Current state (REVAMP — v7 decision-grade UI — M24 complete, 2026-06-21)
 
-Branch `main`. 214 tests green (46 files); build (~104 KB gzip main) + lint clean. Live-verified in browser.
+Branch `main`. 228 tests green (46 files); build (~104 KB gzip main) + lint clean.
+
+**M24 — Feasibility & relaxation engine — COMPLETE (2026-06-21).**
+- Added `RelaxationSuggestion` and `Blocker` interfaces to `src/solver/types.ts`. Added optional `structuredBlockers?: Blocker[]` to `FeasibilityReport` (backward compatible — all old construction sites still compile without changes).
+- Upgraded `src/solver/feasibility.ts` with 6 deterministic capacity checks, each producing a `Blocker` alongside the existing string message: `subject_capacity` (no qualified teacher), `class_capacity` (class demand > weekly slots), `teacher_capacity` (teacher's intrinsic maxPerWeek < sole-qualifier demand), `slot_contention` (subject_only_periods must constraint + demand > allowed slots × days), `locked_conflict` (pinned event violates hard constraint), `cap_sum` (teacher_max_per_week must constraint cap < sole-qualifier demand).
+- `teacher_capacity` and `cap_sum` each supply an `apply: (p: Project) => Project` relaxation that raises the limit, round-trip verified.
+- Joint-class event deduplication: `teacher_capacity` and `cap_sum` count a joint_class event ONCE (not once per class) to avoid inflating forced-demand for teachers who teach multiple classes simultaneously.
+- Added 17 new tests to `src/solver/feasibility.test.ts`: satisfied + blocked for each of the 6 checks (entity names + exact numbers asserted), plus 2 apply round-trip tests.
+- AC met: 228 tests green; build + lint clean; `apply` round-trips verified.
 
 **M23 — Tiering & vocabulary — COMPLETE (2026-06-20).**
 - Added `tierLabel(severity): "Rule" | "Preference"` to `src/domain/constraintText.ts`; re-exported from `src/domain/constraints.ts` — single source of truth for the vocabulary.
-- Rebuilt `src/ui/panels/ConstraintsPanel.tsx`: two-section list (Rules · N with red dot / Preferences · M with amber dot); form shows "Add Rule" + "Add Preference" buttons — no raw `must`/`prefer` codes on the surface. Constraints can be moved between sections via a "→ Rule"/"→ Preference" button which flips their severity via `onAdd` with the updated constraint.
-- Fixed `src/ui/app/Dashboard.tsx`: single "Rules" tile replaced with separate "Rules" (must-count) and "Preferences" (prefer-count) tiles; grid expanded to 5 columns.
-- Updated `src/ui/panels/Issues.tsx`: "Things to fix" heading renamed to "Rule broken" to match the tier vocabulary.
-- Updated tests: `ConstraintsPanel.dom.test.tsx` ("Add Rule" instead of "Add constraint"), `App.issues.test.tsx` ("Rule broken" instead of "Things to fix").
-- AC met: every constraint appears under one of two clearly-titled sections; no raw `must`/`prefer` codes visible anywhere.
+- Rebuilt `src/ui/panels/ConstraintsPanel.tsx`: two-section list (Rules · N / Preferences · M); "Add Rule" + "Add Preference" buttons. Constraints moveable between sections via `onAdd` with flipped severity.
+- Fixed `src/ui/app/Dashboard.tsx`: separate "Rules" and "Preferences" count tiles; grid expanded to 5 columns.
+- Updated `src/ui/panels/Issues.tsx`: "Things to fix" → "Rule broken".
+- AC met: 214 tests green; build + lint clean; live-verified.
 
-**Next action: M24 — Feasibility & relaxation engine.**
-Add structured `Blocker[]` to `src/solver/types.ts` alongside the existing `blockers: string[]` (backward compatible). Upgrade `src/solver/feasibility.ts` with 6 deterministic capacity checks (teacher_capacity, class_capacity, subject_capacity, slot_contention, locked_conflict, cap_sum). Each `RelaxationSuggestion` gets an optional pure `apply?: (p: Project) => Project`. Unit tests for each check (satisfied + blocked, naming entity + number).
+**Next action: M25 — Assessment engine (W4).**
+Create `src/domain/assessment.ts` with `assessTimetable(project, timetableId): TimetableAssessment` returning structured pros/cons + an overall score. See REVAMP_PLAN.md W4 for the full spec.
 
 ---
 

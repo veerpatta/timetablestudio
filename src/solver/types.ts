@@ -4,10 +4,30 @@ import type { CellDiff } from "../domain/diffTimetables";
 export type SolveMode = "fast" | "deep" | "prove";
 export type ProofLevel = "best_found" | "complete" | "impossible" | "timeout";
 
+export interface RelaxationSuggestion {
+  message: string;
+  apply?: (p: Project) => Project;
+  severity: "small" | "moderate" | "large";
+}
+
+export interface Blocker {
+  kind:
+    | "teacher_capacity"
+    | "class_capacity"
+    | "subject_capacity"
+    | "slot_contention"
+    | "locked_conflict"
+    | "cap_sum";
+  message: string;
+  entityRefs: { type: "teacher" | "class" | "subject" | "slot"; id: string }[];
+  relaxation: RelaxationSuggestion;
+}
+
 export interface FeasibilityReport {
   status: "ready" | "blocked" | "unknown";
   blockers: string[];
   relaxationSuggestions: string[];
+  structuredBlockers?: Blocker[];
 }
 
 export interface SolverStats {
