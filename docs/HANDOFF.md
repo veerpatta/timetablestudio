@@ -4,9 +4,16 @@ This file is the bridge between work sessions. The agent MUST update it after ev
 
 ---
 
-## Current state (REVAMP — v7 decision-grade UI — M25 complete, 2026-06-21)
+## Current state (REVAMP — v7 decision-grade UI — M26 complete, 2026-06-21)
 
-Branch `main`. 247 tests green (48 files); build (~105 KB gzip main) + lint clean.
+Branch `main`. 255 tests green (49 files); build (~105 KB gzip main) + lint clean.
+
+**M26 — Multi-candidate generation — COMPLETE (2026-06-21).**
+- Created `src/solver/presets.ts`: `Preset` interface + 3 named presets (`BALANCED_PRESET`, `TEACHER_FRIENDLY_PRESET`, `STUDENT_FOCUSED_PRESET`) as data (multiplier maps over `ConstraintTemplate`). Teacher-friendly up-weights: `balance_teacher_loads` 3×, `teacher_compact_day` 3×, plus 6 other teacher templates at 2×. Student-focused up-weights: `core_subjects_early` 3×, `subject_spread_min_days` 3×, `class_daily_variety` 3×, plus 5 other student templates at 2×.
+- Added `Verdict` type and `Candidate` interface to `src/solver/types.ts` (imports `Assessment` from `domain/assessment.ts` — layering sound). `Candidate` carries: `presetLabel`, `project`, `changes`, `seed`, `hardCount`, `remainingShortfall`, `softScore`, `weightedSoftScore`, `assessment`, `verdict`.
+- Added `generateCandidates(project, timetableId, opts?)` to `src/solver/generate.ts` (existing `generate()` unchanged — all callers unaffected). Each preset gets a non-overlapping seed range (preset 0 → seeds 1–N, preset 1 → seeds N+1–2N …) so different presets genuinely explore different parts of the search space. Weighted soft scoring: Σ(`constraint.weight` × `preset.multiplier[template]`) per soft violation — presets with different multipliers select genuinely different seeds as "best." Dedup by placement hash (`placementHash`). `assessTimetable` called once per surviving candidate.
+- `Verdict` derives from shortfall + hard count: "Complete" (0 shortfall, 0 hard), else "Best found". Impossible/timeout verdicts reserved for the deep-search path (M27/M28).
+- 8 new tests in `src/solver/generate.test.ts` (M26 suite): ≥2 candidates returned, 0 hard each, assessment + verdict present, deterministic, budget respected, dedup correct, weightedSoftScore ≥ 0, teacher-friendly ≤ spread of student-focused. All 255 pass; build + lint clean.
 
 **M25 — Assessment engine — COMPLETE (2026-06-21).**
 - Created `src/domain/assessment.ts` (pure, no framework imports): `assessTimetable(project, timetableId, opts?)` → `Assessment` with `score` (0–100), `band` (Great/Good/Fair/Poor), `summary`, `advantages[]`, `disadvantages[]`.
@@ -31,8 +38,8 @@ Branch `main`. 247 tests green (48 files); build (~105 KB gzip main) + lint clea
 - Updated `src/ui/panels/Issues.tsx`: "Things to fix" → "Rule broken".
 - AC met: 214 tests green; build + lint clean; live-verified.
 
-**Next action: M26 — Multi-candidate generation (W3).**
-Update `solver/generate.ts` to return `Candidate[]` with 2–3 emphasis presets (teacher-friendly, spread, default), each running best-of-N with its own weight multipliers. Each `Candidate` carries `project`, `seed`, `scores`, `assessment` (from M25), `verdict`, and `feasibility`. See REVAMP_PLAN.md W3 for the full spec.
+**Next action: M27 — Generate & Compare UI (W5).**
+Rebuild `ui/app/GenerateView.tsx` with candidate cards (preset label, health band, top 2 advantages, top 1 disadvantage, "Use this one"), a Compare toggle (side-by-side table), and a verdict banner (Complete/Best found/Impossible). Wire `App.makeBestTimetable` to call `generateCandidates` via worker, streaming candidates. "Apply this tweak" buttons on blockers (from M24 `structuredBlockers` `apply` functions). See REVAMP_PLAN.md W5 + §5 (verdict taxonomy) for the full spec.
 
 ---
 
