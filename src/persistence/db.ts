@@ -18,6 +18,17 @@ import type { Project } from "../domain/types";
 const DB_NAME = "timetable-studio-v6";
 const STORE = "project";
 const KEY = "current";
+const KEY_BACKUPS = "backups"; // restore points live alongside the project (same store, new key)
+
+/** A persisted restore point — survives reload so a bad change is always recoverable. */
+export interface Backup {
+  id: string;
+  label: string;
+  createdAt: number; // epoch ms
+  project: Project;
+}
+
+export const MAX_BACKUPS = 15;
 
 const hasIDB = (): boolean => typeof indexedDB !== "undefined";
 
@@ -109,6 +120,29 @@ export async function loadProject(): Promise<Project | null> {
     return raw ? normalizeProject(raw) : null;
   } catch {
     return null;
+  }
+}
+
+/** Persist the restore-point list (newest first, capped). No-op without IndexedDB. */
+export async function saveBackups(backups: Backup[]): Promise<void> {
+  if (!hasIDB()) return;
+  try {
+    const d = await db();
+    await d.put(STORE, backups.slice(0, MAX_BACKUPS), KEY_BACKUPS);
+  } catch {
+    /* best-effort */
+  }
+}
+
+/** Load the restore points (each project normalized), or [] if none / unavailable. */
+export async function loadBackups(): Promise<Backup[]> {
+  if (!hasIDB()) return [];
+  try {
+    const d = await db();
+    const raw = (await d.get(STORE, KEY_BACKUPS)) as Backup[] | undefined;
+    return Array.isArray(raw) ? raw.map((b) => ({ ...b, project: normalizeProject(b.project) })) : [];
+  } catch {
+    return [];
   }
 }
 

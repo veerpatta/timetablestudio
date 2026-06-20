@@ -60,9 +60,11 @@ export function App(): React.ReactElement {
   const applyPlan = () => {
     if (!planResult) return;
     const n = planResult.changes.length;
+    // Auto restore point BEFORE applying — survives reload, so a bad plan is always recoverable.
+    store.createBackup(`Before applying plan · ${new Date().toLocaleString()}`);
     store.applyFix(planResult.project);
     setPlanResult(null);
-    setFlash(`Plan applied — ${n} ${n === 1 ? "cell" : "cells"} updated.`);
+    setFlash(`Plan applied — ${n} ${n === 1 ? "cell" : "cells"} updated. A restore point was saved (Tools).`);
     setSection("timetable");
   };
 

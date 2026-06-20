@@ -10,11 +10,14 @@ import { useProjectStore } from "../../store/projectStore";
 import type { Project, Timetable } from "../../domain/types";
 
 export function ToolsView({ project, timetable }: { project: Project; timetable: Timetable }): React.ReactElement {
-  const { place, saveVersion, restoreVersion, deleteVersion, versions } = useProjectStore();
+  const { place, saveVersion, restoreVersion, deleteVersion, versions, restoreClass, backups, createBackup, restoreBackup, deleteBackup } = useProjectStore();
   const profile = findProfile(project, timetable);
   const schedulable = project.teachers.filter((t) => t.schedulable);
   const [teacherId, setTeacherId] = useState(schedulable[0]?.id ?? "");
   const [versionName, setVersionName] = useState("");
+  const artsDefault = project.classes.find((c) => c.id === "Class 12 Arts")?.id ?? project.classes[0]?.id ?? "";
+  const [repairClassId, setRepairClassId] = useState(artsDefault);
+  const [repaired, setRepaired] = useState(false);
   const tName = (id: string) => project.teachers.find((t) => t.id === id)?.name ?? id;
   const cName = (id: string) => project.classes.find((c) => c.id === id)?.name ?? id;
   const sName = (id: string) => project.subjects.find((s) => s.id === id)?.name ?? id;
@@ -22,8 +25,57 @@ export function ToolsView({ project, timetable }: { project: Project; timetable:
 
   const plan = teacherId ? absentTeacherPlan(project, timetable, teacherId) : [];
 
+  const fmt = (ms: number) => new Date(ms).toLocaleString();
+
   return (
     <div className="grid gap-6 lg:grid-cols-2">
+      <section className="ts-card p-4 lg:col-span-2">
+        <h2 className="mb-1 text-sm font-semibold">Repair a class</h2>
+        <p className="mb-3 text-xs text-slate-500">
+          If a class lost its lessons (e.g. an older version filled it with Self Study), restore that class's own
+          lessons — electives, Self Study and ordinary subjects — from the original timetable. Other classes and shared
+          (combined) lessons are left untouched. This is undoable.
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <select aria-label="Class to repair" className="ts-input" value={repairClassId} onChange={(e) => { setRepairClassId(e.target.value); setRepaired(false); }}>
+            {project.classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+          <button
+            onClick={() => { restoreClass(repairClassId); setRepaired(true); }}
+            className="ts-btn-primary"
+          >
+            Restore from original
+          </button>
+          {repaired && <span className="text-sm font-medium text-emerald-700">Restored {cName(repairClassId)}. Use Undo if needed.</span>}
+        </div>
+      </section>
+
+      <section className="ts-card p-4 lg:col-span-2">
+        <div className="mb-1 flex items-center justify-between">
+          <h2 className="text-sm font-semibold">Restore points</h2>
+          <button onClick={() => createBackup(`Manual save · ${fmt(Date.now())}`)} className="ts-btn-ghost">Save a restore point now</button>
+        </div>
+        <p className="mb-3 text-xs text-slate-500">
+          A restore point is saved automatically before every plan is applied, and survives closing the app. If a change
+          went wrong, roll the whole timetable back here.
+        </p>
+        {backups.length === 0 ? (
+          <p className="text-sm text-slate-500">No restore points yet. One is saved automatically when you apply a plan.</p>
+        ) : (
+          <ul className="space-y-1">
+            {backups.map((b) => (
+              <li key={b.id} className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm">
+                <span className="min-w-0 truncate">{b.label}</span>
+                <span className="flex shrink-0 gap-2">
+                  <button onClick={() => restoreBackup(b.id)} className="rounded border border-slate-300 px-2 py-0.5 text-xs hover:bg-slate-50">Restore</button>
+                  <button onClick={() => deleteBackup(b.id)} className="text-xs text-rose-600 hover:underline">Delete</button>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
       <section>
         <h2 className="mb-2 text-sm font-semibold">If a teacher is away</h2>
         <select className="mb-3 rounded border border-slate-300 px-2 py-1 text-sm" value={teacherId} onChange={(e) => setTeacherId(e.target.value)}>

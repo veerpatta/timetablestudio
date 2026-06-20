@@ -21,9 +21,10 @@ import {
 } from "../domain/entityEdit";
 import { addQualification, removeQualification, setClassTeacher } from "../domain/assign";
 import { removeRequirement, setRequirement } from "../domain/requirementsEdit";
+import { restoreClassFromReference } from "../domain/restore";
 import { canMove, canSwap, type Cell } from "../domain/swaps";
 import { buildBundledProject } from "../fixtures/bundled";
-import { loadProject, saveProject } from "../persistence/db";
+import { loadBackups, loadProject, MAX_BACKUPS, saveBackups, saveProject, type Backup } from "../persistence/db";
 import type { Band, Constraint, Day, Id, Placement, Project, SchoolClass } from "../domain/types";
 
 export type DropResult = "swapped" | "moved" | "illegal";
@@ -76,6 +77,14 @@ interface ProjectState {
   saveVersion: (name: string) => void;
   restoreVersion: (id: Id) => void;
   deleteVersion: (id: Id) => void;
+  /** Repair one class's own lessons from the original bundled timetable (undoable). Recovery
+   *  for the old Self Study collapse — restores electives/Self Study/normals for that class. */
+  restoreClass: (classId: Id) => void;
+  /** Persisted restore points (survive reload) — the safety net for destructive changes. */
+  backups: Backup[];
+  createBackup: (label: string) => void;
+  restoreBackup: (id: Id) => void;
+  deleteBackup: (id: Id) => void;
   undo: () => void;
   reset: () => void;
   /** Load a persisted project from IndexedDB, if any (replaces the bundled seed). */
@@ -201,6 +210,26 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       return v ? { past: [...s.past, s.project], project: v.project } : s;
     }),
   deleteVersion: (id) => set((s) => ({ versions: s.versions.filter((v) => v.id !== id) })),
+  restoreClass: (classId) =>
+    set((s) => ({ past: [...s.past, s.project], project: restoreClassFromReference(s.project, buildBundledProject(), classId, s.timetableId) })),
+  backups: [],
+  createBackup: (label) =>
+    set((s) => {
+      const backups = [{ id: `bk:${Date.now()}`, label, createdAt: Date.now(), project: s.project }, ...s.backups].slice(0, MAX_BACKUPS);
+      void saveBackups(backups);
+      return { backups };
+    }),
+  restoreBackup: (id) =>
+    set((s) => {
+      const b = s.backups.find((x) => x.id === id);
+      return b ? { past: [...s.past, s.project], project: b.project, timetableId: b.project.activeTimetableId ?? s.timetableId } : s;
+    }),
+  deleteBackup: (id) =>
+    set((s) => {
+      const backups = s.backups.filter((b) => b.id !== id);
+      void saveBackups(backups);
+      return { backups };
+    }),
   undo: () =>
     set((s) => (s.past.length === 0 ? s : { project: s.past[s.past.length - 1]!, past: s.past.slice(0, -1) })),
   reset: () =>
@@ -209,8 +238,9 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       return { project, past: [], timetableId: project.activeTimetableId! };
     }),
   hydrate: async () => {
-    const saved = await loadProject();
+    const [saved, backups] = await Promise.all([loadProject(), loadBackups()]);
     if (saved) set({ project: saved, past: [], timetableId: saved.activeTimetableId! });
+    if (backups.length > 0) set({ backups });
   },
 }));
 
