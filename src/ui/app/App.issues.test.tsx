@@ -27,14 +27,14 @@ describe("Issues panel (clash from outside the editor)", () => {
     render(<App />);
     goTimetable();
 
-    expect(screen.getByText(/Things to fix/)).toBeInTheDocument();
+    expect(screen.getByText(/Rule broken/)).toBeInTheDocument();
     expect(screen.getByText(/double-booked/i)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /Fix it/ }));
-    expect(screen.queryByText(/Things to fix/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Rule broken/)).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Undo" }));
-    expect(screen.getByText(/Things to fix/)).toBeInTheDocument();
+    expect(screen.getByText(/Rule broken/)).toBeInTheDocument();
   });
 
   it("'Show me' jumps to the offending cell (opens its editor)", () => {

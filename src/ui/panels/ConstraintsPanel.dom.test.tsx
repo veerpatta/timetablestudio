@@ -16,7 +16,7 @@ describe("Constraints panel (C3, through the UI)", () => {
     // default template is subject_half_of_day; tick Maths + Class 7 (first half default)
     fireEvent.click(screen.getByLabelText("Subjects: Maths"));
     fireEvent.click(screen.getByLabelText("For classes: Class 7"));
-    fireEvent.click(screen.getByRole("button", { name: "Add constraint" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add Rule" }));
 
     expect(proj().constraints.length).toBe(1);
     expect(screen.getAllByText(/Maths in the first half of the day for Class 7/).length).toBeGreaterThanOrEqual(1);

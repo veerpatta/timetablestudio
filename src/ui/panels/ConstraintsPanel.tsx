@@ -1,10 +1,11 @@
-// Constraints panel (C3–C4) — create/toggle/remove APPLIED constraints + one-click
-// "Suggest constraints". The builder is DATA-DRIVEN from constraintCatalog.ts (a field
-// table), so all 24 templates render through one generic form. Plain language, no codes.
+// Constraints panel (M23) — Rules/Preferences two-section UI. Rules are hard limits the
+// planner always respects; Preferences are soft targets it tries to meet. No raw
+// must/prefer codes are ever shown to the user — tierLabel() is the single source of truth
+// for the vocabulary.
 
 import { useMemo, useState } from "react";
 import { CATALOG, descriptorFor, type Field } from "../../domain/constraintCatalog";
-import { constraintSentence } from "../../domain/constraints";
+import { constraintSentence, tierLabel } from "../../domain/constraints";
 import { suggestConstraints } from "../../domain/suggestConstraints";
 import { teachingSlots } from "../../domain/profile";
 import { findProfile } from "../../domain/derive";
@@ -37,18 +38,20 @@ function defaultValues(fields: Field[], project: Project, slots: number[]): Valu
   return v;
 }
 
+function safeSentence(project: Project, c: Constraint): string {
+  try { return constraintSentence(project, c); } catch { return c.template; }
+}
+
 export function ConstraintsPanel({ project, timetable, onAdd, onToggle, onRemove }: Props): React.ReactElement {
   const profile = findProfile(project, timetable) ?? project.profiles[0]!;
   const slots = useMemo(() => teachingSlots(profile), [profile]);
   const [template, setTemplate] = useState<ConstraintTemplate>("subject_half_of_day");
-  const [severity, setSeverity] = useState<ConstraintSeverity>("must");
   const desc = descriptorFor(template);
   const [values, setValues] = useState<Values>(() => defaultValues(desc.fields, project, slots));
 
   const reset = (t: ConstraintTemplate) => {
     const d = descriptorFor(t);
     setTemplate(t);
-    setSeverity(d.defaultSeverity);
     setValues(defaultValues(d.fields, project, slots));
   };
   const toggleIn = (key: string, val: string) =>
@@ -57,7 +60,7 @@ export function ConstraintsPanel({ project, timetable, onAdd, onToggle, onRemove
       return { ...v, [key]: arr.includes(val) ? arr.filter((x) => x !== val) : [...arr, val] };
     });
 
-  const build = (): Constraint => ({
+  const buildWith = (severity: ConstraintSeverity): Constraint => ({
     id: newId(), scope: desc.scope, severity, weight: severity === "prefer" ? 3 : 1, enabled: true,
     template, params: { ...values },
   } as unknown as Constraint);
@@ -67,7 +70,15 @@ export function ConstraintsPanel({ project, timetable, onAdd, onToggle, onRemove
     if (f.kind === "subjects" || f.kind === "classes" || f.kind === "slots") return (v as string[]).length > 0;
     return v !== "" && v != null;
   });
-  const preview = ready ? safeSentence(project, build()) : "";
+  const preview = ready ? safeSentence(project, buildWith("must")) : "";
+
+  const moveTier = (c: Constraint) => {
+    const newSeverity: ConstraintSeverity = c.severity === "must" ? "prefer" : "must";
+    onAdd({ ...c, severity: newSeverity, weight: newSeverity === "prefer" ? 3 : 1 });
+  };
+
+  const rules = project.constraints.filter((c) => c.severity === "must");
+  const prefs = project.constraints.filter((c) => c.severity === "prefer");
 
   const suggestions = useMemo(() => suggestConstraints(project, timetable), [project, timetable]);
   const existingKeys = new Set(project.constraints.map((c) => `${c.template}|${JSON.stringify(c.params)}`));
@@ -75,9 +86,9 @@ export function ConstraintsPanel({ project, timetable, onAdd, onToggle, onRemove
 
   return (
     <div className="max-w-2xl">
-      <h2 className="mb-1 text-lg font-semibold">Constraints</h2>
+      <h2 className="mb-1 text-lg font-semibold">Rules & Preferences</h2>
       <p className="mb-4 text-sm text-slate-500">
-        Rules the timetable must (or should) follow. A “must” shows in red on the grid and is respected when filling gaps; a “should” is a gentle preference.
+        Rules are hard limits the planner always respects. Preferences are soft targets it tries to meet.
       </p>
 
       <div className="mb-5 rounded border border-slate-200 bg-slate-50 p-3 text-sm">
@@ -92,12 +103,21 @@ export function ConstraintsPanel({ project, timetable, onAdd, onToggle, onRemove
         </div>
 
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <select className="rounded border border-slate-300 px-2 py-1" value={severity} onChange={(e) => setSeverity(e.target.value as ConstraintSeverity)} aria-label="Strength">
-            <option value="must">Must (hard)</option>
-            <option value="prefer">Should (soft)</option>
-          </select>
-          <button disabled={!ready} onClick={() => onAdd(build())} className="rounded bg-slate-800 px-3 py-1 text-white disabled:opacity-40">Add constraint</button>
-          {preview && <span className="text-xs italic text-slate-500">“{preview}”</span>}
+          <button
+            disabled={!ready}
+            onClick={() => onAdd(buildWith("must"))}
+            className="rounded bg-rose-700 px-3 py-1 text-sm font-medium text-white disabled:opacity-40 hover:bg-rose-800"
+          >
+            Add Rule
+          </button>
+          <button
+            disabled={!ready}
+            onClick={() => onAdd(buildWith("prefer"))}
+            className="rounded bg-amber-600 px-3 py-1 text-sm font-medium text-white disabled:opacity-40 hover:bg-amber-700"
+          >
+            Add Preference
+          </button>
+          {preview && <span className="text-xs italic text-slate-500">"{preview}"</span>}
         </div>
       </div>
 
@@ -115,27 +135,91 @@ export function ConstraintsPanel({ project, timetable, onAdd, onToggle, onRemove
         </div>
       )}
 
-      <h3 className="mb-2 text-sm font-semibold">Your constraints</h3>
-      {project.constraints.length === 0 ? (
-        <p className="text-sm text-slate-400">None yet. Add one above, or pick a suggestion.</p>
-      ) : (
-        <ul className="divide-y divide-slate-100 rounded border border-slate-200">
-          {project.constraints.map((c) => (
-            <li key={c.id} className="flex items-center gap-2 px-3 py-2 text-sm">
-              <input type="checkbox" checked={c.enabled} onChange={() => onToggle(c.id)} aria-label={`Toggle ${safeSentence(project, c)}`} />
-              <span className={`flex-1 ${c.enabled ? "" : "text-slate-400 line-through"}`}>{safeSentence(project, c)}</span>
-              <span className={`rounded px-2 py-0.5 text-xs ${c.severity === "must" ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-700"}`}>{c.severity === "must" ? "Must" : "Should"}</span>
-              <button onClick={() => onRemove(c.id)} className="rounded border border-slate-300 px-2 py-0.5 text-xs hover:bg-slate-50">Remove</button>
-            </li>
-          ))}
-        </ul>
-      )}
+      <TierSection
+        title={`${tierLabel("must")}s`}
+        count={rules.length}
+        constraints={rules}
+        dotClass="bg-rose-500"
+        borderClass="border-rose-100"
+        rowClass="bg-rose-50/40"
+        hint="Hard limits — the planner always respects these."
+        moveLabel={`→ ${tierLabel("prefer")}`}
+        moveTitleLabel={tierLabel("prefer")}
+        moveClass="border-amber-300 text-amber-700 hover:bg-amber-50"
+        project={project}
+        onToggle={onToggle}
+        onRemove={onRemove}
+        onMove={moveTier}
+      />
+
+      <div className="my-3 border-t border-slate-100" />
+
+      <TierSection
+        title={`${tierLabel("prefer")}s`}
+        count={prefs.length}
+        constraints={prefs}
+        dotClass="bg-amber-500"
+        borderClass="border-amber-100"
+        rowClass="bg-amber-50/40"
+        hint="Soft targets — the planner tries its best but may miss some."
+        moveLabel={`→ ${tierLabel("must")}`}
+        moveTitleLabel={tierLabel("must")}
+        moveClass="border-rose-300 text-rose-700 hover:bg-rose-50"
+        project={project}
+        onToggle={onToggle}
+        onRemove={onRemove}
+        onMove={moveTier}
+      />
     </div>
   );
 }
 
-function safeSentence(project: Project, c: Constraint): string {
-  try { return constraintSentence(project, c); } catch { return c.template; }
+function TierSection({
+  title, count, constraints, dotClass, borderClass, rowClass, hint,
+  moveLabel, moveTitleLabel, moveClass, project, onToggle, onRemove, onMove,
+}: {
+  title: string; count: number; constraints: Constraint[]; dotClass: string; borderClass: string;
+  rowClass: string; hint: string; moveLabel: string; moveTitleLabel: string; moveClass: string;
+  project: Project; onToggle: (id: string) => void; onRemove: (id: string) => void; onMove: (c: Constraint) => void;
+}): React.ReactElement {
+  return (
+    <section>
+      <h3 className="mb-1 flex items-center gap-2 text-sm font-semibold">
+        <span className={`inline-block h-2.5 w-2.5 rounded-full ${dotClass}`} />
+        {title} · {count}
+      </h3>
+      <p className="mb-2 text-xs text-slate-500">{hint}</p>
+      {constraints.length === 0 ? (
+        <p className="py-2 text-sm text-slate-400">None yet. Use the form above to add one.</p>
+      ) : (
+        <ul className={`divide-y divide-slate-100 rounded border ${borderClass}`}>
+          {constraints.map((c) => (
+            <li key={c.id} className={`flex items-center gap-2 px-3 py-2 text-sm ${rowClass}`}>
+              <input
+                type="checkbox"
+                checked={c.enabled}
+                onChange={() => onToggle(c.id)}
+                aria-label={`Toggle ${safeSentence(project, c)}`}
+              />
+              <span className={`flex-1 ${c.enabled ? "" : "text-slate-400 line-through"}`}>
+                {safeSentence(project, c)}
+              </span>
+              <button
+                onClick={() => onMove(c)}
+                className={`rounded border px-2 py-0.5 text-xs ${moveClass}`}
+                title={`Move to ${moveTitleLabel}s`}
+              >
+                {moveLabel}
+              </button>
+              <button onClick={() => onRemove(c.id)} className="rounded border border-slate-300 px-2 py-0.5 text-xs hover:bg-slate-50">
+                Remove
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
 }
 
 function FieldInput({ field, project, slots, values, setValues, toggleIn }: {

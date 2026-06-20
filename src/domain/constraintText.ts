@@ -3,7 +3,12 @@
 
 import { names } from "./constraintShared";
 import { slotLabel } from "./profile";
-import type { Constraint, Id, Project } from "./types";
+import type { Constraint, ConstraintSeverity, Id, Project } from "./types";
+
+/** Single source of truth for the Rules/Preferences vocabulary. */
+export function tierLabel(severity: ConstraintSeverity): "Rule" | "Preference" {
+  return severity === "must" ? "Rule" : "Preference";
+}
 
 export function constraintSentence(project: Project, c: Constraint): string {
   const n = names(project);

@@ -4,7 +4,24 @@ This file is the bridge between work sessions. The agent MUST update it after ev
 
 ---
 
-## Current state (OVERHAUL — engine + green-field UI — COMPLETE, 2026-06-19)
+## Current state (REVAMP — v7 decision-grade UI — M23 complete, 2026-06-20)
+
+Branch `main`. 214 tests green (46 files); build (~104 KB gzip main) + lint clean. Live-verified in browser.
+
+**M23 — Tiering & vocabulary — COMPLETE (2026-06-20).**
+- Added `tierLabel(severity): "Rule" | "Preference"` to `src/domain/constraintText.ts`; re-exported from `src/domain/constraints.ts` — single source of truth for the vocabulary.
+- Rebuilt `src/ui/panels/ConstraintsPanel.tsx`: two-section list (Rules · N with red dot / Preferences · M with amber dot); form shows "Add Rule" + "Add Preference" buttons — no raw `must`/`prefer` codes on the surface. Constraints can be moved between sections via a "→ Rule"/"→ Preference" button which flips their severity via `onAdd` with the updated constraint.
+- Fixed `src/ui/app/Dashboard.tsx`: single "Rules" tile replaced with separate "Rules" (must-count) and "Preferences" (prefer-count) tiles; grid expanded to 5 columns.
+- Updated `src/ui/panels/Issues.tsx`: "Things to fix" heading renamed to "Rule broken" to match the tier vocabulary.
+- Updated tests: `ConstraintsPanel.dom.test.tsx` ("Add Rule" instead of "Add constraint"), `App.issues.test.tsx` ("Rule broken" instead of "Things to fix").
+- AC met: every constraint appears under one of two clearly-titled sections; no raw `must`/`prefer` codes visible anywhere.
+
+**Next action: M24 — Feasibility & relaxation engine.**
+Add structured `Blocker[]` to `src/solver/types.ts` alongside the existing `blockers: string[]` (backward compatible). Upgrade `src/solver/feasibility.ts` with 6 deterministic capacity checks (teacher_capacity, class_capacity, subject_capacity, slot_contention, locked_conflict, cap_sum). Each `RelaxationSuggestion` gets an optional pure `apply?: (p: Project) => Project`. Unit tests for each check (satisfied + blocked, naming entity + number).
+
+---
+
+## Prior state (OVERHAUL — engine + green-field UI — COMPLETE, 2026-06-19)
 
 Branch `overhaul/engine-ui`. 201 tests green (43 files); build (~101 KB gzip main, ~39 KB worker) + lint clean. Live-verified in Chrome.
 

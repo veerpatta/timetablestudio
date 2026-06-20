@@ -64,12 +64,13 @@ export function Dashboard({
         )}
       </section>
 
-      <section className="grid gap-3 sm:grid-cols-4">
+      <section className="grid gap-3 sm:grid-cols-5">
         {[
           { label: "Classes", value: project.classes.length, section: "setup" as Section },
           { label: "Teachers", value: schedulable, section: "setup" as Section },
           { label: "Subjects", value: project.subjects.length, section: "setup" as Section },
-          { label: "Rules", value: project.constraints.filter((c) => c.enabled).length, section: "setup" as Section },
+          { label: "Rules", value: project.constraints.filter((c) => c.enabled && c.severity === "must").length, section: "setup" as Section },
+          { label: "Preferences", value: project.constraints.filter((c) => c.enabled && c.severity === "prefer").length, section: "setup" as Section },
         ].map((s) => (
           <button key={s.label} onClick={() => onGoto(s.section)} className="ts-card p-4 text-left transition hover:border-indigo-300">
             <div className="text-2xl font-semibold text-slate-900 tabular-nums">{s.value}</div>

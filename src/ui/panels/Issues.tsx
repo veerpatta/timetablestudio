@@ -26,7 +26,7 @@ export function IssuesPanel({ project, timetable, onJump, onFix }: Props): React
       {issues.length > 0 && (
     <section className="mb-3 rounded-lg border border-rose-200 bg-rose-50 p-3">
       <h2 className="mb-2 text-sm font-semibold text-rose-800">
-        Things to fix · {issues.length}
+        Rule broken · {issues.length}
       </h2>
       <ul className="space-y-2">
         {issues.map((issue) => {
