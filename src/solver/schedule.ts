@@ -236,57 +236,147 @@ export interface SolveOptions {
 
 const hardCount = (project: Project, tt: Timetable): number => validate(project, tt).filter((v) => v.severity === "hard").length;
 
-/** Greedy construct (`fill`) then a bounded validate-gated repair. Returns a FillResult so it
- *  drops into generate()/plan() unchanged. Deterministic per seed; budget-bounded. */
+/** Relocate soft-violated reschedulable placements to their least-conflicting legal slots.
+ *  Accepts a move only when: hard violations stay 0, shortfall does not increase, and soft
+ *  violation count strictly drops. Runs until no single-swap improvement is found or the
+ *  budget expires. Deterministic per the supplied rng. */
+function softImprovePass(
+  project: Project,
+  timetableId: Id,
+  profile: Profile,
+  rng: () => number,
+  budgetMs: number,
+  startedAt: number,
+): Project {
+  let current = project;
+  const teach = teachingSlots(profile);
+  let madeProgress = true;
+  while (madeProgress && Date.now() - startedAt < budgetMs) {
+    madeProgress = false;
+    const tt = current.timetables.find((t) => t.id === timetableId)!;
+    const sf0 = totalShortfall(current, tt);
+    const allViolations = validate(current, tt);
+    const softBefore = allViolations.filter((v) => v.severity === "soft").length;
+    if (softBefore === 0) break;
+    // Collect (classId, day, slot) keys from soft violation slots.  Local constraint
+    // violations report { classId, day, slot } (no eventId); aggregate ones may carry
+    // eventId instead. Handle both so no violated placement is overlooked.
+    const violatedKeys = new Set<string>();
+    for (const v of allViolations) {
+      if (v.severity !== "soft") continue;
+      for (const s of v.slots) {
+        if (s.classId !== undefined) violatedKeys.add(`c:${s.classId}:${s.day}:${s.slot}`);
+        if (s.eventId !== undefined) violatedKeys.add(`e:${s.eventId}:${s.day}:${s.slot}`);
+      }
+    }
+    const eventIndex = new Map(current.events.map((e) => [e.id, e]));
+    const candidates = shuffle(
+      tt.placements.filter((p) => {
+        if (!isReschedulable(current, p.eventId)) return false;
+        if (violatedKeys.has(`e:${p.eventId}:${p.day}:${p.slot}`)) return true;
+        const ev = eventIndex.get(p.eventId);
+        return ev !== undefined && ev.classIds.some((cId) => violatedKeys.has(`c:${cId}:${p.day}:${p.slot}`));
+      }),
+      rng,
+    );
+    for (const p of candidates) {
+      if (Date.now() - startedAt >= budgetMs) break;
+      for (const day2 of profile.days) {
+        for (const slot2 of teach) {
+          if (day2 === p.day && slot2 === p.slot) continue;
+          if (Date.now() - startedAt >= budgetMs) break;
+          const moved = movePlacement(current, timetableId, p, day2, slot2);
+          const movedTt = moved.timetables.find((t) => t.id === timetableId)!;
+          if (hardCount(moved, movedTt) > 0) continue;
+          if (totalShortfall(moved, movedTt) > sf0) continue;
+          const newSoft = validate(moved, movedTt).filter((v) => v.severity === "soft").length;
+          if (newSoft < softBefore) {
+            current = moved;
+            madeProgress = true;
+            break;
+          }
+        }
+        if (madeProgress) break;
+      }
+      if (madeProgress) break;
+    }
+  }
+  return current;
+}
+
+/** Greedy construct (`fill`) then a bounded validate-gated repair, followed by a soft
+ *  improvement pass. Returns a FillResult so it drops into generate()/plan() unchanged.
+ *  Deterministic per seed; budget-bounded.
+ *
+ *  M-F upgrades (2026-06-21):
+ *  - Contention-directed gap ordering: repair tackles the most constrained (fewest qualified
+ *    teachers) gaps first, giving scarce resources first access to open slots.
+ *  - Min-conflicts soft improvement: after repair, relocate soft-violated lessons to less-
+ *    conflicting positions even when shortfall is already 0. */
 export function solve(project: Project, timetableId: Id, opts?: SolveOptions): FillResult {
   const base = fill(project, timetableId, { seed: opts?.seed });
   let current = base.project;
   const tt0 = current.timetables.find((t) => t.id === timetableId);
   const profile = tt0 && findProfile(current, tt0);
   if (!tt0 || !profile) return base;
-  if (totalShortfall(current, tt0) === 0) return base; // already complete — nothing to repair
 
-  const rng = mulberry32((opts?.seed ?? 1) ^ 0x9e3779b9);
   const budgetMs = opts?.budgetMs ?? 2500;
   const startedAt = Date.now();
-
-  // legal (subject, teacher) options per class, from qualifications (the legal-move rule).
-  const teacherById = new Map(project.teachers.map((t) => [t.id, t]));
-  const subjName = new Map(project.subjects.map((s) => [s.id, s.name]));
-  const teaName = new Map(project.teachers.map((t) => [t.id, t.name]));
-  const qualsByClass = new Map<Id, Qual[]>();
-  for (const q of project.qualifications) {
-    if (!teacherById.get(q.teacherId)?.schedulable) continue;
-    const list = qualsByClass.get(q.classId) ?? [];
-    list.push({ subjectId: q.subjectId, teacherId: q.teacherId, label: `${subjName.get(q.subjectId) ?? q.subjectId} — ${teaName.get(q.teacherId) ?? q.teacherId}` });
-    qualsByClass.set(q.classId, list);
-  }
-  const unavail = new Set<string>();
-  for (const t of project.teachers) for (const u of t.unavailable) unavail.add(K(t.id, `${u.day}#${u.slot}`));
-
   const added: FilledPlacement[] = [...base.added];
-  let progressing = true;
-  while (progressing && Date.now() - startedAt < budgetMs) {
-    progressing = false;
-    const ttNow = current.timetables.find((t) => t.id === timetableId)!;
-    const shortfallBefore = totalShortfall(current, ttNow);
-    if (shortfallBefore === 0) break;
-    // re-derive the outstanding (class, subject) gaps each sweep (cheap; gaps are few).
-    const gaps = requirementCoverage(current, ttNow).filter((c) => c.short > 0);
-    for (const gap of gaps) {
-      if (Date.now() - startedAt >= budgetMs) break;
-      const cands = gapCandidates(current, timetableId, profile, gap.classId, gap.subjectId, qualsByClass.get(gap.classId) ?? [], qualsByClass, unavail, rng, 8);
-      for (const cand of cands) {
-        const candTt = cand.project.timetables.find((t) => t.id === timetableId)!;
-        if (hardCount(cand.project, candTt) === 0 && totalShortfall(cand.project, candTt) < shortfallBefore) {
-          current = cand.project;
-          added.push(cand.placed);
-          progressing = true;
-          break;
-        }
-      }
-      if (progressing) break; // recompute gaps from the new state
+
+  // Repair loop: fill coverage gaps that greedy fill could not close.
+  if (totalShortfall(current, tt0) > 0) {
+    const rng = mulberry32((opts?.seed ?? 1) ^ 0x9e3779b9);
+    // legal (subject, teacher) options per class, from qualifications.
+    const teacherById = new Map(project.teachers.map((t) => [t.id, t]));
+    const subjName = new Map(project.subjects.map((s) => [s.id, s.name]));
+    const teaName = new Map(project.teachers.map((t) => [t.id, t.name]));
+    const qualsByClass = new Map<Id, Qual[]>();
+    for (const q of project.qualifications) {
+      if (!teacherById.get(q.teacherId)?.schedulable) continue;
+      const list = qualsByClass.get(q.classId) ?? [];
+      list.push({ subjectId: q.subjectId, teacherId: q.teacherId, label: `${subjName.get(q.subjectId) ?? q.subjectId} — ${teaName.get(q.teacherId) ?? q.teacherId}` });
+      qualsByClass.set(q.classId, list);
     }
+    const unavail = new Set<string>();
+    for (const t of project.teachers) for (const u of t.unavailable) unavail.add(K(t.id, `${u.day}#${u.slot}`));
+
+    let progressing = true;
+    while (progressing && Date.now() - startedAt < budgetMs) {
+      progressing = false;
+      const ttNow = current.timetables.find((t) => t.id === timetableId)!;
+      const shortfallBefore = totalShortfall(current, ttNow);
+      if (shortfallBefore === 0) break;
+      // Contention-directed ordering: fewest qualified teachers first → most constrained gap
+      // gets first pick of still-open slots, reducing the chance of a dead-end.
+      const gaps = requirementCoverage(current, ttNow)
+        .filter((c) => c.short > 0)
+        .sort((a, b) => {
+          const aCount = (qualsByClass.get(a.classId) ?? []).filter((q) => q.subjectId === a.subjectId).length;
+          const bCount = (qualsByClass.get(b.classId) ?? []).filter((q) => q.subjectId === b.subjectId).length;
+          return aCount - bCount;
+        });
+      for (const gap of gaps) {
+        if (Date.now() - startedAt >= budgetMs) break;
+        const cands = gapCandidates(current, timetableId, profile, gap.classId, gap.subjectId, qualsByClass.get(gap.classId) ?? [], qualsByClass, unavail, rng, 8);
+        for (const cand of cands) {
+          const candTt = cand.project.timetables.find((t) => t.id === timetableId)!;
+          if (hardCount(cand.project, candTt) === 0 && totalShortfall(cand.project, candTt) < shortfallBefore) {
+            current = cand.project;
+            added.push(cand.placed);
+            progressing = true;
+            break;
+          }
+        }
+        if (progressing) break; // recompute gaps from the new state
+      }
+    }
+  }
+
+  // Min-conflicts soft improvement: relocate prefer-violated lessons to less-conflicting slots.
+  if (Date.now() - startedAt < budgetMs) {
+    const rngSoft = mulberry32((opts?.seed ?? 1) ^ 0xdeadbeef);
+    current = softImprovePass(current, timetableId, profile, rngSoft, budgetMs, startedAt);
   }
 
   const finalTt = current.timetables.find((t) => t.id === timetableId)!;

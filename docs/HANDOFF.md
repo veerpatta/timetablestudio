@@ -4,9 +4,9 @@ This file is the bridge between work sessions. The agent MUST update it after ev
 
 ---
 
-## Current state (PLAN — "Rarely Get Stuck" — M-E COMPLETE, 2026-06-21)
+## Current state (PLAN — "Rarely Get Stuck" — M-F COMPLETE, 2026-06-21)
 
-Branch `main`. 280 tests green (52 files); build (112 KB gzip main) + lint clean.
+Branch `main`. 286 tests green (52 files); build (113 KB gzip main) + lint clean.
 
 Active plan: `docs/PLAN.md` — 8 milestones M-A through M-H. Scope: M-A through M-F are the full deliverable; M-G (CP-SAT WASM) is optional/heavy; M-H is document-only.
 
@@ -15,10 +15,16 @@ Active plan: `docs/PLAN.md` — 8 milestones M-A through M-H. Scope: M-A through
 **M-C COMPLETE** — Constraint priority tiers. `tier?: 0|1|2|3` on `ConstraintBase`; `constraintTier()` helper for zero-migration data reads; 4-way T0–T3 segmented control per rule card; tier cross-boundary sync updates severity.
 **M-D COMPLETE** — Flexible qualified swaps. `primaryTeacher()` continuity-preference helper; phase-3 load-swap in `gapCandidates()` (substitute Y into Q's blocker class freeing Q for gap); `note?: string` on `FilledPlacement`; amber note in FillReview; 3 new tests.
 **M-E COMPLETE** — Relaxation engine. `solveWithRelaxation()` four-step algorithm; graft-back guardrail; "Relaxed to fit" amber UI section; "Accept (apply relaxed)" button; 6 new tests.
+**M-F COMPLETE** — In-browser search upgrades. Contention-directed gap ordering; `softImprovePass()` min-conflicts second stage; `PROVE_UNIT_LIMIT` raised to 25; 6 new tests.
 
-**Next action**: M-F — In-browser search upgrades. Conflict-directed restarts; min-conflicts local search second repair stage; tighter budget bounds; raise `PROVE_UNIT_LIMIT` beyond 18. See `docs/PLAN.md` §4.6.
+**Next action**: M-G (optional/heavy — CP-SAT-WASM adapter) or M-H (document-only — FET/Timefold bridge). Both are optional; the plan's core deliverable is complete.
 
 ---
+
+**M-F — In-browser search upgrades — COMPLETE (2026-06-21).**
+- `src/solver/schedule.ts`: `softImprovePass()` (new private fn) — iterates soft-violated reschedulable placements and tries every other (day, slot), accepting the first move that strictly reduces soft count while keeping hard=0 and shortfall unchanged. Also sorts repair-loop gaps by contention (fewest qualified teachers first). Both run within the existing `budgetMs` constraint.
+- `src/solver/deepSearch.ts`: `PROVE_UNIT_LIMIT` raised 18→25 and exported (tests now assert the constant directly).
+- `src/solver/scheduleUpgrades.test.ts` (new): 6 tests — `PROVE_UNIT_LIMIT > 18`; determinism; contention fixture resolves to 0 shortfall; soft improvement reduces violations vs plain fill; no hard violations during soft pass; non-regression vs fill.
 
 **M-E — Relaxation engine — COMPLETE (2026-06-21).**
 - `src/solver/relaxation.ts` (new): `RelaxationItem`, `RelaxationResult` types; `solveWithRelaxation(project, timetableId, opts)` four-step algorithm: (1) generate as-is; (2) demote tier-1 to prefer, re-generate, detect bent rules via validate() on grafted project; (3) list tier-1 suggestions for incomplete case; (4) always return. Graft-back guardrail: `{ ...step2.project, constraints: project.constraints }` — demoted severities never leak.

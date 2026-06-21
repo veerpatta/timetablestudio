@@ -9,7 +9,7 @@ import { buildSearchDomains, outstandingUnits, type SearchOption } from "./domai
 import type { CandidateResult, SolverRequest } from "./types";
 
 const DEFAULT_BUDGET = 5000;
-const PROVE_UNIT_LIMIT = 18;
+export const PROVE_UNIT_LIMIT = 25;
 
 interface ExactResult {
   project: Project;
