@@ -48,6 +48,7 @@ export function SetupHub({
             project={project}
             timetable={timetable}
             onAdd={onAddConstraint}
+            onUpdate={store.updateConstraint}
             onToggle={store.toggleConstraint}
             onRemove={store.removeConstraint}
           />

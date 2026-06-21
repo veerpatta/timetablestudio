@@ -61,16 +61,7 @@ export function buildFixesForGap(
   const className = project.classes.find((c) => c.id === gap.classId)?.name ?? gap.classId;
   const subjectName = project.subjects.find((s) => s.id === gap.subjectId)?.name ?? gap.subjectId;
 
-  // Fix: reduce requirement to what's placed (always safe — just accepts the reality)
-  if (gap.placed >= 0) {
-    fixes.push({
-      label: `Reduce ${className} ${subjectName} requirement to ${gap.placed} ${gap.placed === 1 ? "period" : "periods"} (what's currently placed)`,
-      costEstimate: "medium",
-      spec: { kind: "reduce_requirement", classId: gap.classId, subjectId: gap.subjectId, newPeriods: gap.placed },
-    });
-  }
-
-  // Fix: qualify an additional teacher — suggest the most available schedulable teacher
+  // Fix 1 (low cost): qualify an additional teacher when no qualified teacher exists
   const alreadyQualified = new Set(
     project.qualifications.filter((q) => q.classId === gap.classId && q.subjectId === gap.subjectId).map((q) => q.teacherId),
   );
@@ -82,6 +73,15 @@ export function buildFixesForGap(
       label: `Qualify ${candidate.name} to teach ${subjectName} to ${className}`,
       costEstimate: "low",
       spec: { kind: "qualify_teacher", teacherId: candidate.id, subjectId: gap.subjectId, classId: gap.classId },
+    });
+  }
+
+  // Fix 2 (medium cost): reduce requirement to what's placed — accepts current reality
+  if (gap.placed >= 0) {
+    fixes.push({
+      label: `Reduce ${className} ${subjectName} requirement to ${gap.placed} ${gap.placed === 1 ? "period" : "periods"} (what's currently placed)`,
+      costEstimate: "medium",
+      spec: { kind: "reduce_requirement", classId: gap.classId, subjectId: gap.subjectId, newPeriods: gap.placed },
     });
   }
 

@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 import { useProjectStore } from "../../store/projectStore";
+import { constraintTier } from "../../domain/constraints";
 import { App } from "../app/App";
 
 const proj = () => useProjectStore.getState().project;
@@ -27,6 +28,33 @@ describe("Constraints panel (C3, through the UI)", () => {
     expect(proj().constraints.find((c) => c.id === id)?.enabled).toBe(false);
     fireEvent.click(screen.getByRole("button", { name: "Remove" }));
     expect(proj().constraints.length).toBe(0);
+  });
+
+  it("tier segmented control (M-C) updates tier and syncs severity (M-C)", () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Setup" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Rules/ }));
+
+    // Add a "must" rule (subject_half_of_day)
+    fireEvent.click(screen.getByLabelText("Subjects: Maths"));
+    fireEvent.click(screen.getByLabelText("For classes: Class 7"));
+    fireEvent.click(screen.getByRole("button", { name: "Add Rule" }));
+
+    const id = proj().constraints[0]!.id;
+    // Newly added must→tier 0 by default
+    expect(constraintTier(proj().constraints[0]!)).toBe(0);
+
+    // Click T1 chip → tier becomes 1, severity stays "must"
+    fireEvent.click(screen.getByRole("button", { name: /Set tier 1/ }));
+    const afterT1 = proj().constraints.find((c) => c.id === id)!;
+    expect(constraintTier(afterT1)).toBe(1);
+    expect(afterT1.severity).toBe("must");
+
+    // Click T2 chip → tier becomes 2, severity flips to "prefer"
+    fireEvent.click(screen.getByRole("button", { name: /Set tier 2/ }));
+    const afterT2 = proj().constraints.find((c) => c.id === id)!;
+    expect(constraintTier(afterT2)).toBe(2);
+    expect(afterT2.severity).toBe("prefer");
   });
 
   it("a must constraint highlights the offending class cell (live)", () => {

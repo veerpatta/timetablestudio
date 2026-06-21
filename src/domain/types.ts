@@ -185,6 +185,7 @@ export interface ConstraintBase {
   scope: ConstraintScope;
   targetId?: Id; // optional UI hint; params carry the authoritative entity refs
   severity: ConstraintSeverity;
+  tier?: 0 | 1 | 2 | 3; // M-C: priority within severity band. derive via constraintTier() — never read directly
   weight: number; // soft weight when severity === "prefer"
   enabled: boolean;
 }

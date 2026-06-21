@@ -4,18 +4,31 @@ This file is the bridge between work sessions. The agent MUST update it after ev
 
 ---
 
-## Current state (PLAN — "Rarely Get Stuck" — M-B COMPLETE, 2026-06-21)
+## Current state (PLAN — "Rarely Get Stuck" — M-C COMPLETE, 2026-06-21)
 
-Branch `main`. 263 tests green (49 files); build (110 KB gzip main) + lint clean.
+Branch `main`. 271 tests green (51 files); build (110 KB gzip main) + lint clean.
 
 Active plan: `docs/PLAN.md` — 8 milestones M-A through M-H. Scope: M-A through M-F are the full deliverable; M-G (CP-SAT WASM) is optional/heavy; M-H is document-only.
 
 **M-A COMPLETE** — Partial-fill is first-class. CoverageReport + gapReasons threading + "What's left & why" UI panel.
 **M-B COMPLETE** — Fix framework + one-click apply. `ProjectFix`/`FixSpec` type; executable gap fixes in `CoverageGapEntry`; "Apply fix" buttons per gap; "Auto-fix to feasible" greedy loop.
+**M-C COMPLETE** — Constraint priority tiers. `tier?: 0|1|2|3` on `ConstraintBase`; `constraintTier()` helper for zero-migration data reads; 4-way T0–T3 segmented control per rule card; tier cross-boundary sync updates severity.
 
-**Next action**: M-C — Constraint tiers (0–3). Add `tier: 0|1|2|3` to `ConstraintBase`; migrate existing data (`must` → tier 0, `prefer` → tier 2); update solver to read tier; 4-way segmented UI control per rule card.
+**Next action**: M-D — Flexible qualified swaps. Three new candidate generators in `gapCandidates()`: teacher substitution within subject, qualification-widening suggestion, load rebalancing. See `docs/PLAN.md` §4.4 M-D for full spec.
 
 ---
+
+**M-C — Constraint priority tiers — COMPLETE (2026-06-21).**
+- `src/domain/types.ts`: added `tier?: 0|1|2|3` to `ConstraintBase` (optional — no existing code needs updating; `constraintTier()` is the only read point).
+- `src/domain/constraintText.ts`: added `ConstraintTier` type, `constraintTier(c)` (migrates `must→0`, `prefer→2`), `severityForTier(tier)`, `tierChipLabel(tier)`, `tierDescription(tier)`.
+- `src/domain/constraints.ts`: re-exports all new helpers from `constraintText.ts`.
+- `src/ui/panels/ConstraintsPanel.tsx`: replaced binary "move to must/prefer" button with a 4-way T0–T3 segmented control per item row. Changing tier across must/prefer boundary (T1→T2 or T2→T1) also updates `severity` and `weight`. Added `onUpdate` prop (wired to `store.updateConstraint`). Panel sections now filter by `constraintTier(c) <= 1` and `>= 2`.
+- `src/ui/setup/SetupHub.tsx`: passes `onUpdate={store.updateConstraint}` to `ConstraintsPanel`.
+- `src/domain/constraintTier.test.ts` (new): 7 unit tests for `constraintTier`, `severityForTier`, `tierChipLabel`, `tierDescription`.
+- `src/ui/panels/ConstraintsPanel.dom.test.tsx`: added M-C UI test — adds a rule, clicks T1 (stays must), clicks T2 (flips to prefer), asserts tier and severity.
+- Solver, `validate()`, feasibility: no behavior changes — still read `severity`. Tier-driven solving is M-E.
+- `docs/projectFixes.ts` M-B fix: `buildFixesForGap` now orders cheapest-first (qualify_teacher/low before reduce_requirement/medium).
+- 271 tests pass, 0 failures.
 
 **M-B — Fix framework + one-click apply — COMPLETE (2026-06-21).**
 - Added `src/domain/projectFixes.ts` (new, pure domain): `FixSpec` discriminated union, `ProjectFix` interface, `applyProjectFix(project, spec)` pure function, `buildFixesForGap(project, gap)` → generates `reduce_requirement` and `qualify_teacher` fixes per coverage gap.

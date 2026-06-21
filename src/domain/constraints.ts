@@ -15,7 +15,8 @@ import { deriveMaps, findProfile } from "./derive";
 import { teachingSlots } from "./profile";
 import type { Constraint, ConstraintTemplate, Profile, Project, Timetable, Violation } from "./types";
 
-export { constraintSentence, tierLabel } from "./constraintText";
+export { constraintSentence, tierLabel, constraintTier, severityForTier, tierChipLabel, tierDescription } from "./constraintText";
+export type { ConstraintTier } from "./constraintText";
 export type { PlacedLesson } from "./constraintShared";
 
 const LOCAL_TEMPLATES: ReadonlySet<ConstraintTemplate> = new Set([

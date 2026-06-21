@@ -3,11 +3,44 @@
 
 import { names } from "./constraintShared";
 import { slotLabel } from "./profile";
-import type { Constraint, ConstraintSeverity, Id, Project } from "./types";
+import type { Constraint, ConstraintBase, ConstraintSeverity, Id, Project } from "./types";
 
 /** Single source of truth for the Rules/Preferences vocabulary. */
 export function tierLabel(severity: ConstraintSeverity): "Rule" | "Preference" {
   return severity === "must" ? "Rule" : "Preference";
+}
+
+export type ConstraintTier = 0 | 1 | 2 | 3;
+
+/**
+ * The single read point for a constraint's tier.
+ * Migration: must→0, prefer→2 when tier is absent (existing data).
+ * Always call this instead of reading c.tier directly.
+ */
+export function constraintTier(c: ConstraintBase): ConstraintTier {
+  if (c.tier !== undefined) return c.tier as ConstraintTier;
+  return c.severity === "must" ? 0 : 2;
+}
+
+/** The severity implied by a tier (0-1 = hard must, 2-3 = soft prefer). */
+export function severityForTier(tier: ConstraintTier): ConstraintSeverity {
+  return tier <= 1 ? "must" : "prefer";
+}
+
+/** Short label shown in the 4-way tier chip (T0–T3). */
+export function tierChipLabel(tier: ConstraintTier): string {
+  return `T${tier}`;
+}
+
+/** Tooltip description for each tier. */
+export function tierDescription(tier: ConstraintTier): string {
+  const d: Record<ConstraintTier, string> = {
+    0: "Iron — solver never breaks this",
+    1: "Firm — solver keeps unless unavoidable",
+    2: "Soft — solver tries but may skip",
+    3: "Wish — lowest priority, easiest to drop",
+  };
+  return d[tier];
 }
 
 export function constraintSentence(project: Project, c: Constraint): string {

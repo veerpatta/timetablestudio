@@ -5,7 +5,8 @@
 
 import { useMemo, useState } from "react";
 import { CATALOG, descriptorFor, type Field } from "../../domain/constraintCatalog";
-import { constraintSentence, tierLabel } from "../../domain/constraints";
+import { constraintSentence, constraintTier, severityForTier, tierChipLabel, tierDescription, tierLabel } from "../../domain/constraints";
+import type { ConstraintTier } from "../../domain/constraints";
 import { suggestConstraints } from "../../domain/suggestConstraints";
 import { teachingSlots } from "../../domain/profile";
 import { findProfile } from "../../domain/derive";
@@ -15,6 +16,7 @@ interface Props {
   project: Project;
   timetable: Timetable;
   onAdd: (c: Constraint) => void;
+  onUpdate: (c: Constraint) => void;
   onToggle: (id: string) => void;
   onRemove: (id: string) => void;
 }
@@ -42,7 +44,7 @@ function safeSentence(project: Project, c: Constraint): string {
   try { return constraintSentence(project, c); } catch { return c.template; }
 }
 
-export function ConstraintsPanel({ project, timetable, onAdd, onToggle, onRemove }: Props): React.ReactElement {
+export function ConstraintsPanel({ project, timetable, onAdd, onUpdate, onToggle, onRemove }: Props): React.ReactElement {
   const profile = findProfile(project, timetable) ?? project.profiles[0]!;
   const slots = useMemo(() => teachingSlots(profile), [profile]);
   const [template, setTemplate] = useState<ConstraintTemplate>("subject_half_of_day");
@@ -61,7 +63,9 @@ export function ConstraintsPanel({ project, timetable, onAdd, onToggle, onRemove
     });
 
   const buildWith = (severity: ConstraintSeverity): Constraint => ({
-    id: newId(), scope: desc.scope, severity, weight: severity === "prefer" ? 3 : 1, enabled: true,
+    id: newId(), scope: desc.scope, severity,
+    tier: severity === "must" ? 0 : 2,
+    weight: severity === "prefer" ? 3 : 1, enabled: true,
     template, params: { ...values },
   } as unknown as Constraint);
 
@@ -72,13 +76,13 @@ export function ConstraintsPanel({ project, timetable, onAdd, onToggle, onRemove
   });
   const preview = ready ? safeSentence(project, buildWith("must")) : "";
 
-  const moveTier = (c: Constraint) => {
-    const newSeverity: ConstraintSeverity = c.severity === "must" ? "prefer" : "must";
-    onAdd({ ...c, severity: newSeverity, weight: newSeverity === "prefer" ? 3 : 1 });
+  const setTier = (c: Constraint, t: ConstraintTier) => {
+    const newSeverity = severityForTier(t);
+    onUpdate({ ...c, tier: t, severity: newSeverity, weight: newSeverity === "prefer" ? 3 : 1 });
   };
 
-  const rules = project.constraints.filter((c) => c.severity === "must");
-  const prefs = project.constraints.filter((c) => c.severity === "prefer");
+  const rules = project.constraints.filter((c) => constraintTier(c) <= 1);
+  const prefs = project.constraints.filter((c) => constraintTier(c) >= 2);
 
   const suggestions = useMemo(() => suggestConstraints(project, timetable), [project, timetable]);
   const existingKeys = new Set(project.constraints.map((c) => `${c.template}|${JSON.stringify(c.params)}`));
@@ -143,13 +147,10 @@ export function ConstraintsPanel({ project, timetable, onAdd, onToggle, onRemove
         borderClass="border-rose-100"
         rowClass="bg-rose-50/40"
         hint="Hard limits — the planner always respects these."
-        moveLabel={`→ ${tierLabel("prefer")}`}
-        moveTitleLabel={tierLabel("prefer")}
-        moveClass="border-amber-300 text-amber-700 hover:bg-amber-50"
         project={project}
         onToggle={onToggle}
         onRemove={onRemove}
-        onMove={moveTier}
+        onSetTier={setTier}
       />
 
       <div className="my-3 border-t border-slate-100" />
@@ -162,25 +163,25 @@ export function ConstraintsPanel({ project, timetable, onAdd, onToggle, onRemove
         borderClass="border-amber-100"
         rowClass="bg-amber-50/40"
         hint="Soft targets — the planner tries its best but may miss some."
-        moveLabel={`→ ${tierLabel("must")}`}
-        moveTitleLabel={tierLabel("must")}
-        moveClass="border-rose-300 text-rose-700 hover:bg-rose-50"
         project={project}
         onToggle={onToggle}
         onRemove={onRemove}
-        onMove={moveTier}
+        onSetTier={setTier}
       />
     </div>
   );
 }
 
+const TIERS: ConstraintTier[] = [0, 1, 2, 3];
+
 function TierSection({
   title, count, constraints, dotClass, borderClass, rowClass, hint,
-  moveLabel, moveTitleLabel, moveClass, project, onToggle, onRemove, onMove,
+  project, onToggle, onRemove, onSetTier,
 }: {
   title: string; count: number; constraints: Constraint[]; dotClass: string; borderClass: string;
-  rowClass: string; hint: string; moveLabel: string; moveTitleLabel: string; moveClass: string;
-  project: Project; onToggle: (id: string) => void; onRemove: (id: string) => void; onMove: (c: Constraint) => void;
+  rowClass: string; hint: string;
+  project: Project; onToggle: (id: string) => void; onRemove: (id: string) => void;
+  onSetTier: (c: Constraint, t: ConstraintTier) => void;
 }): React.ReactElement {
   return (
     <section>
@@ -193,29 +194,39 @@ function TierSection({
         <p className="py-2 text-sm text-slate-400">None yet. Use the form above to add one.</p>
       ) : (
         <ul className={`divide-y divide-slate-100 rounded border ${borderClass}`}>
-          {constraints.map((c) => (
-            <li key={c.id} className={`flex items-center gap-2 px-3 py-2 text-sm ${rowClass}`}>
-              <input
-                type="checkbox"
-                checked={c.enabled}
-                onChange={() => onToggle(c.id)}
-                aria-label={`Toggle ${safeSentence(project, c)}`}
-              />
-              <span className={`flex-1 ${c.enabled ? "" : "text-slate-400 line-through"}`}>
-                {safeSentence(project, c)}
-              </span>
-              <button
-                onClick={() => onMove(c)}
-                className={`rounded border px-2 py-0.5 text-xs ${moveClass}`}
-                title={`Move to ${moveTitleLabel}s`}
-              >
-                {moveLabel}
-              </button>
-              <button onClick={() => onRemove(c.id)} className="rounded border border-slate-300 px-2 py-0.5 text-xs hover:bg-slate-50">
-                Remove
-              </button>
-            </li>
-          ))}
+          {constraints.map((c) => {
+            const ct = constraintTier(c);
+            return (
+              <li key={c.id} className={`flex items-center gap-2 px-3 py-2 text-sm ${rowClass}`}>
+                <input
+                  type="checkbox"
+                  checked={c.enabled}
+                  onChange={() => onToggle(c.id)}
+                  aria-label={`Toggle ${safeSentence(project, c)}`}
+                />
+                <span className={`flex-1 ${c.enabled ? "" : "text-slate-400 line-through"}`}>
+                  {safeSentence(project, c)}
+                </span>
+                <span className="flex rounded border border-slate-200 text-xs" role="group" aria-label="Priority tier">
+                  {TIERS.map((t) => (
+                    <button
+                      key={t}
+                      onClick={() => onSetTier(c, t)}
+                      className={`px-1.5 py-0.5 ${t === ct ? "bg-slate-700 text-white font-semibold" : "text-slate-500 hover:bg-slate-100"} ${t === 0 ? "rounded-l" : ""} ${t === 3 ? "rounded-r" : ""}`}
+                      title={tierDescription(t)}
+                      aria-label={`Set tier ${t}: ${tierDescription(t)}`}
+                      aria-pressed={t === ct}
+                    >
+                      {tierChipLabel(t)}
+                    </button>
+                  ))}
+                </span>
+                <button onClick={() => onRemove(c.id)} className="rounded border border-slate-300 px-2 py-0.5 text-xs hover:bg-slate-50">
+                  Remove
+                </button>
+              </li>
+            );
+          })}
         </ul>
       )}
     </section>
