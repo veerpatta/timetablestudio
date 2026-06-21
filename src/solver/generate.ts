@@ -7,6 +7,7 @@
 //   two presets that converge to the same timetable produce only one candidate.
 
 import { assessTimetable } from "../domain/assessment";
+import { buildCoverageReport } from "../domain/coverage";
 import { diffProjects } from "../domain/diffTimetables";
 import { validate } from "../domain/validate";
 import type { ConstraintTemplate, Id, Placement, Project, Violation } from "../domain/types";
@@ -165,6 +166,7 @@ export function generateCandidates(
     const before = { ...project, activeTimetableId: timetableId };
     const after = { ...best.res.project, activeTimetableId: timetableId };
 
+    const coverageReport = buildCoverageReport(best.res.project, table, best.res.gapReasons);
     candidates.push({
       presetLabel: preset.label,
       project: best.res.project,
@@ -176,6 +178,7 @@ export function generateCandidates(
       weightedSoftScore: best.wSoft,
       assessment: assessTimetable(best.res.project, timetableId),
       verdict: verdictOf(best.res.remainingShortfall, best.hardCount),
+      coverageReport,
     });
   }
 

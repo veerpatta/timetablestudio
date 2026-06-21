@@ -212,5 +212,5 @@ export function solve(project: Project, timetableId: Id, opts?: SolveOptions): F
   }
 
   const finalTt = current.timetables.find((t) => t.id === timetableId)!;
-  return { project: current, added, remainingShortfall: totalShortfall(current, finalTt), blockers: base.blockers };
+  return { project: current, added, remainingShortfall: totalShortfall(current, finalTt), blockers: base.blockers, gapReasons: base.gapReasons };
 }

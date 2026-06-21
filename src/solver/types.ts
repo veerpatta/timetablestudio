@@ -1,6 +1,9 @@
 import type { Assessment } from "../domain/assessment";
+import type { CoverageReport } from "../domain/coverage";
 import type { CellDiff } from "../domain/diffTimetables";
 import type { Project } from "../domain/types";
+
+export type { CoverageReport } from "../domain/coverage";
 
 export type SolveMode = "fast" | "deep" | "prove";
 export type ProofLevel = "best_found" | "complete" | "impossible" | "timeout";
@@ -65,6 +68,7 @@ export interface CandidateResult {
   stats: SolverStats;
   blockers: string[];
   relaxationSuggestions: string[];
+  coverageReport: CoverageReport;
 }
 
 // --- Multi-candidate generation (M26) ---
@@ -94,4 +98,5 @@ export interface Candidate {
   weightedSoftScore: number;   // Σ(constraint.weight × preset.multiplier[template]) for soft violations
   assessment: Assessment;
   verdict: Verdict;
+  coverageReport: CoverageReport;
 }

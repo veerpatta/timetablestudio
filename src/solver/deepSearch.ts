@@ -99,6 +99,7 @@ export function solveTimetable(project: Project, timetableId: Id, request: Solve
       triedCandidates: generated.triedSeeds,
       startedAt,
       blockers: generated.blockers,
+      fillGapReasons: generated.gapReasons,
     });
     options.onCandidate?.(fastResult);
     return fastResult;
@@ -124,16 +125,23 @@ export function solveTimetable(project: Project, timetableId: Id, request: Solve
 
   const fast = generate(project, timetableId, { seeds: request.seeds ?? request.maxCandidates ?? 8, budgetMs: Math.floor(budgetMs / 2) });
   let best = fast.project;
+  let bestGapReasons = fast.gapReasons;
   let tried = fast.triedSeeds;
   const remainingBudget = Math.max(250, budgetMs - (Date.now() - startedAt));
   if (units.length <= PROVE_UNIT_LIMIT) {
     const exact = exactSearch(project, timetableId, remainingBudget);
     tried += exact.tried;
-    if (betterProject(exact.project, best, timetableId)) best = exact.project;
+    if (betterProject(exact.project, best, timetableId)) {
+      best = exact.project;
+      bestGapReasons = [];
+    }
   } else {
     const repaired = planTimetable(project, timetableId, { seeds: request.maxCandidates ?? 12, budgetMs: remainingBudget });
     tried += repaired.triedSeeds;
-    if (betterProject(repaired.project, best, timetableId)) best = repaired.project;
+    if (betterProject(repaired.project, best, timetableId)) {
+      best = repaired.project;
+      bestGapReasons = repaired.gapReasons;
+    }
   }
   const score = scoreProject(best, timetableId);
   const deepResult = candidateResult(project, best, timetableId, {
@@ -143,6 +151,7 @@ export function solveTimetable(project: Project, timetableId: Id, request: Solve
     triedCandidates: tried,
     startedAt,
     timedOut: Date.now() - startedAt >= budgetMs,
+    fillGapReasons: bestGapReasons,
   });
   options.onCandidate?.(deepResult);
   return deepResult;

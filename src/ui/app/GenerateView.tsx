@@ -295,6 +295,37 @@ export function GenerateView({
         </section>
       )}
 
+      {/* ── What's left & why (M-A) ────────────────────────────────────────── */}
+      {active && hasResult && active.remainingShortfall > 0 && active.coverageReport.gaps.length > 0 && (
+        <section className="ts-card border-amber-200 bg-amber-50 p-5">
+          <h3 className="mb-3 text-sm font-semibold text-amber-900">
+            What's left & why — {active.remainingShortfall} {active.remainingShortfall === 1 ? "period" : "periods"} unplaced
+          </h3>
+          <ul className="space-y-3">
+            {active.coverageReport.gaps.slice(0, 8).map((g, i) => {
+              const subjectName = active.project.subjects.find((s) => s.id === g.subjectId)?.name ?? g.subjectId;
+              const className = active.project.classes.find((c) => c.id === g.classId)?.name ?? g.classId;
+              return (
+                <li key={i} className="rounded-lg border border-amber-100 bg-white p-3">
+                  <p className="mb-1 text-sm font-medium text-slate-800">
+                    {className} · {subjectName} · {g.short} {g.short === 1 ? "period" : "periods"} missing
+                  </p>
+                  {g.reasons.length > 0 && (
+                    <p className="mb-1 text-xs text-slate-600">{g.reasons[0]}</p>
+                  )}
+                  <p className="text-xs text-amber-700">{g.suggestion}</p>
+                </li>
+              );
+            })}
+            {active.coverageReport.gaps.length > 8 && (
+              <li className="text-xs text-slate-400">
+                …and {active.coverageReport.gaps.length - 8} more gaps
+              </li>
+            )}
+          </ul>
+        </section>
+      )}
+
       {/* ── Alternative candidates ──────────────────────────────────────────── */}
       {candidates.length > 1 && hasResult && (
         <section className="ts-card p-4">

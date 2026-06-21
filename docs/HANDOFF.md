@@ -4,11 +4,28 @@ This file is the bridge between work sessions. The agent MUST update it after ev
 
 ---
 
-## Current state (REVAMP — v7 decision-grade UI — ALL MILESTONES COMPLETE, 2026-06-21)
+## Current state (PLAN — "Rarely Get Stuck" — M-A COMPLETE, 2026-06-21)
 
-Branch `main`. 258 tests green (49 files); build (109 KB gzip main) + lint clean. All 6 milestones (M23–M28) committed and pushed to origin/main.
+Branch `main`. 259 tests green (49 files); build (109 KB gzip main) + lint clean.
 
-**Next session**: no pending milestones. The REVAMP plan is complete. Possible follow-ups: browser smoke-test of targeted regenerate UI, or new feature requests.
+Active plan: `docs/PLAN.md` — 8 milestones M-A through M-H. Scope: M-A through M-F are the full deliverable; M-G (CP-SAT WASM) is optional/heavy; M-H is document-only.
+
+**M-A COMPLETE** — Partial-fill is first-class. CoverageReport + gapReasons threading + "What's left & why" UI panel.
+
+**Next action**: M-B — Fix framework + one-click apply. Define `Fix` type; wire feasibility relaxations and gap reasons to ranked fixes with preview-diff-then-apply; "Auto-fix to feasible" button.
+
+---
+
+**M-A — Partial-fill is first-class — COMPLETE (2026-06-21).**
+- Added `CoverageGapEntry` and `CoverageReport` types to `src/domain/coverage.ts` (pure domain types, layering clean). Also added `buildCoverageReport(project, timetable, gapReasons)` function that merges `coverageGaps()` with fill-level diagnostics.
+- Added `FillGapReason` and `gapReasons: FillGapReason[]` to `FillResult` in `src/solver/fill.ts`. The blocker diagnosis loop now emits both the flat `blockers: string[]` (backward compat) and structured `gapReasons` (per class+subject attribution for CoverageReport).
+- `src/solver/schedule.ts`: `solve()` threads `gapReasons: base.gapReasons` through the repair pass.
+- `src/solver/types.ts`: added `coverageReport: CoverageReport` to `CandidateResult` and `Candidate`. Re-exports `CoverageReport` from `domain/coverage`.
+- `src/solver/candidateScoring.ts`: `candidateResult()` now accepts optional `fillGapReasons` and always builds and includes a `CoverageReport` in every result.
+- `src/solver/deepSearch.ts`: `solveTimetable()` threads `fillGapReasons` through fast mode (from `planTimetable`) and deep mode (from `generate()` + `planTimetable()`); exact-search path gets `gapReasons: []`.
+- `src/solver/generate.ts`: `generateCandidates()` builds `coverageReport` for each `Candidate` using `buildCoverageReport()`.
+- `src/ui/app/GenerateView.tsx`: added "What's left & why" amber panel that renders when the active candidate has `remainingShortfall > 0`, listing each gap with its class, subject, period count, first reason, and an actionable suggestion.
+- 1 new AC test in `src/domain/coverage.test.ts`: over-constrained fixture (no qualified teacher for a (class,subject) pair) → fill → `buildCoverageReport` returns non-empty gaps with reasons and suggestions.
 
 ---
 

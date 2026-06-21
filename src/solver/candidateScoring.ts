@@ -1,7 +1,8 @@
-import { totalShortfall } from "../domain/coverage";
+import { buildCoverageReport, totalShortfall } from "../domain/coverage";
 import { diffProjects } from "../domain/diffTimetables";
 import type { Project, Timetable } from "../domain/types";
 import { validate } from "../domain/validate";
+import type { FillGapReason } from "./fill";
 import type { CandidateResult, FeasibilityReport, ProofLevel, SolveMode } from "./types";
 
 function activeTable(project: Project, timetableId: string): Timetable | undefined {
@@ -40,11 +41,16 @@ export function candidateResult(
     timedOut?: boolean;
     blockers?: string[];
     relaxationSuggestions?: string[];
+    fillGapReasons?: FillGapReason[];
   },
 ): CandidateResult {
   const score = scoreProject(project, timetableId);
   const blockers = [...new Set([...(opts.blockers ?? []), ...opts.feasibility.blockers])];
   const relaxationSuggestions = [...new Set([...(opts.relaxationSuggestions ?? []), ...opts.feasibility.relaxationSuggestions])];
+  const timetable = activeTable(project, timetableId);
+  const coverageReport = timetable
+    ? buildCoverageReport(project, timetable, opts.fillGapReasons ?? [])
+    : { totalShortfall: 0, gaps: [] };
   return {
     project,
     changes: diffProjects(original, project),
@@ -59,5 +65,6 @@ export function candidateResult(
     },
     blockers,
     relaxationSuggestions,
+    coverageReport,
   };
 }

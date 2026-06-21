@@ -2,6 +2,12 @@
 
 Format: `YYYY-MM-DD — decision — rationale`
 
+- 2026-06-21 (M-A) — `CoverageReport` / `CoverageGapEntry` defined in `domain/coverage.ts`, not `solver/types.ts` — they are pure domain types (no solver references) so they belong in the domain layer; `solver/types.ts` re-exports them to avoid import-direction violations (domain ← solver).
+- 2026-06-21 (M-A) — `gapReasons: FillGapReason[]` added alongside existing `blockers: string[]` in `FillResult` rather than replacing it — `blockers` is used by `FillReview.tsx` and other callers; adding a parallel structured field avoids changing call sites while enabling `buildCoverageReport()` to attribute reasons to specific (class, subject) pairs without brittle substring matching.
+- 2026-06-21 (M-A) — The exact-search path in `deepSearch.ts` emits `fillGapReasons: []` (empty) — the exact backtracker directly places via `applyOption` without going through `fill()`, so there are no fill-level gap reasons to propagate. The `CoverageReport` is still computed from `coverageGaps()` using the resulting project's actual shortfall.
+- 2026-06-21 (M-A) — "Amber open cells" in the grid deferred to M-B or later — rendering per-slot amber cells would require knowing WHICH slot should have which unplaced subject, but the fill algorithm doesn't commit to a slot for an unplaced requirement (it just knows N periods are missing). The "What's left & why" panel satisfies the M-A acceptance criteria without that ambiguity.
+- 2026-06-21 (M-A) — One suggestion string per gap rather than a typed `Fix` object — M-B defines the full `Fix` type with `apply(project): Project`; importing it in M-A would couple domain/coverage.ts to solver types prematurely. Lean on text suggestions for M-A; M-B upgrades them to executable Fix objects.
+
 - 2026-06-04 — New repo, separate from `timetable2025`; integration via legacy rawData export only — keeps the deployed viewer stable; the generator has different architectural needs.
 - 2026-06-04 — Hand-rolled TS solver in a Web Worker, no CP libraries — problem size ≤ 504 cells; keeps bundle small, fully free, debuggable, deterministic.
 - 2026-06-04 — ELGA modeled as an atomic `BlockActivity` (5 classes × 5 teachers × 3 consecutive periods) — matches reality: students regroup by English level across Classes 1–5; partial moves are meaningless.

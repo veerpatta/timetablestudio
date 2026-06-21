@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildBundledProject } from "../fixtures/bundled";
-import { coverageGaps, requirementCoverage, totalShortfall } from "./coverage";
+import { fill } from "../solver/fill";
+import { buildCoverageReport, coverageGaps, requirementCoverage, totalShortfall } from "./coverage";
 import type { Project } from "./types";
 
 function activeTable(p: Project) {
@@ -50,6 +51,47 @@ describe("requirementCoverage", () => {
     expect(gaps).toHaveLength(1);
     expect(gaps[0]).toMatchObject({ classId, subjectId, short: 1 });
     expect(gaps[0]!.message).toMatch(/needs 1 more/);
+  });
+
+  it("buildCoverageReport (M-A) — over-constrained fixture yields gap with reason and suggestion", () => {
+    const base = buildBundledProject();
+    const timetableId = base.activeTimetableId!;
+    // Pick a normal single-class requirement that has a qualified schedulable teacher.
+    const req = base.requirements.find((r) => {
+      if (r.periodsPerWeek === 0) return false;
+      return base.qualifications.some(
+        (q) => q.classId === r.classId && q.subjectId === r.subjectId && base.teachers.find((t) => t.id === q.teacherId)?.schedulable,
+      );
+    });
+    expect(req).toBeDefined();
+    const { classId, subjectId } = req!;
+
+    // Strip all qualifications for this (class, subject) pair so fill cannot place it.
+    // Also remove existing placements for events belonging to this pair so fill tries to fill them.
+    const eventIds = new Set(
+      base.events
+        .filter((e) => e.classIds.includes(classId) && e.subjectId === subjectId && e.classIds.length === 1)
+        .map((e) => e.id),
+    );
+    const project: Project = {
+      ...base,
+      qualifications: base.qualifications.filter((q) => !(q.classId === classId && q.subjectId === subjectId)),
+      timetables: base.timetables.map((t) =>
+        t.id !== timetableId ? t : { ...t, placements: t.placements.filter((p) => !eventIds.has(p.eventId)) },
+      ),
+    };
+
+    const result = fill(project, timetableId);
+    const timetable = result.project.timetables.find((t) => t.id === timetableId)!;
+    const report = buildCoverageReport(result.project, timetable, result.gapReasons);
+
+    // Acceptance: non-empty gap report with at least one reason and suggestion per gap.
+    expect(report.totalShortfall).toBeGreaterThan(0);
+    expect(report.gaps.length).toBeGreaterThan(0);
+    const gap = report.gaps.find((g) => g.classId === classId && g.subjectId === subjectId);
+    expect(gap).toBeDefined();
+    expect(gap!.reasons.length).toBeGreaterThan(0);
+    expect(gap!.suggestion.length).toBeGreaterThan(0);
   });
 
   it("counts each Arts elective subject against its class (electives are covered)", () => {
