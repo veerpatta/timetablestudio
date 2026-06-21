@@ -4,6 +4,7 @@
 
 import { useState } from "react";
 import { coverageGaps } from "../../domain/coverage";
+import { applyProjectFix } from "../../domain/projectFixes";
 import { findProfile } from "../../domain/derive";
 import type { Project, Timetable } from "../../domain/types";
 import type { Candidate, CandidateResult, FeasibilityReport, Verdict } from "../../solver/types";
@@ -89,6 +90,7 @@ export function GenerateView({
   onApply,
   onReject,
   onApplyTweak,
+  onAutoFix,
   onJumpToTimetable,
   onTargetedRegenerate,
 }: {
@@ -101,6 +103,7 @@ export function GenerateView({
   onApply: (c: Candidate) => void;
   onReject: () => void;
   onApplyTweak: (p: Project) => void;
+  onAutoFix?: () => void;
   onJumpToTimetable: () => void;
   onTargetedRegenerate: (scope: TargetedScope) => Promise<CandidateResult>;
 }): React.ReactElement {
@@ -295,16 +298,26 @@ export function GenerateView({
         </section>
       )}
 
-      {/* ── What's left & why (M-A) ────────────────────────────────────────── */}
+      {/* ── What's left & why (M-A/M-B) ──────────────────────────────────────── */}
       {active && hasResult && active.remainingShortfall > 0 && active.coverageReport.gaps.length > 0 && (
         <section className="ts-card border-amber-200 bg-amber-50 p-5">
-          <h3 className="mb-3 text-sm font-semibold text-amber-900">
-            What's left & why — {active.remainingShortfall} {active.remainingShortfall === 1 ? "period" : "periods"} unplaced
-          </h3>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold text-amber-900">
+              What's left & why — {active.remainingShortfall} {active.remainingShortfall === 1 ? "period" : "periods"} unplaced
+            </h3>
+            {onAutoFix && feasibility?.status === "blocked" && (feasibility.structuredBlockers ?? []).some((b) => b.relaxation.apply) && (
+              <button
+                onClick={onAutoFix}
+                className="rounded bg-indigo-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-indigo-700"
+              >
+                Auto-fix to feasible
+              </button>
+            )}
+          </div>
           <ul className="space-y-3">
             {active.coverageReport.gaps.slice(0, 8).map((g, i) => {
-              const subjectName = active.project.subjects.find((s) => s.id === g.subjectId)?.name ?? g.subjectId;
-              const className = active.project.classes.find((c) => c.id === g.classId)?.name ?? g.classId;
+              const subjectName = project.subjects.find((s) => s.id === g.subjectId)?.name ?? g.subjectId;
+              const className = project.classes.find((c) => c.id === g.classId)?.name ?? g.classId;
               return (
                 <li key={i} className="rounded-lg border border-amber-100 bg-white p-3">
                   <p className="mb-1 text-sm font-medium text-slate-800">
@@ -313,7 +326,21 @@ export function GenerateView({
                   {g.reasons.length > 0 && (
                     <p className="mb-1 text-xs text-slate-600">{g.reasons[0]}</p>
                   )}
-                  <p className="text-xs text-amber-700">{g.suggestion}</p>
+                  <p className="mb-2 text-xs text-amber-700">{g.suggestion}</p>
+                  {g.fixes.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {g.fixes.map((fix, fi) => (
+                        <button
+                          key={fi}
+                          onClick={() => onApplyTweak(applyProjectFix(project, fix.spec))}
+                          className="rounded border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs text-amber-800 hover:bg-amber-100"
+                          title={fix.label}
+                        >
+                          {fix.label.length > 60 ? fix.label.slice(0, 57) + "…" : fix.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </li>
               );
             })}
@@ -388,9 +415,19 @@ export function GenerateView({
       {/* ── Blockers (impossible path) ──────────────────────────────────────── */}
       {feasibility && (feasibility.structuredBlockers?.length ?? 0) > 0 && hasResult && (
         <section className="ts-card border-rose-200 bg-rose-50 p-5">
-          <h3 className="mb-3 text-sm font-semibold text-rose-900">
-            {overallVerdict === "Proven impossible" ? "Why this cannot be generated" : "Why some requests couldn't be fully met"}
-          </h3>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold text-rose-900">
+              {overallVerdict === "Proven impossible" ? "Why this cannot be generated" : "Why some requests couldn't be fully met"}
+            </h3>
+            {onAutoFix && (feasibility.structuredBlockers ?? []).some((b) => b.relaxation.apply) && (
+              <button
+                onClick={onAutoFix}
+                className="rounded bg-indigo-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-indigo-700"
+              >
+                Auto-fix to feasible
+              </button>
+            )}
+          </div>
           <ul className="space-y-3">
             {(feasibility.structuredBlockers ?? []).slice(0, 6).map((b, i) => (
               <li key={i} className="rounded-lg border border-rose-100 bg-white p-3">

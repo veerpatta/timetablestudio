@@ -6,6 +6,7 @@
 
 import { useMemo, useState } from "react";
 import type { Constraint, Project } from "../../domain/types";
+import { autoFixToFeasible } from "../../solver/autoFix";
 import { analyzeFeasibility } from "../../solver/feasibility";
 import { runGenerateCandidates, runTargetedRegenerate } from "../../solver/fillClient";
 import type { Candidate, FeasibilityReport } from "../../solver/types";
@@ -85,6 +86,19 @@ export function App(): React.ReactElement {
     void makeBestTimetable(tweakedProject);
   };
 
+  const applyAutoFix = () => {
+    const { project: fixed, appliedLabels } = autoFixToFeasible(project, timetableId);
+    if (appliedLabels.length === 0) {
+      setFlash("No automatic fixes could be applied. Try the individual suggestions above.");
+      return;
+    }
+    const summary = appliedLabels.slice(0, 2).join("; ") + (appliedLabels.length > 2 ? ` (and ${appliedLabels.length - 2} more)` : "");
+    store.createBackup(`Before auto-fix · ${new Date().toLocaleString()}`);
+    store.applyFix(fixed);
+    void makeBestTimetable(fixed);
+    setFlash(`Auto-fixed ${appliedLabels.length} ${appliedLabels.length === 1 ? "issue" : "issues"}: ${summary}`);
+  };
+
   const doTargetedRegenerate = (scope: TargetedScope) =>
     runTargetedRegenerate(project, timetableId, scope);
 
@@ -147,6 +161,7 @@ export function App(): React.ReactElement {
               onApply={applyCandidate}
               onReject={() => { setCandidates([]); setFeasibility(null); setFlash("Discarded the proposed plan."); }}
               onApplyTweak={applyTweak}
+              onAutoFix={applyAutoFix}
               onJumpToTimetable={() => go("timetable")}
               onTargetedRegenerate={doTargetedRegenerate}
             />

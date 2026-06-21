@@ -4,17 +4,26 @@ This file is the bridge between work sessions. The agent MUST update it after ev
 
 ---
 
-## Current state (PLAN — "Rarely Get Stuck" — M-A COMPLETE, 2026-06-21)
+## Current state (PLAN — "Rarely Get Stuck" — M-B COMPLETE, 2026-06-21)
 
-Branch `main`. 259 tests green (49 files); build (109 KB gzip main) + lint clean.
+Branch `main`. 263 tests green (49 files); build (110 KB gzip main) + lint clean.
 
 Active plan: `docs/PLAN.md` — 8 milestones M-A through M-H. Scope: M-A through M-F are the full deliverable; M-G (CP-SAT WASM) is optional/heavy; M-H is document-only.
 
 **M-A COMPLETE** — Partial-fill is first-class. CoverageReport + gapReasons threading + "What's left & why" UI panel.
+**M-B COMPLETE** — Fix framework + one-click apply. `ProjectFix`/`FixSpec` type; executable gap fixes in `CoverageGapEntry`; "Apply fix" buttons per gap; "Auto-fix to feasible" greedy loop.
 
-**Next action**: M-B — Fix framework + one-click apply. Define `Fix` type; wire feasibility relaxations and gap reasons to ranked fixes with preview-diff-then-apply; "Auto-fix to feasible" button.
+**Next action**: M-C — Constraint tiers (0–3). Add `tier: 0|1|2|3` to `ConstraintBase`; migrate existing data (`must` → tier 0, `prefer` → tier 2); update solver to read tier; 4-way segmented UI control per rule card.
 
 ---
+
+**M-B — Fix framework + one-click apply — COMPLETE (2026-06-21).**
+- Added `src/domain/projectFixes.ts` (new, pure domain): `FixSpec` discriminated union, `ProjectFix` interface, `applyProjectFix(project, spec)` pure function, `buildFixesForGap(project, gap)` → generates `reduce_requirement` and `qualify_teacher` fixes per coverage gap.
+- `src/domain/coverage.ts`: `CoverageGapEntry` now carries `placed: number` and `fixes: ProjectFix[]`; `buildCoverageReport()` calls `buildFixesForGap()` for each gap. Serializable design — `ProjectFix` has no function fields, survives worker round-trip.
+- `src/solver/autoFix.ts` (new): `autoFixToFeasible(project, timetableId)` greedy loop — applies `relaxation.apply` from `teacher_capacity` and `cap_sum` blockers until `analyzeFeasibility` returns "ready" or no more auto-applicable blockers remain. Returns `{ project, appliedLabels }`.
+- `src/ui/app/GenerateView.tsx`: each gap in the "What's left & why" panel now shows "Apply fix" buttons for each `fix` in `gap.fixes`; clicking calls `onApplyTweak(applyProjectFix(project, fix.spec))`. Added `onAutoFix?` prop; "Auto-fix to feasible" button shown in both the gap panel and the blockers section when applicable.
+- `src/ui/app/App.tsx`: `applyAutoFix()` function — calls `autoFixToFeasible`, saves backup, applies project, reruns Make timetable. Flash message lists what was auto-fixed. `onAutoFix={applyAutoFix}` passed to GenerateView.
+- 3 new AC tests in `src/solver/autoFix.test.ts`; 2 new AC tests in `src/domain/coverage.test.ts`.
 
 **M-A — Partial-fill is first-class — COMPLETE (2026-06-21).**
 - Added `CoverageGapEntry` and `CoverageReport` types to `src/domain/coverage.ts` (pure domain types, layering clean). Also added `buildCoverageReport(project, timetable, gapReasons)` function that merges `coverageGaps()` with fill-level diagnostics.

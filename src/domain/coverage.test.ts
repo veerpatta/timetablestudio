@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { buildBundledProject } from "../fixtures/bundled";
 import { fill } from "../solver/fill";
 import { buildCoverageReport, coverageGaps, requirementCoverage, totalShortfall } from "./coverage";
+import { applyProjectFix } from "./projectFixes";
 import type { Project } from "./types";
 
 function activeTable(p: Project) {
@@ -92,6 +93,52 @@ describe("requirementCoverage", () => {
     expect(gap).toBeDefined();
     expect(gap!.reasons.length).toBeGreaterThan(0);
     expect(gap!.suggestion.length).toBeGreaterThan(0);
+    // M-B: fixes should be present and executable
+    expect(gap!.fixes.length).toBeGreaterThan(0);
+    for (const fix of gap!.fixes) {
+      expect(fix.label.length).toBeGreaterThan(0);
+      expect(fix.costEstimate).toMatch(/^(low|medium|high)$/);
+      // Applying the fix should return a valid project without throwing
+      const fixed = applyProjectFix(result.project, fix.spec);
+      expect(fixed).toBeDefined();
+    }
+  });
+
+  it("buildFixesForGap (M-B) — reduce_requirement fix brings shortfall to zero when applied", () => {
+    const base = buildBundledProject();
+    const timetableId = base.activeTimetableId!;
+    // Find any unfilled gap (same setup as M-A test: strip qualifications)
+    const req = base.requirements.find((r) => {
+      if (r.periodsPerWeek === 0) return false;
+      return base.qualifications.some(
+        (q) => q.classId === r.classId && q.subjectId === r.subjectId && base.teachers.find((t) => t.id === q.teacherId)?.schedulable,
+      );
+    })!;
+    const { classId, subjectId } = req;
+    const eventIds = new Set(
+      base.events
+        .filter((e) => e.classIds.includes(classId) && e.subjectId === subjectId && e.classIds.length === 1)
+        .map((e) => e.id),
+    );
+    const project: Project = {
+      ...base,
+      qualifications: base.qualifications.filter((q) => !(q.classId === classId && q.subjectId === subjectId)),
+      timetables: base.timetables.map((t) =>
+        t.id !== timetableId ? t : { ...t, placements: t.placements.filter((p) => !eventIds.has(p.eventId)) },
+      ),
+    };
+    const result = fill(project, timetableId);
+    const timetable = result.project.timetables.find((t) => t.id === timetableId)!;
+    const report = buildCoverageReport(result.project, timetable, result.gapReasons);
+    const gap = report.gaps.find((g) => g.classId === classId && g.subjectId === subjectId)!;
+
+    // Find the reduce_requirement fix
+    const reduceFix = gap.fixes.find((f) => f.spec.kind === "reduce_requirement");
+    expect(reduceFix).toBeDefined();
+    const fixed = applyProjectFix(result.project, reduceFix!.spec);
+    // After applying, the requirement should be reduced — shortfall should disappear
+    const fixedTt = fixed.timetables.find((t) => t.id === timetableId)!;
+    expect(totalShortfall(fixed, fixedTt)).toBe(0);
   });
 
   it("counts each Arts elective subject against its class (electives are covered)", () => {
