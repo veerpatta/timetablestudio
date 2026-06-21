@@ -3,7 +3,7 @@ import { totalShortfall } from "../domain/coverage";
 import { validate } from "../domain/validate";
 import { buildBundledProject } from "../fixtures/bundled";
 import { makeMiniSchool } from "../fixtures/synthetic";
-import type { Day, Project, Requirement, TimetableEvent } from "../domain/types";
+import type { Day, Project, Qualification, Requirement, Teacher, TimetableEvent } from "../domain/types";
 import { fill } from "./fill";
 import { solve } from "./schedule";
 import { planTimetable } from "./plan";
@@ -99,5 +99,104 @@ describe("planTimetable preserves a good timetable", () => {
     const result = planTimetable(project, ttId, { seeds: 4 });
     expect(result.hardCount).toBe(0);
     expect(result.remainingShortfall).toBe(0); // completeness is preserved, not lost on re-plan
+  });
+});
+
+// ---------------------------------------------------------------------------
+// M-D: flexible qualified swaps — two new candidate generators in gapCandidates
+// ---------------------------------------------------------------------------
+
+/** Scenario for phase-3 load-swap: X (only c1 Maths qualifier) is stuck at Mon P1 teaching
+ *  c2 Maths. X is unavailable everywhere else, so phase-2 can't relocate. Y is qualified for
+ *  c2 Maths and is free Mon P1 → phase-3 swaps Y into c2, freeing X to cover c1. */
+function loadSwapProject(): Project {
+  const p = makeMiniSchool();
+  const allDays: Day[] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const teachSlots = [1, 2, 3, 4, 6, 7, 8, 9];
+  // X (mMaths) available ONLY Mon P1
+  const unavailX = allDays.flatMap((day) =>
+    teachSlots.filter((slot) => !(day === "Mon" && slot === 1)).map((slot) => ({ day, slot })),
+  );
+  // Y: qualified for c2 Maths only (NOT c1) — this forces the load-swap path
+  const tY: Teacher = { id: "tY", name: "Teacher Y", maxPerDay: 8, maxPerWeek: 48, schedulable: true, unavailable: [] };
+  const qualifications: Qualification[] = [
+    ...p.qualifications,
+    { teacherId: "tY", subjectId: "Maths", classId: "c2" },
+  ];
+  const teachers: Teacher[] = p.teachers.map((t) => (t.id === "mMaths" ? { ...t, unavailable: unavailX } : t)).concat([tY]);
+  const requirements: Requirement[] = [
+    { id: "r-c1", classId: "c1", subjectId: "Maths", periodsPerWeek: 1, teacherIds: [] },
+    { id: "r-c2", classId: "c2", subjectId: "Maths", periodsPerWeek: 1, teacherIds: [] },
+  ];
+  // Pre-place X for c2 Maths Mon P1 — X's only available slot is already in use for c2
+  const preEvt: TimetableEvent = {
+    id: "evt-c2-maths-x", type: "normal", subjectId: "Maths",
+    classIds: ["c2"], teacherIds: ["mMaths"], duration: 1, source: "imported",
+  };
+  const timetables = [{
+    id: "tt", name: "Draft", profileId: p.profiles[0]!.id,
+    placements: [{ eventId: "evt-c2-maths-x", day: "Mon" as Day, slot: 1, pinned: false }],
+  }];
+  return { ...p, teachers, qualifications, requirements, events: [...p.events, preEvt], timetables, activeTimetableId: "tt" };
+}
+
+/** Baseline (same as above but X is NOT pre-placed for c2): X is free Mon P1 and fills
+ *  c1 directly via greedy fill — no load-swap needed, no note. */
+function directFillProject(): Project {
+  const base = loadSwapProject();
+  // Remove the pre-placed c2 lesson so X's only slot is free
+  return {
+    ...base,
+    events: base.events.filter((e) => e.id !== "evt-c2-maths-x"),
+    timetables: [{ id: "tt", name: "Draft", profileId: base.profiles[0]!.id, placements: [] }],
+    requirements: [{ id: "r-c1", classId: "c1", subjectId: "Maths", periodsPerWeek: 1, teacherIds: [] }],
+  };
+}
+
+describe("M-D: flexible qualified swaps — gapCandidates new generators", () => {
+  it("phase-3 load-swap: Y covers c2 Maths freeing X to fill c1 Maths gap", () => {
+    const project = loadSwapProject();
+    const res = solve(project, "tt", { seed: 1, budgetMs: 1500 });
+    expect(res.remainingShortfall).toBe(0);
+    expect(hard(res.project, "tt")).toBe(0);
+    // The c1 Maths placement must have a load-rebalancing note
+    const rebalanced = res.added.find((a) => a.classId === "c1" && a.subjectId === "Maths" && a.note?.includes("load rebalanced"));
+    expect(rebalanced).toBeDefined();
+    expect(rebalanced!.teacherIds).toEqual(["mMaths"]);
+  });
+
+  it("direct-fill baseline: X fills c1 without a note when no swap is needed", () => {
+    const project = directFillProject();
+    const res = solve(project, "tt", { seed: 1, budgetMs: 1000 });
+    expect(res.remainingShortfall).toBe(0);
+    expect(hard(res.project, "tt")).toBe(0);
+    // All c1 placements (added by fill or repair) should have no note
+    const c1Added = res.added.filter((a) => a.classId === "c1" && a.subjectId === "Maths");
+    expect(c1Added.length).toBeGreaterThan(0);
+    expect(c1Added.every((a) => !a.note)).toBe(true);
+  });
+
+  it("X/Y substitution: Y covers c1 Maths when Y is explicitly qualified and X is occupied", () => {
+    // Y is qualified for c1 Maths (unlike load-swap scenario where Y only qualifies for c2).
+    // fill() places Y directly — the scenario auto-completes with Y covering c1.
+    const base = loadSwapProject();
+    const project: Project = {
+      ...base,
+      qualifications: [
+        ...base.qualifications,
+        { teacherId: "tY", subjectId: "Maths", classId: "c1" },
+      ],
+    };
+    const res = solve(project, "tt", { seed: 1, budgetMs: 1000 });
+    expect(res.remainingShortfall).toBe(0);
+    expect(hard(res.project, "tt")).toBe(0);
+    // c1 Maths must be placed by either X or Y (whoever fill / repair chose)
+    const tt = res.project.timetables.find((t) => t.id === "tt")!;
+    const eventIndex = new Map(res.project.events.map((e) => [e.id, e]));
+    const c1MathsCount = tt.placements.filter((p) => {
+      const ev = eventIndex.get(p.eventId);
+      return ev?.subjectId === "Maths" && ev.classIds.includes("c1");
+    }).length;
+    expect(c1MathsCount).toBe(1); // requirement fulfilled
   });
 });

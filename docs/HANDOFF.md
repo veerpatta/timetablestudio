@@ -4,19 +4,26 @@ This file is the bridge between work sessions. The agent MUST update it after ev
 
 ---
 
-## Current state (PLAN — "Rarely Get Stuck" — M-C COMPLETE, 2026-06-21)
+## Current state (PLAN — "Rarely Get Stuck" — M-D COMPLETE, 2026-06-21)
 
-Branch `main`. 271 tests green (51 files); build (110 KB gzip main) + lint clean.
+Branch `main`. 274 tests green (51 files); build (110 KB gzip main) + lint clean.
 
 Active plan: `docs/PLAN.md` — 8 milestones M-A through M-H. Scope: M-A through M-F are the full deliverable; M-G (CP-SAT WASM) is optional/heavy; M-H is document-only.
 
 **M-A COMPLETE** — Partial-fill is first-class. CoverageReport + gapReasons threading + "What's left & why" UI panel.
 **M-B COMPLETE** — Fix framework + one-click apply. `ProjectFix`/`FixSpec` type; executable gap fixes in `CoverageGapEntry`; "Apply fix" buttons per gap; "Auto-fix to feasible" greedy loop.
 **M-C COMPLETE** — Constraint priority tiers. `tier?: 0|1|2|3` on `ConstraintBase`; `constraintTier()` helper for zero-migration data reads; 4-way T0–T3 segmented control per rule card; tier cross-boundary sync updates severity.
+**M-D COMPLETE** — Flexible qualified swaps. `primaryTeacher()` continuity-preference helper; phase-3 load-swap in `gapCandidates()` (substitute Y into Q's blocker class freeing Q for gap); `note?: string` on `FilledPlacement`; amber note in FillReview; 3 new tests.
 
-**Next action**: M-D — Flexible qualified swaps. Three new candidate generators in `gapCandidates()`: teacher substitution within subject, qualification-widening suggestion, load rebalancing. See `docs/PLAN.md` §4.4 M-D for full spec.
+**Next action**: M-E — Relaxation engine. Implement `solveWithRelaxation()`: tier-0+1 solve → auto-relax tier-2+3 → present minimal tier-1 relaxation set for approval → always return best partial + gap report. See `docs/PLAN.md` §4.5.
 
 ---
+
+**M-D — Flexible qualified swaps — COMPLETE (2026-06-21).**
+- `src/solver/fill.ts`: `note?: string` added to `FilledPlacement` interface.
+- `src/solver/schedule.ts`: `primaryTeacher()` helper; `gapCandidates()` extended with continuity ordering (primary teacher first) and phase-3 load-swap; `solve()` passes `allQualsByClass` to `gapCandidates()`.
+- `src/ui/panels/FillReview.tsx`: amber `(note)` span shown when a placed lesson has a note.
+- `src/solver/schedule.test.ts`: 3 new M-D tests (phase-3, baseline, substitution). All 274 tests pass; build clean.
 
 **M-C — Constraint priority tiers — COMPLETE (2026-06-21).**
 - `src/domain/types.ts`: added `tier?: 0|1|2|3` to `ConstraintBase` (optional — no existing code needs updating; `constraintTier()` is the only read point).

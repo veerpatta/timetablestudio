@@ -20,7 +20,7 @@ import { findProfile } from "../domain/derive";
 import { movePlacement, placeNormalLesson } from "../domain/edit";
 import { occupiedSlots, teachingSlots } from "../domain/profile";
 import { validate } from "../domain/validate";
-import type { Day, Id, Placement, Profile, Project, Timetable } from "../domain/types";
+import type { Day, Id, Placement, Profile, Project, Timetable, TimetableEvent } from "../domain/types";
 import { fill, type FillResult, type FilledPlacement } from "./fill";
 import { mulberry32 } from "./rng";
 
@@ -80,6 +80,24 @@ function buildOccupancy(project: Project, tt: Timetable, profile: Profile): Occu
   return { teacherBusy, classBusy, movableAt };
 }
 
+/** Return the teacherId who has the most already-placed lessons for (classId, subjectId). */
+function primaryTeacher(
+  tt: Timetable,
+  classId: Id,
+  subjectId: Id,
+  eventIndex: Map<Id, TimetableEvent>,
+): Id | null {
+  const counts = new Map<Id, number>();
+  for (const p of tt.placements) {
+    const ev = eventIndex.get(p.eventId);
+    if (!ev || ev.subjectId !== subjectId || !ev.classIds.includes(classId)) continue;
+    for (const tid of ev.teacherIds) counts.set(tid, (counts.get(tid) ?? 0) + 1);
+  }
+  let best: Id | null = null, bestCount = 0;
+  for (const [tid, n] of counts) if (n > bestCount) { best = tid; bestCount = n; }
+  return best;
+}
+
 /** Candidate repair moves for one gap, each with the newly-placed lesson for the diff. */
 interface RepairCandidate {
   project: Project;
@@ -93,6 +111,7 @@ function gapCandidates(
   classId: Id,
   subjectId: Id,
   quals: Qual[],
+  allQualsByClass: Map<Id, Qual[]>,
   unavail: Set<string>,
   rng: () => number,
   cap: number,
@@ -102,21 +121,38 @@ function gapCandidates(
   const teach = teachingSlots(profile);
   const holes: { day: Day; slot: number }[] = [];
   for (const day of profile.days) for (const slot of teach) if (!occ.classBusy.has(K(classId, `${day}#${slot}`))) holes.push({ day, slot });
-  const teachers = shuffle(quals.filter((q) => q.subjectId === subjectId), rng);
+
+  // Continuity preference (M-D): put the teacher who has the most already-placed periods for
+  // this (classId, subjectId) first; shuffle the rest. The solver prefers same-teacher for
+  // subject continuity and only substitutes when continuity-preserving fill is impossible.
+  const eventIndex = new Map(project.events.map((e) => [e.id, e]));
+  const primaryId = primaryTeacher(tt, classId, subjectId, eventIndex);
+  const rawTeachers = quals.filter((q) => q.subjectId === subjectId);
+  const primary = rawTeachers.filter((q) => q.teacherId === primaryId);
+  const others = shuffle(rawTeachers.filter((q) => q.teacherId !== primaryId), rng);
+  const teachers: Qual[] = [...primary, ...others];
+
   const out: RepairCandidate[] = [];
-  const ok = (teacherId: Id, day: Day, slot: number) =>
+
+  // okFor: gate check for arbitrary (classId, subjectId, teacher) placement.
+  const okFor = (teacherId: Id, cId: Id, sId: Id, day: Day, slot: number): boolean =>
     !unavail.has(K(teacherId, `${day}#${slot}`)) &&
-    !localMustForbids(project, profile, { classId, subjectId, teacherIds: [teacherId], day, slot });
+    !localMustForbids(project, profile, { classId: cId, subjectId: sId, teacherIds: [teacherId], day, slot });
+  const ok = (teacherId: Id, day: Day, slot: number): boolean => okFor(teacherId, classId, subjectId, day, slot);
 
   // 1) direct placement — a hole where a qualified teacher is already free (greedy may have
-  //    missed it under a different ordering).
+  //    missed it under a different ordering). Primary teacher tried first (continuity).
   for (const h of shuffle(holes, rng)) {
     const dk = `${h.day}#${h.slot}`;
     for (const q of teachers) {
       if (occ.teacherBusy.has(K(q.teacherId, dk)) || !ok(q.teacherId, h.day, h.slot)) continue;
+      const note =
+        primaryId !== null && q.teacherId !== primaryId
+          ? `substituted for primary teacher (continuity relaxed)`
+          : undefined;
       out.push({
         project: placeNormalLesson(project, timetableId, classId, h.day, h.slot, subjectId, [q.teacherId]),
-        placed: { classId, day: h.day, slot: h.slot, subjectId, teacherIds: [q.teacherId], label: q.label },
+        placed: { classId, day: h.day, slot: h.slot, subjectId, teacherIds: [q.teacherId], label: q.label, note },
       });
       if (out.length >= cap) return out;
     }
@@ -136,18 +172,60 @@ function gapCandidates(
           const dk2 = `${day2}#${slot2}`;
           if (occ.classBusy.has(K(movedClass, dk2)) || occ.teacherBusy.has(K(q.teacherId, dk2))) continue;
           if (unavail.has(K(q.teacherId, dk2))) continue;
-          const movedEvent = project.events.find((e) => e.id === blocker.placement.eventId)!;
+          const movedEvent = eventIndex.get(blocker.placement.eventId)!;
           if (localMustForbids(project, profile, { classId: movedClass, subjectId: movedEvent.subjectId, teacherIds: [q.teacherId], day: day2, slot: slot2 })) continue;
           const relocated = movePlacement(project, timetableId, blocker.placement, day2, slot2);
+          const note =
+            primaryId !== null && q.teacherId !== primaryId
+              ? `substituted for primary teacher (continuity relaxed)`
+              : undefined;
           out.push({
             project: placeNormalLesson(relocated, timetableId, classId, h.day, h.slot, subjectId, [q.teacherId]),
-            placed: { classId, day: h.day, slot: h.slot, subjectId, teacherIds: [q.teacherId], label: q.label },
+            placed: { classId, day: h.day, slot: h.slot, subjectId, teacherIds: [q.teacherId], label: q.label, note },
           });
           if (out.length >= cap) return out;
         }
       }
     }
   }
+
+  // 3) load-swap (M-D) — when a qualified teacher Q is busy at the gap hole with a movable
+  //    lesson for a DIFFERENT class, try substituting another teacher Y into Q's lesson (Q→Y
+  //    for that class), freeing Q to fill the gap. This handles the case where phase 2 can't
+  //    relocate Q's blocker lesson (Q is unavailable in all other slots) but a substitute Y
+  //    can step in. Reported as a load-rebalancing note.
+  for (const h of shuffle(holes, rng)) {
+    const dk = `${h.day}#${h.slot}`;
+    for (const q of teachers) {
+      const blocker = occ.movableAt.get(K(q.teacherId, dk));
+      if (!blocker) continue;
+      if (blocker.classId === classId) continue; // same class — phase 2 territory
+      if (!ok(q.teacherId, h.day, h.slot)) continue;
+      const blockerEvent = eventIndex.get(blocker.placement.eventId);
+      if (!blockerEvent) continue;
+      const blockerSubject = blockerEvent.subjectId;
+      const subs = (allQualsByClass.get(blocker.classId) ?? []).filter((r) => r.subjectId === blockerSubject);
+      for (const y of shuffle(subs, rng)) {
+        if (y.teacherId === q.teacherId) continue;
+        if (occ.teacherBusy.has(K(y.teacherId, dk))) continue;
+        if (!okFor(y.teacherId, blocker.classId, blockerSubject, h.day, h.slot)) continue;
+        const yName = project.teachers.find((t) => t.id === y.teacherId)?.name ?? y.teacherId;
+        const blockerClassName = project.classes.find((c) => c.id === blocker.classId)?.name ?? blocker.classId;
+        const blockerSubjectName = project.subjects.find((s) => s.id === blockerSubject)?.name ?? blockerSubject;
+        const swapped = placeNormalLesson(project, timetableId, blocker.classId, h.day, h.slot, blockerSubject, [y.teacherId]);
+        const filled = placeNormalLesson(swapped, timetableId, classId, h.day, h.slot, subjectId, [q.teacherId]);
+        out.push({
+          project: filled,
+          placed: {
+            classId, day: h.day, slot: h.slot, subjectId, teacherIds: [q.teacherId], label: q.label,
+            note: `load rebalanced — ${yName} covers ${blockerSubjectName} for ${blockerClassName}`,
+          },
+        });
+        if (out.length >= cap) return out;
+      }
+    }
+  }
+
   return out;
 }
 
@@ -197,7 +275,7 @@ export function solve(project: Project, timetableId: Id, opts?: SolveOptions): F
     const gaps = requirementCoverage(current, ttNow).filter((c) => c.short > 0);
     for (const gap of gaps) {
       if (Date.now() - startedAt >= budgetMs) break;
-      const cands = gapCandidates(current, timetableId, profile, gap.classId, gap.subjectId, qualsByClass.get(gap.classId) ?? [], unavail, rng, 8);
+      const cands = gapCandidates(current, timetableId, profile, gap.classId, gap.subjectId, qualsByClass.get(gap.classId) ?? [], qualsByClass, unavail, rng, 8);
       for (const cand of cands) {
         const candTt = cand.project.timetables.find((t) => t.id === timetableId)!;
         if (hardCount(cand.project, candTt) === 0 && totalShortfall(cand.project, candTt) < shortfallBefore) {

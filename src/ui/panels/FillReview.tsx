@@ -41,6 +41,7 @@ export function FillReview({ project, result, onAccept, onReject }: Props): Reac
             <li key={`${a.classId}#${a.day}#${a.slot}`} className="rounded bg-white px-2 py-1">
               <span className="font-medium">{className(a.classId)}</span>{" "}
               <span className="text-slate-500">{a.day} {slotLabel(a.slot)}</span> → {a.label}
+              {a.note && <span className="ml-2 text-xs text-amber-600">({a.note})</span>}
             </li>
           ))}
         </ul>
