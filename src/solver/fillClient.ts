@@ -7,6 +7,7 @@ import { candidateResult } from "./candidateScoring";
 import { solveTimetable } from "./deepSearch";
 import { fill, type FillResult } from "./fill";
 import { generate, generateCandidates, type GenerateResult } from "./generate";
+import { solveWithRelaxation, type RelaxationResult } from "./relaxation";
 import { targetedRegenerate, type TargetedScope } from "./targetedRegenerate";
 import type { Candidate, CandidateResult, SolverProgress, SolverRequest } from "./types";
 
@@ -193,6 +194,32 @@ export async function runTargetedRegenerate(
     }
   }
   return targetedRegenerate(project, timetableId, scope, opts);
+}
+
+/** Relaxation engine (M-E). Falls back to main thread if Worker unavailable. */
+export async function runSolveWithRelaxation(
+  project: Project,
+  timetableId: Id,
+  opts?: { seeds?: number; budgetMs?: number },
+): Promise<RelaxationResult> {
+  if (typeof Worker !== "undefined") {
+    try {
+      return await new Promise<RelaxationResult>((resolve, reject) => {
+        const worker = new Worker(new URL("./fillWorker.ts", import.meta.url), { type: "module" });
+        type OutMsg = { type: "done_relaxation"; result: RelaxationResult } | { type: "error"; message: string };
+        worker.onmessage = (e: MessageEvent<OutMsg>) => {
+          worker.terminate();
+          if (e.data.type === "done_relaxation") resolve(e.data.result);
+          else reject(new Error(e.data.message));
+        };
+        worker.onerror = (e) => { worker.terminate(); reject(e); };
+        worker.postMessage({ type: "solveWithRelaxation", project, timetableId, opts });
+      });
+    } catch {
+      // Worker unavailable — fall back to main thread.
+    }
+  }
+  return solveWithRelaxation(project, timetableId, opts);
 }
 
 /** Multi-preset candidate generation (M27). Falls back to main thread if Worker unavailable. */

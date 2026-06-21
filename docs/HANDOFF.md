@@ -4,9 +4,9 @@ This file is the bridge between work sessions. The agent MUST update it after ev
 
 ---
 
-## Current state (PLAN — "Rarely Get Stuck" — M-D COMPLETE, 2026-06-21)
+## Current state (PLAN — "Rarely Get Stuck" — M-E COMPLETE, 2026-06-21)
 
-Branch `main`. 274 tests green (51 files); build (110 KB gzip main) + lint clean.
+Branch `main`. 280 tests green (52 files); build (112 KB gzip main) + lint clean.
 
 Active plan: `docs/PLAN.md` — 8 milestones M-A through M-H. Scope: M-A through M-F are the full deliverable; M-G (CP-SAT WASM) is optional/heavy; M-H is document-only.
 
@@ -14,10 +14,18 @@ Active plan: `docs/PLAN.md` — 8 milestones M-A through M-H. Scope: M-A through
 **M-B COMPLETE** — Fix framework + one-click apply. `ProjectFix`/`FixSpec` type; executable gap fixes in `CoverageGapEntry`; "Apply fix" buttons per gap; "Auto-fix to feasible" greedy loop.
 **M-C COMPLETE** — Constraint priority tiers. `tier?: 0|1|2|3` on `ConstraintBase`; `constraintTier()` helper for zero-migration data reads; 4-way T0–T3 segmented control per rule card; tier cross-boundary sync updates severity.
 **M-D COMPLETE** — Flexible qualified swaps. `primaryTeacher()` continuity-preference helper; phase-3 load-swap in `gapCandidates()` (substitute Y into Q's blocker class freeing Q for gap); `note?: string` on `FilledPlacement`; amber note in FillReview; 3 new tests.
+**M-E COMPLETE** — Relaxation engine. `solveWithRelaxation()` four-step algorithm; graft-back guardrail; "Relaxed to fit" amber UI section; "Accept (apply relaxed)" button; 6 new tests.
 
-**Next action**: M-E — Relaxation engine. Implement `solveWithRelaxation()`: tier-0+1 solve → auto-relax tier-2+3 → present minimal tier-1 relaxation set for approval → always return best partial + gap report. See `docs/PLAN.md` §4.5.
+**Next action**: M-F — In-browser search upgrades. Conflict-directed restarts; min-conflicts local search second repair stage; tighter budget bounds; raise `PROVE_UNIT_LIMIT` beyond 18. See `docs/PLAN.md` §4.6.
 
 ---
+
+**M-E — Relaxation engine — COMPLETE (2026-06-21).**
+- `src/solver/relaxation.ts` (new): `RelaxationItem`, `RelaxationResult` types; `solveWithRelaxation(project, timetableId, opts)` four-step algorithm: (1) generate as-is; (2) demote tier-1 to prefer, re-generate, detect bent rules via validate() on grafted project; (3) list tier-1 suggestions for incomplete case; (4) always return. Graft-back guardrail: `{ ...step2.project, constraints: project.constraints }` — demoted severities never leak.
+- `src/solver/fillWorker.ts` + `fillClient.ts`: `SolveWithRelaxationMessage` type + handler; `runSolveWithRelaxation()` client function (Worker + main-thread fallback).
+- `src/ui/app/App.tsx`: `relaxationResult` + `relaxationRunning` state; runs `runSolveWithRelaxation` after `runGenerateCandidates` when all candidates are incomplete; `applyRelaxed()` handler.
+- `src/ui/app/GenerateView.tsx`: "Relaxed to fit" amber section (shows bent rules + "Accept" button when step=2); "Firm rules blocking" rose section (when step=partial + tier1Suggestions); new props `relaxationResult`, `relaxationRunning`, `onApplyRelaxed`.
+- `src/solver/relaxation.test.ts` (new): 6 tests — AC, no-relaxation-needed, leak check, determinism, hard-violation-on-grafted, no-tier1-constraints.
 
 **M-D — Flexible qualified swaps — COMPLETE (2026-06-21).**
 - `src/solver/fill.ts`: `note?: string` added to `FilledPlacement` interface.

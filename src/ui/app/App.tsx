@@ -8,7 +8,8 @@ import { useMemo, useState } from "react";
 import type { Constraint, Project } from "../../domain/types";
 import { autoFixToFeasible } from "../../solver/autoFix";
 import { analyzeFeasibility } from "../../solver/feasibility";
-import { runGenerateCandidates, runTargetedRegenerate } from "../../solver/fillClient";
+import { runGenerateCandidates, runSolveWithRelaxation, runTargetedRegenerate } from "../../solver/fillClient";
+import type { RelaxationResult } from "../../solver/relaxation";
 import type { Candidate, FeasibilityReport } from "../../solver/types";
 import type { TargetedScope } from "../../solver/targetedRegenerate";
 import { useProjectStore } from "../../store/projectStore";
@@ -34,6 +35,8 @@ export function App(): React.ReactElement {
   const [feasibility, setFeasibility] = useState<FeasibilityReport | null>(null);
   const [planning, setPlanning] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
+  const [relaxationResult, setRelaxationResult] = useState<RelaxationResult | null>(null);
+  const [relaxationRunning, setRelaxationRunning] = useState(false);
 
   const health = useMemo(() => projectHealth(project, timetable), [project, timetable]);
 
@@ -52,6 +55,7 @@ export function App(): React.ReactElement {
     setPlanning(true);
     setCandidates([]);
     setFeasibility(null);
+    setRelaxationResult(null);
     setFlash(null);
     setSection("generate");
     try {
@@ -61,6 +65,19 @@ export function App(): React.ReactElement {
       if (feas.status !== "blocked") {
         const cands = await runGenerateCandidates(proj, timetableId, { seeds: 4, budgetMs: 6000 });
         setCandidates(cands);
+        // M-E: if all candidates are incomplete, run the relaxation engine to try bending tier-1 rules
+        const allIncomplete = cands.length > 0 && cands.every((c) => c.remainingShortfall > 0 || c.hardCount > 0);
+        if (allIncomplete) {
+          setRelaxationRunning(true);
+          try {
+            const relax = await runSolveWithRelaxation(proj, timetableId, { seeds: 4, budgetMs: 4000 });
+            if (relax.step !== 1) setRelaxationResult(relax);
+          } catch {
+            // Relaxation failure is non-fatal — main candidates are still shown
+          } finally {
+            setRelaxationRunning(false);
+          }
+        }
       }
     } catch {
       setFlash("The planner could not finish. Check your setup and try again.");
@@ -76,7 +93,18 @@ export function App(): React.ReactElement {
     store.applyFix(candidate.project);
     setCandidates([]);
     setFeasibility(null);
+    setRelaxationResult(null);
     setFlash(`Plan applied — ${n} ${n === 1 ? "cell" : "cells"} updated. A restore point was saved (Tools).`);
+    setSection("timetable");
+  };
+
+  const applyRelaxed = (p: Project) => {
+    store.createBackup(`Before applying relaxed plan · ${new Date().toLocaleString()}`);
+    store.applyFix(p);
+    setCandidates([]);
+    setFeasibility(null);
+    setRelaxationResult(null);
+    setFlash("Relaxed plan applied — check Issues for the bent rule. A restore point was saved (Tools).");
     setSection("timetable");
   };
 
@@ -157,10 +185,13 @@ export function App(): React.ReactElement {
               candidates={candidates}
               feasibility={feasibility}
               planning={planning}
+              relaxationResult={relaxationResult}
+              relaxationRunning={relaxationRunning}
               onGenerate={() => void makeBestTimetable()}
               onApply={applyCandidate}
-              onReject={() => { setCandidates([]); setFeasibility(null); setFlash("Discarded the proposed plan."); }}
+              onReject={() => { setCandidates([]); setFeasibility(null); setRelaxationResult(null); setFlash("Discarded the proposed plan."); }}
               onApplyTweak={applyTweak}
+              onApplyRelaxed={applyRelaxed}
               onAutoFix={applyAutoFix}
               onJumpToTimetable={() => go("timetable")}
               onTargetedRegenerate={doTargetedRegenerate}

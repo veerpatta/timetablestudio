@@ -1,11 +1,13 @@
 // Web Worker entry for the timetable solver. Legacy fill/generate calls stay supported;
 // the deep planner uses structured progress/done/error messages.
 // M27: generateCandidates message type added for multi-preset candidate generation.
+// M-E: solveWithRelaxation message type added for the relaxation engine.
 
 import type { Id, Project } from "../domain/types";
 import { solveTimetable } from "./deepSearch";
 import { fill } from "./fill";
 import { generate, generateCandidates } from "./generate";
+import { solveWithRelaxation, type RelaxationResult } from "./relaxation";
 import { targetedRegenerate, type TargetedScope } from "./targetedRegenerate";
 import type { Candidate, CandidateResult, SolverProgress, SolverRequest } from "./types";
 
@@ -39,15 +41,23 @@ interface TargetedRegenerateMessage {
   opts?: { budgetMs?: number };
 }
 
+interface SolveWithRelaxationMessage {
+  type: "solveWithRelaxation";
+  project: Project;
+  timetableId: Id;
+  opts?: { seeds?: number; budgetMs?: number };
+}
+
 type WorkerOutbound =
   | { type: "done"; result: unknown }
   | { type: "done_candidates"; candidates: Candidate[] }
   | { type: "done_targeted"; result: CandidateResult }
+  | { type: "done_relaxation"; result: RelaxationResult }
   | { type: "progress"; progress: SolverProgress }
   | { type: "candidate"; result: unknown }
   | { type: "error"; message: string };
 
-type WorkerRequest = LegacyRequest | SolveRequestMessage | GenerateCandidatesMessage | TargetedRegenerateMessage;
+type WorkerRequest = LegacyRequest | SolveRequestMessage | GenerateCandidatesMessage | TargetedRegenerateMessage | SolveWithRelaxationMessage;
 
 function post(message: WorkerOutbound | unknown): void {
   (self as unknown as { postMessage: (m: unknown) => void }).postMessage(message);
@@ -74,6 +84,16 @@ self.onmessage = (e: MessageEvent<WorkerRequest>): void => {
       post({ type: "done_targeted", result });
     } catch (err) {
       post({ type: "error", message: err instanceof Error ? err.message : "targetedRegenerate failed." });
+    }
+    return;
+  }
+
+  if ("type" in e.data && e.data.type === "solveWithRelaxation") {
+    try {
+      const result = solveWithRelaxation(e.data.project, e.data.timetableId, e.data.opts);
+      post({ type: "done_relaxation", result });
+    } catch (err) {
+      post({ type: "error", message: err instanceof Error ? err.message : "solveWithRelaxation failed." });
     }
     return;
   }

@@ -7,6 +7,7 @@ import { coverageGaps } from "../../domain/coverage";
 import { applyProjectFix } from "../../domain/projectFixes";
 import { findProfile } from "../../domain/derive";
 import type { Project, Timetable } from "../../domain/types";
+import type { RelaxationResult } from "../../solver/relaxation";
 import type { Candidate, CandidateResult, FeasibilityReport, Verdict } from "../../solver/types";
 import type { ScopeType, TargetedScope } from "../../solver/targetedRegenerate";
 import { projectHealth } from "./status";
@@ -86,10 +87,13 @@ export function GenerateView({
   candidates,
   feasibility,
   planning,
+  relaxationResult,
+  relaxationRunning,
   onGenerate,
   onApply,
   onReject,
   onApplyTweak,
+  onApplyRelaxed,
   onAutoFix,
   onJumpToTimetable,
   onTargetedRegenerate,
@@ -99,10 +103,13 @@ export function GenerateView({
   candidates: Candidate[];
   feasibility: FeasibilityReport | null;
   planning: boolean;
+  relaxationResult?: RelaxationResult | null;
+  relaxationRunning?: boolean;
   onGenerate: () => void;
   onApply: (c: Candidate) => void;
   onReject: () => void;
   onApplyTweak: (p: Project) => void;
+  onApplyRelaxed?: (p: Project) => void;
   onAutoFix?: () => void;
   onJumpToTimetable: () => void;
   onTargetedRegenerate: (scope: TargetedScope) => Promise<CandidateResult>;
@@ -349,6 +356,65 @@ export function GenerateView({
                 …and {active.coverageReport.gaps.length - 8} more gaps
               </li>
             )}
+          </ul>
+        </section>
+      )}
+
+      {/* ── Relaxed to fit (M-E) ───────────────────────────────────────────── */}
+      {relaxationRunning && (
+        <section className="ts-card border-amber-200 bg-amber-50 p-4">
+          <p className="text-sm text-amber-700">Trying harder — checking if bending a firm rule would complete the timetable…</p>
+        </section>
+      )}
+
+      {!relaxationRunning && relaxationResult && relaxationResult.step === 2 && (
+        <section className="ts-card border-amber-200 bg-amber-50 p-5" role="region" aria-label="Relaxed to fit">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold text-amber-900">Relaxed to fit</h3>
+            {onApplyRelaxed && (
+              <div className="flex gap-2">
+                <button
+                  onClick={() => onApplyRelaxed(relaxationResult.project)}
+                  className="rounded bg-amber-600 px-3 py-1 text-sm font-medium text-white hover:bg-amber-700"
+                >
+                  Accept (apply relaxed)
+                </button>
+              </div>
+            )}
+          </div>
+          <p className="mb-2 text-xs text-slate-600">
+            The planner completed the timetable by treating {relaxationResult.relaxed.length === 1 ? "this firm rule" : "these firm rules"} as a preference instead of a requirement:
+          </p>
+          <ul className="space-y-1">
+            {relaxationResult.relaxed.map((r) => (
+              <li key={r.constraintId} className="flex items-start gap-2 rounded border border-amber-200 bg-white p-2 text-xs text-slate-700">
+                <span className="mt-0.5 shrink-0 rounded bg-amber-100 px-1 py-0.5 text-amber-700 font-mono">T{r.tier}</span>
+                <span className="flex-1">{r.sentence}</span>
+                {r.violationCount > 0 && (
+                  <span className="shrink-0 text-amber-600">·&nbsp;{r.violationCount}&nbsp;{r.violationCount === 1 ? "violation" : "violations"}</span>
+                )}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-xs text-amber-700">
+            If this trade-off is acceptable, accept above. To tighten the rule, adjust it in Setup → Rules.
+          </p>
+        </section>
+      )}
+
+      {!relaxationRunning && relaxationResult && relaxationResult.step === "partial" && relaxationResult.tier1Suggestions.length > 0 && (
+        <section className="ts-card border-rose-200 bg-rose-50 p-5" role="region" aria-label="Firm rules blocking completion">
+          <h3 className="mb-2 text-sm font-semibold text-rose-900">Firm rules may be blocking completion</h3>
+          <p className="mb-2 text-xs text-slate-600">
+            The planner could not complete the timetable even after treating these firm rules as preferences. Consider relaxing them in Setup → Rules:
+          </p>
+          <ul className="space-y-1">
+            {relaxationResult.tier1Suggestions.map((r) => (
+              <li key={r.constraintId} className="flex items-start gap-2 rounded border border-rose-100 bg-white p-2 text-xs text-slate-700">
+                <span className="mt-0.5 shrink-0 rounded bg-rose-100 px-1 py-0.5 text-rose-700 font-mono">T{r.tier}</span>
+                <span className="flex-1">{r.sentence}</span>
+              </li>
+            ))}
           </ul>
         </section>
       )}
